@@ -1,83 +1,117 @@
+/* ----------------------------- */
+/*  1. Tailwind Base & Layers    */
+/* ----------------------------- */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* 
+   Adjust the root-level RGB variables for quick usage if needed.
+   (Though the HSL-based variables below are the main drivers now.)
+*/
 :root {
     --foreground-rgb: 0, 0, 0;
-    --background-start-rgb: 214, 219, 220;
+    --background-start-rgb: 235, 246, 255; /* a pale pastel */
     --background-end-rgb: 255, 255, 255;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
         --foreground-rgb: 255, 255, 255;
-        --background-start-rgb: 0, 0, 0;
+        --background-start-rgb: 10, 10, 20;
         --background-end-rgb: 0, 0, 0;
     }
 }
 
+/* ----------------------------- */
+/*  2. Custom Utility Classes    */
+/* ----------------------------- */
 @layer utilities {
+    /* Keep your existing text-balance or other utilities */
     .text-balance {
         text-wrap: balance;
     }
+
+    /* Example: a subtle glow utility for buttons, cards, etc. */
+    .glow {
+        box-shadow: 0 0 12px rgba(139, 92, 246, 0.6); /* a soft purple glow */
+    }
 }
 
+/* ----------------------------- */
+/*  3. Base Variables & Themes   */
+/* ----------------------------- */
 @layer base {
     :root {
-        --background: 0 0% 100%;
-        --foreground: 240 10% 3.9%;
-        --card: 0 0% 100%;
-        --card-foreground: 240 10% 3.9%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 240 10% 3.9%;
-        --primary: 240 5.9% 10%;
-        --primary-foreground: 0 0% 98%;
-        --secondary: 240 4.8% 95.9%;
-        --secondary-foreground: 240 5.9% 10%;
-        --muted: 240 4.8% 95.9%;
-        --muted-foreground: 240 3.8% 46.1%;
-        --accent: 240 4.8% 95.9%;
-        --accent-foreground: 240 5.9% 10%;
-        --destructive: 0 84.2% 60.2%;
-        --destructive-foreground: 0 0% 98%;
-        --border: 240 5.9% 90%;
-        --input: 240 5.9% 90%;
-        --ring: 240 10% 3.9%;
-        --chart-1: 12 76% 61%;
-        --chart-2: 173 58% 39%;
-        --chart-3: 197 37% 24%;
-        --chart-4: 43 74% 66%;
-        --chart-5: 27 87% 67%;
-        --radius: 0.5rem;
-        --sidebar-background: 0 0% 98%;
+        /*
+      LIGHT THEME
+      Using HSL for an ethereal pastel vibe:
+      - background: a pale lavender/blue
+      - foreground: a deep neutral for contrast
+      - accent: bright neon/purple
+      - destructive: a bright pinkish red
+    */
+        --background: 230 100% 98%; /* hsl(230, 100%, 98%) - near-white with a bluish tint */
+        --foreground: 240 6% 10%; /* hsl(240, 6%, 10%) - dark neutral text */
+        --card: 230 100% 100%; /* near white with a slight bluish tone */
+        --card-foreground: 240 6% 10%;
+        --popover: 230 100% 100%;
+        --popover-foreground: 240 6% 10%;
+        --primary: 268 83% 60%; /* a bright neon purple, hsl(268, 83%, 60%) */
+        --primary-foreground: 0 0% 100%; /* white text on bright purple */
+        --secondary: 230 25% 94%; /* a light lavender for secondary elements */
+        --secondary-foreground: 240 6% 10%;
+        --muted: 228 16% 90%;
+        --muted-foreground: 228 8% 30%;
+        --accent: 268 83% 60%; /* same as primary or pick a second neon color */
+        --accent-foreground: 0 0% 100%;
+        --destructive: 355 80% 60%; /* bright pinkish red */
+        --destructive-foreground: 0 0% 100%;
+        --border: 230 20% 85%;
+        --input: 230 20% 85%;
+        --ring: 268 83% 60%; /* ring color around focus states, etc. */
+        --chart-1: 190 70% 55%;
+        --chart-2: 160 60% 45%;
+        --chart-3: 30 80% 55%;
+        --chart-4: 280 65% 60%;
+        --chart-5: 340 75% 55%;
+        --radius: 0.75rem; /* slightly larger radius for a “softer” look */
+        --sidebar-background: 230 20% 98%;
         --sidebar-foreground: 240 5.3% 26.1%;
-        --sidebar-primary: 240 5.9% 10%;
-        --sidebar-primary-foreground: 0 0% 98%;
-        --sidebar-accent: 240 4.8% 95.9%;
+        --sidebar-primary: 268 83% 60%;
+        --sidebar-primary-foreground: 0 0% 100%;
+        --sidebar-accent: 230 25% 94%;
         --sidebar-accent-foreground: 240 5.9% 10%;
         --sidebar-border: 220 13% 91%;
-        --sidebar-ring: 217.2 91.2% 59.8%;
+        --sidebar-ring: 268 83% 60%;
     }
+
     .dark {
-        --background: 240 10% 3.9%;
-        --foreground: 0 0% 98%;
-        --card: 240 10% 3.9%;
+        /*
+      DARK THEME
+      - deeper black/purple backgrounds
+      - bright neon accent
+      - near-white text
+    */
+        --background: 240 8% 9%; /* a dark purplish/blue hue */
+        --foreground: 0 0% 98%; /* near-white text */
+        --card: 240 8% 11%;
         --card-foreground: 0 0% 98%;
-        --popover: 240 10% 3.9%;
+        --popover: 240 8% 11%;
         --popover-foreground: 0 0% 98%;
-        --primary: 0 0% 98%;
-        --primary-foreground: 240 5.9% 10%;
-        --secondary: 240 3.7% 15.9%;
+        --primary: 268 83% 66%; /* a slightly brighter neon purple for dark mode */
+        --primary-foreground: 0 0% 98%;
+        --secondary: 240 5% 18%;
         --secondary-foreground: 0 0% 98%;
-        --muted: 240 3.7% 15.9%;
-        --muted-foreground: 240 5% 64.9%;
-        --accent: 240 3.7% 15.9%;
+        --muted: 240 5% 14%;
+        --muted-foreground: 240 3% 64%;
+        --accent: 268 83% 66%;
         --accent-foreground: 0 0% 98%;
-        --destructive: 0 62.8% 30.6%;
+        --destructive: 355 70% 50%;
         --destructive-foreground: 0 0% 98%;
-        --border: 240 3.7% 15.9%;
-        --input: 240 3.7% 15.9%;
-        --ring: 240 4.9% 83.9%;
+        --border: 240 5% 14%;
+        --input: 240 5% 14%;
+        --ring: 268 83% 66%;
         --chart-1: 220 70% 50%;
         --chart-2: 160 60% 45%;
         --chart-3: 30 80% 55%;
@@ -85,15 +119,19 @@
         --chart-5: 340 75% 55%;
         --sidebar-background: 240 5.9% 10%;
         --sidebar-foreground: 240 4.8% 95.9%;
-        --sidebar-primary: 224.3 76.3% 48%;
+        --sidebar-primary: 268 83% 66%;
         --sidebar-primary-foreground: 0 0% 100%;
-        --sidebar-accent: 240 3.7% 15.9%;
+        --sidebar-accent: 240 5% 14%;
         --sidebar-accent-foreground: 240 4.8% 95.9%;
-        --sidebar-border: 240 3.7% 15.9%;
-        --sidebar-ring: 217.2 91.2% 59.8%;
+        --sidebar-border: 240 5% 14%;
+        --sidebar-ring: 268 83% 66%;
     }
 }
 
+/* 
+   Additional base styles for elements. 
+   We apply the color variables with Tailwind classes or @apply.
+*/
 @layer base {
     * {
         @apply border-border;
@@ -101,8 +139,12 @@
 
     body {
         @apply bg-background text-foreground;
+        background-image: radial-gradient( at 20% 20%, hsla(var(--primary), 0.05), transparent 30% );
+        /* Subtle radial gradient for an ethereal effect. */
+        font-family: "geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
+    /* Include your custom fonts as before, or update to a futuristic font */
     @font-face {
         font-family: "geist";
         font-style: normal;
@@ -118,25 +160,34 @@
     }
 }
 
+/* ----------------------------- */
+/*  4. Skeleton Loading Styles   */
+/* ----------------------------- */
 .skeleton {
-    * {
-        pointer-events: none !important;
-    }
+    *
 
-    *[class^="text-"] {
-        color: transparent;
-        @apply rounded-md bg-foreground/20 select-none animate-pulse;
-    }
-
-    .skeleton-bg {
-        @apply bg-foreground/10;
-    }
-
-    .skeleton-div {
-        @apply bg-foreground/20 animate-pulse;
-    }
+{
+    pointer-events: none !important;
 }
 
+*[class^="text-"] {
+    color: transparent;
+    @apply rounded-md bg-foreground/20 select-none animate-pulse;
+}
+
+.skeleton-bg {
+    @apply bg-foreground/10;
+}
+
+.skeleton-div {
+    @apply bg-foreground/20 animate-pulse;
+}
+
+}
+
+/* ----------------------------- */
+/*  5. Code/Editor + Highlight   */
+/* ----------------------------- */
 .ProseMirror {
     outline: none;
 }
