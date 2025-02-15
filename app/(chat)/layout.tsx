@@ -22,7 +22,7 @@ export default async function Layout({
       />
       <SidebarProvider defaultOpen={!isCollapsed}>
         {/* This wrapper applies your brand background, text color, and font. */}
-        <div className="bg-brandBg text-brandNeutral font-body min-h-screen">
+        <div className="bg-brandBg text-brandNeutral font-body">
           <AppSidebar user={session?.user} />
           <SidebarInset>{children}</SidebarInset>
         </div>
