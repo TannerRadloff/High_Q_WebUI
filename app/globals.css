@@ -32,35 +32,35 @@
     /* Light theme variables */
     :root {
         /* near-white background with a bluish tint */
-        --background: 230 100% 98%; /* hsl(230, 100%, 98%) */
+        --background: 42 100% 98%; /* hsl(230, 100%, 98%) */
         /* deep neutral text with a cool undertone */
-        --foreground: 240 6% 10%; /* hsl(240, 6%, 10%) */
+        --foreground: 42 6% 10%; /* hsl(240, 6%, 10%) */
         /* pure white background with a slight cool tint */
         --card: 230 100% 100%; /* hsl(230, 100%, 100%) */
-        --card-foreground: 240 6% 10%;
+        --card-foreground: 42 6% 10%;
         --popover: var(--card);
         --popover-foreground: var(--card-foreground);
         /* Gold */
-        --primary: 50 60% 50%; /* hsl(268, 83%, 60%) */
+        --primary: 42 100% 42%; /* hsl(268, 83%, 60%) */
         /* white text for high contrast */
         --primary-foreground: 0 0% 100%; /* hsl(0, 0%, 100%) */
         /* light pastel lavender */
-        --secondary: 50 50% 50%; /* hsl(230, 25%, 94%) */
-        --secondary-foreground: 54 0% 39%;
+        --secondary: 42 100% 42%; /* hsl(230, 25%, 94%) */
+        --secondary-foreground: 42 0% 39%;
         /* pale grayish-blue for muted elements */
-        --muted: 56 16% 90%; /* hsl(228, 16%, 90%) */
-        --muted-foreground: 228 8% 30%;
+        --muted: 42 100% 90%; /* hsl(228, 16%, 90%) */
+        --muted-foreground: 42 8% 30%;
         /* accent uses the same neon purple as primary */
-        --accent: 50 75% 50%;
+        --accent: 42 75% 42%;
         --accent-foreground: 0 0% 100%;
         /* bright pinkish red for destructive actions */
         --destructive: 355 80% 60%; /* hsl(355, 80%, 60%) */
         --destructive-foreground: 0 0% 100%;
         /* subtle light gray-blue border/input */
         --border: 230 20% 0%; /* hsl(230, 20%, 85%) */
-        --input: 50 20% 85%;
+        --input: 42 20% 85%;
         /* neon purple ring color for focus outlines */
-        --ring: 50 95% 50%;
+        --ring: 42 95% 42%;
         /* chart color #1: medium teal */
         --chart-1: 190 70% 55%; /* hsl(190, 70%, 55%) */
         /* chart color #2: medium green */
@@ -77,7 +77,7 @@
         --sidebar-background: 230 20% 98%; /* hsl(230, 20%, 98%) */
         --sidebar-foreground: 240 5.3% 26.1%;
         /* neon purple for sidebar primary */
-        --sidebar-primary: 50 50% 50%;
+        --sidebar-primary: 42 42% 42%;
         --sidebar-primary-foreground: 0 0% 100%;
         /* pastel lavender for sidebar accent */
         --sidebar-accent: 230 25% 94%;
@@ -85,42 +85,42 @@
         /* subtle cool gray border for sidebar */
         --sidebar-border: 220 13% 91%;
         /* neon purple ring */
-        --sidebar-ring: 50 75% 50%;
+        --sidebar-ring: 42 75% 42%;
     }
 
     /* Dark theme overrides */
     .dark {
         /* very dark bluish-purple background */
-        --background: 50 8% 0%; /* hsl(240, 8%, 9%) */
+        --background: 42 100% 0%; /* hsl(240, 8%, 9%) */
         /* near-white text color */
-        --foreground: 50 75% 50%; /* hsl(0, 0%, 98%) */
+        --foreground: 42 75% 100%; /* hsl(0, 0%, 98%) */
         /* slightly lighter than background for cards/popovers */
-        --card: 50 0% 13%; /* hsl(240, 8%, 11%) */
+        --card: 42 0% 13%; /* hsl(240, 8%, 11%) */
         --card-foreground: 0 0% 100%;
         --popover: var(--card);
         --popover-foreground: var(--card-foreground);
         /* slightly brighter neon purple */
-        --primary: 50 75% 50%; /* hsl(268, 83%, 66%) */
+        --primary: 42 100% 42%; /* hsl(268, 83%, 66%) */
         --primary-foreground: 0 0% 0%;
         /* dark grayish-blue for secondary elements */
-        --secondary: 50 5% 0%; /* hsl(240, 5%, 18%) */
-        --secondary-foreground: 0 0% 100%;
+        --secondary: 42 100% 50%; /* hsl(240, 5%, 18%) */
+        --secondary-foreground: 0 0% 0%;
         /* deeper background accent for muted elements */
-        --muted: 50 5% 14%; /* hsl(240, 5%, 14%) */
-        --muted-foreground: 50 3% 64%;
+        --muted: 42 5% 14%; /* hsl(240, 5%, 14%) */
+        --muted-foreground: 42 3% 64%;
         /* bright neon purple accent matching primary */
-        --accent: 50 60% 50%;
-        --accent-foreground: 0 0% 98%;
+        --accent: 42 100% 50%;
+        --accent-foreground: 0 0% 100%;
         /* pinkish red for destructive actions */
-        --destructive: 355 70% 50%; /* hsl(355, 70%, 50%) */
+        --destructive: 355 70% 42%; /* hsl(355, 70%, 42%) */
         --destructive-foreground: 0 0% 98%;
         /* dark background for borders and inputs */
-        --border: 50 60% 50%; /* hsl(240, 5%, 14%) */
+        --border: 42 60% 42%; /* hsl(240, 5%, 14%) */
         --input: 240 5% 0%;
         /* neon purple ring for focus */
-        --ring: 50 100% 50%;
+        --ring: 42 100% 42%;
         /* chart color #1: bright saturated blue */
-        --chart-1: 220 70% 50%; /* hsl(220, 70%, 50%) */
+        --chart-1: 220 70% 42%; /* hsl(220, 70%, 42%) */
         /* chart color #2: medium green */
         --chart-2: 160 60% 45%; /* hsl(160, 60%, 45%) */
         /* chart color #3: bright orange */
@@ -131,15 +131,15 @@
         --chart-5: 340 75% 55%; /* hsl(340, 75%, 55%) */
         /* very dark bluish-purple background for sidebar */
         --sidebar-background: 240 0% 10%; /* hsl(240, 5.9%, 10%) */
-        --sidebar-foreground: 50 75% 50%;
+        --sidebar-foreground: 42 75% 42%;
         /* neon purple for sidebar primary */
-        --sidebar-primary: 50 75% 50%;
+        --sidebar-primary: 42 75% 42%;
         --sidebar-primary-foreground: 0 0% 0%;
         /* deeper shade for sidebar accent elements */
-        --sidebar-accent: 50 75% 50%;
+        --sidebar-accent: 42 75% 42%;
         --sidebar-accent-foreground: 240 4.8% 0%;
-        --sidebar-border: 50 50% 50%;
-        --sidebar-ring: 50 60% 50%;
+        --sidebar-border: 42 42% 42%;
+        --sidebar-ring: 42 60% 42%;
     }
 
     /* Global style applications */
@@ -229,5 +229,5 @@
 }
 
 .suggestion-highlight {
-    @apply bg-blue-200 hover:bg-blue-300 dark:hover:bg-blue-400/50 dark:text-blue-50 dark:bg-blue-500/40;
+    @apply bg-blue-200 hover:bg-blue-300 dark:hover:bg-blue-400/42 dark:text-blue-42 dark:bg-blue-420/40;
 }
