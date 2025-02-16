@@ -1,10 +1,9 @@
-/* Minimal approach: unify repeated variables, remove unused, rely on defaults. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Quick root-level RGB if needed somewhere in your project. */
 :root {
+    /* Minimal root-level RGB variables */
     --foreground-rgb: 0, 0, 0;
     --background-start-rgb: 235, 246, 255;
     --background-end-rgb: 255, 255, 255;
@@ -12,6 +11,7 @@
 
 @media (prefers-color-scheme: dark) {
     :root {
+        /* Dark-mode RGB overrides */
         --foreground-rgb: 255, 255, 255;
         --background-start-rgb: 10, 10, 20;
         --background-end-rgb: 0, 0, 0;
@@ -19,59 +19,97 @@
 }
 
 @layer utilities {
-    /* Custom utility classes if needed. */
     .text-balance {
         text-wrap: balance;
     }
-
+    /* Subtle glow utility */
     .glow {
         box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
     }
 }
 
 @layer base {
-    /*
-    We unify card & popover as "--surface",
-    and remove accent since it was identical to primary.
-    Also removing rarely used or identical variables for brevity.
-  */
+    /* Light theme variables */
     :root {
-        --background: 230 100% 98%; /* near-white bluish */
-        --foreground: 240 6% 10%; /* dark neutral text */
-        --surface: 230 100% 100%; /* card/popover unify */
-        --surface-foreground: 240 6% 10%;
+        --background: 230 100% 98%;
+        --foreground: 240 6% 10%;
+        --card: 230 100% 100%;
+        --card-foreground: 240 6% 10%;
+        --popover: var(--card);
+        --popover-foreground: var(--card-foreground);
         --primary: 268 83% 60%;
         --primary-foreground: 0 0% 100%;
-        /* Keep destructive if used for error states. */
+        --secondary: 230 25% 94%;
+        --secondary-foreground: 240 6% 10%;
+        --muted: 228 16% 90%;
+        --muted-foreground: 228 8% 30%;
+        --accent: 268 83% 60%;
+        --accent-foreground: 0 0% 100%;
         --destructive: 355 80% 60%;
         --destructive-foreground: 0 0% 100%;
-        /* Simple border/input/ring. */
         --border: 230 20% 85%;
         --input: 230 20% 85%;
         --ring: 268 83% 60%;
-        /* If you need corner rounding. */
+        --chart-1: 190 70% 55%;
+        --chart-2: 160 60% 45%;
+        --chart-3: 30 80% 55%;
+        --chart-4: 280 65% 60%;
+        --chart-5: 340 75% 55%;
         --radius: 0.75rem;
+        --sidebar-background: 230 20% 98%;
+        --sidebar-foreground: 240 5.3% 26.1%;
+        --sidebar-primary: 268 83% 60%;
+        --sidebar-primary-foreground: 0 0% 100%;
+        --sidebar-accent: 230 25% 94%;
+        --sidebar-accent-foreground: 240 5.9% 10%;
+        --sidebar-border: 220 13% 91%;
+        --sidebar-ring: 268 83% 60%;
     }
 
-    /* Dark theme: only define what changes. */
+    /* Dark theme overrides */
     .dark {
         --background: 240 8% 9%;
         --foreground: 0 0% 98%;
-        --surface: 240 8% 11%;
-        --surface-foreground: 0 0% 98%;
+        --card: 240 8% 11%;
+        --card-foreground: 0 0% 98%;
+        --popover: var(--card);
+        --popover-foreground: var(--card-foreground);
         --primary: 268 83% 66%;
         --primary-foreground: 0 0% 98%;
+        --secondary: 240 5% 18%;
+        --secondary-foreground: 0 0% 98%;
+        --muted: 240 5% 14%;
+        --muted-foreground: 240 3% 64%;
+        --accent: 268 83% 66%;
+        --accent-foreground: 0 0% 98%;
         --destructive: 355 70% 50%;
         --destructive-foreground: 0 0% 98%;
         --border: 240 5% 14%;
         --input: 240 5% 14%;
         --ring: 268 83% 66%;
+        --chart-1: 220 70% 50%;
+        --chart-2: 160 60% 45%;
+        --chart-3: 30 80% 55%;
+        --chart-4: 280 65% 60%;
+        --chart-5: 340 75% 55%;
+        --sidebar-background: 240 5.9% 10%;
+        --sidebar-foreground: 240 4.8% 95.9%;
+        --sidebar-primary: 268 83% 66%;
+        --sidebar-primary-foreground: 0 0% 100%;
+        --sidebar-accent: 240 5% 14%;
+        --sidebar-accent-foreground: 240 4.8% 95.9%;
+        --sidebar-border: 240 5% 14%;
+        --sidebar-ring: 268 83% 66%;
     }
 
-    /* We can rely mostly on Tailwind classes for layout; just referencing these vars. */
+    /* Global style applications */
+    * {
+        @apply border-border;
+    }
+
     body {
         @apply bg-background text-foreground;
-        background-image: radial-gradient( at 20% 20%, hsla(var(--primary), 0.05), transparent 30% );
+        background-image: radial-gradient(at 20% 20%, hsla(var(--primary), 0.05), transparent 30%);
         font-family: "geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
@@ -90,7 +128,7 @@
     }
 }
 
-/* Skeleton loading styles if desired. */
+/* Skeleton loading states */
 .skeleton {
     *
 
@@ -113,7 +151,7 @@
 
 }
 
-/* Editor styles (ProseMirror / CodeMirror). */
+/* Editor styling */
 .ProseMirror {
     outline: none;
 }
