@@ -95,12 +95,12 @@
         /* near-white text color */
         --foreground: 42 75% 100%; /* hsl(0, 0%, 98%) */
         /* slightly lighter than background for cards/popovers */
-        --card: 42 0% 20%; /* hsl(240, 8%, 11%) */
+        --card: 42 100% 10%; /* hsl(240, 8%, 11%) */
         --card-foreground: 0 0% 100%;
         --popover: var(--card);
         --popover-foreground: var(--card-foreground);
         /* slightly brighter neon purple */
-        --primary: 42 100% 50%; /* hsl(268, 83%, 66%) */
+        --primary: 42 80% 50%; /* hsl(268, 83%, 66%) */
         --primary-foreground: 0 0% 0%;
         /* dark grayish-blue for secondary elements */
         --secondary: 42 100% 50%; /* hsl(240, 5%, 18%) */
@@ -110,15 +110,15 @@
         --muted-foreground: 42 3% 64%;
         /* bright neon purple accent matching primary */
         --accent: 42 100% 50%;
-        --accent-foreground: 0 0% 100%;
+        --accent-foreground: 0 0% 0%;
         /* pinkish red for destructive actions */
         --destructive: 355 70% 42%; /* hsl(355, 70%, 42%) */
         --destructive-foreground: 0 0% 98%;
         /* dark background for borders and inputs */
-        --border: 42 60% 42%; /* hsl(240, 5%, 14%) */
-        --input: 240 5% 0%;
+        --border: 42 60% 50%; /* hsl(240, 5%, 14%) */
+        --input: 42 5% 50%;
         /* neon purple ring for focus */
-        --ring: 42 100% 42%;
+        --ring: 42 100% 50%;
         /* chart color #1: bright saturated blue */
         --chart-1: 220 70% 42%; /* hsl(220, 70%, 42%) */
         /* chart color #2: medium green */
@@ -131,14 +131,14 @@
         --chart-5: 340 75% 55%; /* hsl(340, 75%, 55%) */
         /* very dark bluish-purple background for sidebar */
         --sidebar-background: 240 0% 10%; /* hsl(240, 5.9%, 10%) */
-        --sidebar-foreground: 42 75% 42%;
+        --sidebar-foreground: 42 50% 50%;
         /* neon purple for sidebar primary */
-        --sidebar-primary: 42 75% 42%;
+        --sidebar-primary: 42 75% 50%;
         --sidebar-primary-foreground: 0 0% 0%;
         /* deeper shade for sidebar accent elements */
         --sidebar-accent: 42 75% 42%;
         --sidebar-accent-foreground: 240 4.8% 0%;
-        --sidebar-border: 42 42% 42%;
+        --sidebar-border: 42 90% 55%;
         --sidebar-ring: 42 60% 42%;
     }
 
