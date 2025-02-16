@@ -31,75 +31,115 @@
 @layer base {
     /* Light theme variables */
     :root {
-        --background: 230 100% 98%;
-        --foreground: 240 6% 10%;
-        --card: 230 100% 100%;
+        /* near-white background with a bluish tint */
+        --background: 230 100% 98%; /* hsl(230, 100%, 98%) */
+        /* deep neutral text with a cool undertone */
+        --foreground: 240 6% 10%; /* hsl(240, 6%, 10%) */
+        /* pure white background with a slight cool tint */
+        --card: 230 100% 100%; /* hsl(230, 100%, 100%) */
         --card-foreground: 240 6% 10%;
         --popover: var(--card);
         --popover-foreground: var(--card-foreground);
-        --primary: 268 83% 60%;
-        --primary-foreground: 0 0% 100%;
-        --secondary: 230 25% 94%;
+        /* Gold */
+        --primary: 50 50% 75%; /* hsl(268, 83%, 60%) */
+        /* white text for high contrast */
+        --primary-foreground: 0 0% 100%; /* hsl(0, 0%, 100%) */
+        /* light pastel lavender */
+        --secondary: 230 25% 94%; /* hsl(230, 25%, 94%) */
         --secondary-foreground: 240 6% 10%;
-        --muted: 228 16% 90%;
+        /* pale grayish-blue for muted elements */
+        --muted: 228 16% 90%; /* hsl(228, 16%, 90%) */
         --muted-foreground: 228 8% 30%;
+        /* accent uses the same neon purple as primary */
         --accent: 268 83% 60%;
         --accent-foreground: 0 0% 100%;
-        --destructive: 355 80% 60%;
+        /* bright pinkish red for destructive actions */
+        --destructive: 355 80% 60%; /* hsl(355, 80%, 60%) */
         --destructive-foreground: 0 0% 100%;
-        --border: 230 20% 85%;
+        /* subtle light gray-blue border/input */
+        --border: 230 20% 0%; /* hsl(230, 20%, 85%) */
         --input: 230 20% 85%;
-        --ring: 268 83% 60%;
-        --chart-1: 190 70% 55%;
-        --chart-2: 160 60% 45%;
-        --chart-3: 30 80% 55%;
-        --chart-4: 280 65% 60%;
-        --chart-5: 340 75% 55%;
+        /* neon purple ring color for focus outlines */
+        --ring: 50 95% 50%;
+        /* chart color #1: medium teal */
+        --chart-1: 190 70% 55%; /* hsl(190, 70%, 55%) */
+        /* chart color #2: medium green */
+        --chart-2: 160 60% 45%; /* hsl(160, 60%, 45%) */
+        /* chart color #3: bright orange */
+        --chart-3: 30 80% 55%; /* hsl(30, 80%, 55%) */
+        /* chart color #4: bright pinkish purple */
+        --chart-4: 280 65% 60%; /* hsl(280, 65%, 60%) */
+        /* chart color #5: bright pinkish magenta */
+        --chart-5: 340 75% 55%; /* hsl(340, 75%, 55%) */
+        /* slightly rounded corners */
         --radius: 0.75rem;
-        --sidebar-background: 230 20% 98%;
+        /* near-white background for sidebar */
+        --sidebar-background: 230 20% 98%; /* hsl(230, 20%, 98%) */
         --sidebar-foreground: 240 5.3% 26.1%;
-        --sidebar-primary: 268 83% 60%;
+        /* neon purple for sidebar primary */
+        --sidebar-primary: 50 50% 50%;
         --sidebar-primary-foreground: 0 0% 100%;
+        /* pastel lavender for sidebar accent */
         --sidebar-accent: 230 25% 94%;
         --sidebar-accent-foreground: 240 5.9% 10%;
+        /* subtle cool gray border for sidebar */
         --sidebar-border: 220 13% 91%;
-        --sidebar-ring: 268 83% 60%;
+        /* neon purple ring */
+        --sidebar-ring: 50 75% 50%;
     }
 
     /* Dark theme overrides */
     .dark {
-        --background: 240 8% 9%;
-        --foreground: 0 0% 98%;
-        --card: 240 8% 11%;
+        /* very dark bluish-purple background */
+        --background: 240 8% 9%; /* hsl(240, 8%, 9%) */
+        /* near-white text color */
+        --foreground: 0 0% 98%; /* hsl(0, 0%, 98%) */
+        /* slightly lighter than background for cards/popovers */
+        --card: 240 8% 11%; /* hsl(240, 8%, 11%) */
         --card-foreground: 0 0% 98%;
         --popover: var(--card);
         --popover-foreground: var(--card-foreground);
-        --primary: 268 83% 66%;
+        /* slightly brighter neon purple */
+        --primary: 50 95% 50%; /* hsl(268, 83%, 66%) */
         --primary-foreground: 0 0% 98%;
-        --secondary: 240 5% 18%;
+        /* dark grayish-blue for secondary elements */
+        --secondary: 240 5% 18%; /* hsl(240, 5%, 18%) */
         --secondary-foreground: 0 0% 98%;
-        --muted: 240 5% 14%;
+        /* deeper background accent for muted elements */
+        --muted: 240 5% 14%; /* hsl(240, 5%, 14%) */
         --muted-foreground: 240 3% 64%;
-        --accent: 268 83% 66%;
+        /* bright neon purple accent matching primary */
+        --accent: 50 95% 60%;
         --accent-foreground: 0 0% 98%;
-        --destructive: 355 70% 50%;
+        /* pinkish red for destructive actions */
+        --destructive: 355 70% 50%; /* hsl(355, 70%, 50%) */
         --destructive-foreground: 0 0% 98%;
-        --border: 240 5% 14%;
+        /* dark background for borders and inputs */
+        --border: 240 5% 14%; /* hsl(240, 5%, 14%) */
         --input: 240 5% 14%;
-        --ring: 268 83% 66%;
-        --chart-1: 220 70% 50%;
-        --chart-2: 160 60% 45%;
-        --chart-3: 30 80% 55%;
-        --chart-4: 280 65% 60%;
-        --chart-5: 340 75% 55%;
-        --sidebar-background: 240 5.9% 10%;
+        /* neon purple ring for focus */
+        --ring: 50 100% 50%;
+        /* chart color #1: bright saturated blue */
+        --chart-1: 220 70% 50%; /* hsl(220, 70%, 50%) */
+        /* chart color #2: medium green */
+        --chart-2: 160 60% 45%; /* hsl(160, 60%, 45%) */
+        /* chart color #3: bright orange */
+        --chart-3: 30 80% 55%; /* hsl(30, 80%, 55%) */
+        /* chart color #4: bright pinkish purple */
+        --chart-4: 280 65% 60%; /* hsl(280, 65%, 60%) */
+        /* chart color #5: bright pinkish magenta */
+        --chart-5: 340 75% 55%; /* hsl(340, 75%, 55%) */
+        /* very dark bluish-purple background for sidebar */
+        --sidebar-background: 240 5.9% 10%; /* hsl(240, 5.9%, 10%) */
         --sidebar-foreground: 240 4.8% 95.9%;
-        --sidebar-primary: 268 83% 66%;
+        /* neon purple for sidebar primary */
+        --sidebar-primary: 50 50% 50%;
         --sidebar-primary-foreground: 0 0% 100%;
+        /* deeper shade for sidebar accent elements */
         --sidebar-accent: 240 5% 14%;
         --sidebar-accent-foreground: 240 4.8% 95.9%;
-        --sidebar-border: 240 5% 14%;
-        --sidebar-ring: 268 83% 66%;
+        --sidebar-border: 50 50% 50%;
+        --sidebar-ring: 50 60% 50%;
     }
 
     /* Global style applications */
