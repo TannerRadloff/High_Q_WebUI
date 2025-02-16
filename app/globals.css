@@ -1,17 +1,12 @@
-/* ----------------------------- */
-/*  1. Tailwind Base & Layers    */
-/* ----------------------------- */
+/* Minimal approach: unify repeated variables, remove unused, rely on defaults. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 
-   Adjust the root-level RGB variables for quick usage if needed.
-   (Though the HSL-based variables below are the main drivers now.)
-*/
+/* Quick root-level RGB if needed somewhere in your project. */
 :root {
     --foreground-rgb: 0, 0, 0;
-    --background-start-rgb: 235, 246, 255; /* a pale pastel */
+    --background-start-rgb: 235, 246, 255;
     --background-end-rgb: 255, 255, 255;
 }
 
@@ -23,128 +18,63 @@
     }
 }
 
-/* ----------------------------- */
-/*  2. Custom Utility Classes    */
-/* ----------------------------- */
 @layer utilities {
-    /* Keep your existing text-balance or other utilities */
+    /* Custom utility classes if needed. */
     .text-balance {
         text-wrap: balance;
     }
 
-    /* Example: a subtle glow utility for buttons, cards, etc. */
     .glow {
-        box-shadow: 0 0 12px rgba(139, 92, 246, 0.6); /* a soft purple glow */
+        box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
     }
 }
 
-/* ----------------------------- */
-/*  3. Base Variables & Themes   */
-/* ----------------------------- */
 @layer base {
+    /*
+    We unify card & popover as "--surface",
+    and remove accent since it was identical to primary.
+    Also removing rarely used or identical variables for brevity.
+  */
     :root {
-        /*
-      LIGHT THEME
-      Using HSL for an ethereal pastel vibe:
-      - background: a pale lavender/blue
-      - foreground: a deep neutral for contrast
-      - accent: bright neon/purple
-      - destructive: a bright pinkish red
-    */
-        --background: 230 100% 98%; /* hsl(230, 100%, 98%) - near-white with a bluish tint */
-        --foreground: 240 6% 10%; /* hsl(240, 6%, 10%) - dark neutral text */
-        --card: 230 100% 100%; /* near white with a slight bluish tone */
-        --card-foreground: 240 6% 10%;
-        --popover: 230 100% 100%;
-        --popover-foreground: 240 6% 10%;
-        --primary: 268 83% 60%; /* a bright neon purple, hsl(268, 83%, 60%) */
-        --primary-foreground: 0 0% 100%; /* white text on bright purple */
-        --secondary: 230 25% 94%; /* a light lavender for secondary elements */
-        --secondary-foreground: 240 6% 10%;
-        --muted: 228 16% 90%;
-        --muted-foreground: 228 8% 30%;
-        --accent: 268 83% 60%; /* same as primary or pick a second neon color */
-        --accent-foreground: 0 0% 100%;
-        --destructive: 355 80% 60%; /* bright pinkish red */
+        --background: 230 100% 98%; /* near-white bluish */
+        --foreground: 240 6% 10%; /* dark neutral text */
+        --surface: 230 100% 100%; /* card/popover unify */
+        --surface-foreground: 240 6% 10%;
+        --primary: 268 83% 60%;
+        --primary-foreground: 0 0% 100%;
+        /* Keep destructive if used for error states. */
+        --destructive: 355 80% 60%;
         --destructive-foreground: 0 0% 100%;
+        /* Simple border/input/ring. */
         --border: 230 20% 85%;
         --input: 230 20% 85%;
-        --ring: 268 83% 60%; /* ring color around focus states, etc. */
-        --chart-1: 190 70% 55%;
-        --chart-2: 160 60% 45%;
-        --chart-3: 30 80% 55%;
-        --chart-4: 280 65% 60%;
-        --chart-5: 340 75% 55%;
-        --radius: 0.75rem; /* slightly larger radius for a “softer” look */
-        --sidebar-background: 230 20% 98%;
-        --sidebar-foreground: 240 5.3% 26.1%;
-        --sidebar-primary: 268 83% 60%;
-        --sidebar-primary-foreground: 0 0% 100%;
-        --sidebar-accent: 230 25% 94%;
-        --sidebar-accent-foreground: 240 5.9% 10%;
-        --sidebar-border: 220 13% 91%;
-        --sidebar-ring: 268 83% 60%;
+        --ring: 268 83% 60%;
+        /* If you need corner rounding. */
+        --radius: 0.75rem;
     }
 
+    /* Dark theme: only define what changes. */
     .dark {
-        /*
-      DARK THEME
-      - deeper black/purple backgrounds
-      - bright neon accent
-      - near-white text
-    */
-        --background: 240 8% 9%; /* a dark purplish/blue hue */
-        --foreground: 0 0% 98%; /* near-white text */
-        --card: 240 8% 11%;
-        --card-foreground: 0 0% 98%;
-        --popover: 240 8% 11%;
-        --popover-foreground: 0 0% 98%;
-        --primary: 268 83% 66%; /* a slightly brighter neon purple for dark mode */
+        --background: 240 8% 9%;
+        --foreground: 0 0% 98%;
+        --surface: 240 8% 11%;
+        --surface-foreground: 0 0% 98%;
+        --primary: 268 83% 66%;
         --primary-foreground: 0 0% 98%;
-        --secondary: 240 5% 18%;
-        --secondary-foreground: 0 0% 98%;
-        --muted: 240 5% 14%;
-        --muted-foreground: 240 3% 64%;
-        --accent: 268 83% 66%;
-        --accent-foreground: 0 0% 98%;
         --destructive: 355 70% 50%;
         --destructive-foreground: 0 0% 98%;
         --border: 240 5% 14%;
         --input: 240 5% 14%;
         --ring: 268 83% 66%;
-        --chart-1: 220 70% 50%;
-        --chart-2: 160 60% 45%;
-        --chart-3: 30 80% 55%;
-        --chart-4: 280 65% 60%;
-        --chart-5: 340 75% 55%;
-        --sidebar-background: 240 5.9% 10%;
-        --sidebar-foreground: 240 4.8% 95.9%;
-        --sidebar-primary: 268 83% 66%;
-        --sidebar-primary-foreground: 0 0% 100%;
-        --sidebar-accent: 240 5% 14%;
-        --sidebar-accent-foreground: 240 4.8% 95.9%;
-        --sidebar-border: 240 5% 14%;
-        --sidebar-ring: 268 83% 66%;
-    }
-}
-
-/* 
-   Additional base styles for elements. 
-   We apply the color variables with Tailwind classes or @apply.
-*/
-@layer base {
-    * {
-        @apply border-border;
     }
 
+    /* We can rely mostly on Tailwind classes for layout; just referencing these vars. */
     body {
         @apply bg-background text-foreground;
         background-image: radial-gradient( at 20% 20%, hsla(var(--primary), 0.05), transparent 30% );
-        /* Subtle radial gradient for an ethereal effect. */
         font-family: "geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
-    /* Include your custom fonts as before, or update to a futuristic font */
     @font-face {
         font-family: "geist";
         font-style: normal;
@@ -160,9 +90,7 @@
     }
 }
 
-/* ----------------------------- */
-/*  4. Skeleton Loading Styles   */
-/* ----------------------------- */
+/* Skeleton loading styles if desired. */
 .skeleton {
     *
 
@@ -185,9 +113,7 @@
 
 }
 
-/* ----------------------------- */
-/*  5. Code/Editor + Highlight   */
-/* ----------------------------- */
+/* Editor styles (ProseMirror / CodeMirror). */
 .ProseMirror {
     outline: none;
 }
@@ -197,9 +123,9 @@
     @apply bg-background dark:bg-zinc-800 outline-none selection:bg-zinc-900 !important;
 }
 
-.ͼo.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground,
-.ͼo.cm-selectionBackground,
-.ͼo.cm-content::selection {
+.\u036Co.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground,
+.\u036Co.cm-selectionBackground,
+.\u036Co.cm-content::selection {
     @apply bg-zinc-200 dark:bg-zinc-900 !important;
 }
 
