@@ -95,16 +95,16 @@
         /* near-white text color */
         --foreground: 42 75% 100%; /* hsl(0, 0%, 98%) */
         /* slightly lighter than background for cards/popovers */
-        --card: 42 0% 13%; /* hsl(240, 8%, 11%) */
+        --card: 42 0% 20%; /* hsl(240, 8%, 11%) */
         --card-foreground: 0 0% 100%;
         --popover: var(--card);
         --popover-foreground: var(--card-foreground);
         /* slightly brighter neon purple */
-        --primary: 42 100% 42%; /* hsl(268, 83%, 66%) */
+        --primary: 42 100% 50%; /* hsl(268, 83%, 66%) */
         --primary-foreground: 0 0% 0%;
         /* dark grayish-blue for secondary elements */
         --secondary: 42 100% 50%; /* hsl(240, 5%, 18%) */
-        --secondary-foreground: 0 0% 0%;
+        --secondary-foreground: 42 100% 35%;
         /* deeper background accent for muted elements */
         --muted: 42 5% 14%; /* hsl(240, 5%, 14%) */
         --muted-foreground: 42 3% 64%;
