@@ -91,32 +91,32 @@
     /* Dark theme overrides */
     .dark {
         /* very dark bluish-purple background */
-        --background: 240 8% 0%; /* hsl(240, 8%, 9%) */
+        --background: 50 8% 0%; /* hsl(240, 8%, 9%) */
         /* near-white text color */
-        --foreground: 0 0% 98%; /* hsl(0, 0%, 98%) */
+        --foreground: 50 75% 50%; /* hsl(0, 0%, 98%) */
         /* slightly lighter than background for cards/popovers */
         --card: 50 0% 13%; /* hsl(240, 8%, 11%) */
-        --card-foreground: 0 0% 98%;
+        --card-foreground: 0 0% 100%;
         --popover: var(--card);
         --popover-foreground: var(--card-foreground);
         /* slightly brighter neon purple */
         --primary: 50 75% 50%; /* hsl(268, 83%, 66%) */
-        --primary-foreground: 0 0% 98%;
+        --primary-foreground: 0 0% 0%;
         /* dark grayish-blue for secondary elements */
-        --secondary: 240 5% 1%; /* hsl(240, 5%, 18%) */
-        --secondary-foreground: 0 0% 98%;
+        --secondary: 50 5% 0%; /* hsl(240, 5%, 18%) */
+        --secondary-foreground: 0 0% 100%;
         /* deeper background accent for muted elements */
-        --muted: 240 5% 14%; /* hsl(240, 5%, 14%) */
-        --muted-foreground: 240 3% 64%;
+        --muted: 50 5% 14%; /* hsl(240, 5%, 14%) */
+        --muted-foreground: 50 3% 64%;
         /* bright neon purple accent matching primary */
-        --accent: 50 95% 50%;
+        --accent: 50 60% 50%;
         --accent-foreground: 0 0% 98%;
         /* pinkish red for destructive actions */
         --destructive: 355 70% 50%; /* hsl(355, 70%, 50%) */
         --destructive-foreground: 0 0% 98%;
         /* dark background for borders and inputs */
-        --border: 50 50% 50%; /* hsl(240, 5%, 14%) */
-        --input: 240 5% 1%;
+        --border: 50 60% 50%; /* hsl(240, 5%, 14%) */
+        --input: 240 5% 0%;
         /* neon purple ring for focus */
         --ring: 50 100% 50%;
         /* chart color #1: bright saturated blue */
@@ -130,14 +130,14 @@
         /* chart color #5: bright pinkish magenta */
         --chart-5: 340 75% 55%; /* hsl(340, 75%, 55%) */
         /* very dark bluish-purple background for sidebar */
-        --sidebar-background: 240 5.9% 10%; /* hsl(240, 5.9%, 10%) */
-        --sidebar-foreground: 240 4.8% 95.9%;
+        --sidebar-background: 240 0% 10%; /* hsl(240, 5.9%, 10%) */
+        --sidebar-foreground: 50 75% 50%;
         /* neon purple for sidebar primary */
-        --sidebar-primary: 50 50% 50%;
-        --sidebar-primary-foreground: 0 0% 100%;
+        --sidebar-primary: 50 75% 50%;
+        --sidebar-primary-foreground: 0 0% 0%;
         /* deeper shade for sidebar accent elements */
-        --sidebar-accent: 240 5% 1%;
-        --sidebar-accent-foreground: 240 4.8% 95.9%;
+        --sidebar-accent: 50 75% 50%;
+        --sidebar-accent-foreground: 240 4.8% 0%;
         --sidebar-border: 50 50% 50%;
         --sidebar-ring: 50 60% 50%;
     }
