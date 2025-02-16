@@ -1,44 +1,46 @@
-/* -----------------------------
-   1. Tailwind Base & Layers
------------------------------ */
+/* ----------------------------- */
+/* 1. Tailwind Base & Layers     */
+/* ----------------------------- */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* -----------------------------
-   2. Root Variables
------------------------------ */
+/* ----------------------------- */
+/* 2. Global Variable Definitions */
+/* ----------------------------- */
 :root {
-    --color-bg: #000000; /* Black background */
+    /* Core Colors for Luxury Black & Gold Theme */
+    --color-bg: #000000; /* Pure black background */
+    --color-primary: #FFD700; /* Classic gold accent */
+    --color-secondary: #f2c94c; /* Lighter gold (optional accent) */
     --color-text: #ffffff; /* White text for high contrast */
-    --color-primary: #FFD700; /* Gold accent */
-    --color-secondary: #f2c94c; /* Lighter gold (optional) */
     --color-text-muted: #cccccc; /* Muted text for subtle elements */
+    /* Additional Variables */
+    --border-color: #FFD700;
     --font-sans: "Poppins", sans-serif;
 }
 
+/* ----------------------------- */
+/* 3. Media Query for Dark Mode  */
+/* ----------------------------- */
+/* (Since our theme is already dark, these variables simply reaffirm our choices) */
 @media (prefers-color-scheme: dark) {
     :root {
         --color-bg: #000000;
         --color-text: #ffffff;
-        --color-primary: #FFD700;
-        --color-secondary: #f2c94c;
-        --color-text-muted: #cccccc;
     }
 }
 
-/* -----------------------------
-   3. Base Styles
------------------------------ */
+/* ----------------------------- */
+/* 4. Base Styles */
+/* ----------------------------- */
 @layer base {
-    *,
-    *::before,
-    *::after {
+    /* Global resets & box-sizing */
+    *, *::before, *::after {
         box-sizing: border-box;
     }
 
-    html,
-    body {
+    html, body {
         margin: 0;
         padding: 0;
         background-color: var(--color-bg);
@@ -46,17 +48,12 @@
         font-family: var(--font-sans);
     }
 
-    /* Optional: subtle radial gold gradient for depth */
+    /* Optional: Subtle radial gradient for an ethereal effect */
     body {
-        background-image: radial-gradient( at 20% 20%, rgba(255, 215, 0, 0.05), transparent 30% );
+        background-image: radial-gradient(at 20% 20%, hsla(51, 100%, 50%, 0.05), transparent 30%);
     }
 
-    /* Uncomment if you want headings in gold:
-  h1, h2, h3, h4, h5, h6 {
-    color: var(--color-primary);
-  }
-  */
-
+    /* Custom Fonts (adjust paths as needed) */
     @font-face {
         font-family: "geist";
         font-style: normal;
@@ -72,18 +69,21 @@
     }
 }
 
-/* -----------------------------
-   4. Utility Classes
------------------------------ */
+/* ----------------------------- */
+/* 5. Custom Utility Classes */
+/* ----------------------------- */
 @layer utilities {
+    /* Maintain text balance utility */
     .text-balance {
         text-wrap: balance;
     }
 
+    /* Gold glow for buttons, cards, etc. */
     .glow {
         box-shadow: 0 0 12px rgba(255, 215, 0, 0.6);
     }
 
+    /* Additional luxury accent utilities */
     .gold-border {
         border: 1px solid var(--color-primary);
         border-radius: 4px;
@@ -102,45 +102,38 @@
     }
 }
 
-/* -----------------------------
-   5. Skeleton Loading Styles
------------------------------ */
+/* ----------------------------- */
+/* 6. Skeleton Loading Styles */
+/* ----------------------------- */
 .skeleton {
     pointer-events: none !important;
 }
 
+*[class^="text-"] {
+    color: transparent;
+    @apply rounded-md bg-[rgba(255,215,0,0.2)] select-none animate-pulse;
+}
+
 .skeleton-bg {
-    background-color: rgba(255, 215, 0, 0.1);
+    @apply bg-[rgba(255,215,0,0.1)];
 }
 
 .skeleton-div {
-    background-color: rgba(255, 215, 0, 0.2);
-    @apply animate-pulse;
+    @apply bg-[rgba(255,215,0,0.2)] animate-pulse;
 }
 
-*[class^="text-"].skeleton {
-    color: transparent;
-    @apply rounded-md select-none;
-}
-
-/* -----------------------------
-   6. Code/Editor Highlight Styles
------------------------------ */
-/* These styles target CodeMirror (or similar) classes */
+/* ----------------------------- */
+/* 7. Code Editor & Highlight Styles */
+/* ----------------------------- */
 .ProseMirror {
     outline: none;
 }
 
 .cm-editor,
 .cm-gutters {
-    background-color: var(--color-bg) !important;
-    outline: none;
-    /* If you need a different dark color for gutters:
-     @apply dark:bg-zinc-800; 
-  */
+    @apply bg-[var(--color-bg)] dark:bg-zinc-800 outline-none selection:bg-zinc-900 !important;
 }
 
-/* Active line highlighting */
 .cm-activeLine,
 .cm-activeLineGutter {
     @apply bg-transparent !important;
@@ -150,7 +143,6 @@
     @apply rounded-r-sm !important;
 }
 
-/* Line numbers & fold gutter spacing */
 .cm-lineNumbers {
     @apply min-w-7;
 }
@@ -163,7 +155,6 @@
     @apply rounded-l-sm !important;
 }
 
-/* Example highlight for suggestions */
 .suggestion-highlight {
     @apply bg-blue-200 hover:bg-blue-300 dark:hover:bg-blue-400/50 dark:text-blue-50 dark:bg-blue-500/40;
 }
