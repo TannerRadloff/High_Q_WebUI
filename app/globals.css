@@ -41,24 +41,24 @@
         --popover: var(--card);
         --popover-foreground: var(--card-foreground);
         /* Gold */
-        --primary: 50 50% 75%; /* hsl(268, 83%, 60%) */
+        --primary: 50 60% 50%; /* hsl(268, 83%, 60%) */
         /* white text for high contrast */
         --primary-foreground: 0 0% 100%; /* hsl(0, 0%, 100%) */
         /* light pastel lavender */
-        --secondary: 230 25% 94%; /* hsl(230, 25%, 94%) */
-        --secondary-foreground: 240 6% 10%;
+        --secondary: 50 50% 50%; /* hsl(230, 25%, 94%) */
+        --secondary-foreground: 54 0% 39%;
         /* pale grayish-blue for muted elements */
-        --muted: 228 16% 90%; /* hsl(228, 16%, 90%) */
+        --muted: 56 16% 90%; /* hsl(228, 16%, 90%) */
         --muted-foreground: 228 8% 30%;
         /* accent uses the same neon purple as primary */
-        --accent: 268 83% 60%;
+        --accent: 50 75% 50%;
         --accent-foreground: 0 0% 100%;
         /* bright pinkish red for destructive actions */
         --destructive: 355 80% 60%; /* hsl(355, 80%, 60%) */
         --destructive-foreground: 0 0% 100%;
         /* subtle light gray-blue border/input */
         --border: 230 20% 0%; /* hsl(230, 20%, 85%) */
-        --input: 230 20% 85%;
+        --input: 50 20% 85%;
         /* neon purple ring color for focus outlines */
         --ring: 50 95% 50%;
         /* chart color #1: medium teal */
@@ -91,32 +91,32 @@
     /* Dark theme overrides */
     .dark {
         /* very dark bluish-purple background */
-        --background: 240 8% 9%; /* hsl(240, 8%, 9%) */
+        --background: 240 8% 0%; /* hsl(240, 8%, 9%) */
         /* near-white text color */
         --foreground: 0 0% 98%; /* hsl(0, 0%, 98%) */
         /* slightly lighter than background for cards/popovers */
-        --card: 240 8% 11%; /* hsl(240, 8%, 11%) */
+        --card: 50 0% 13%; /* hsl(240, 8%, 11%) */
         --card-foreground: 0 0% 98%;
         --popover: var(--card);
         --popover-foreground: var(--card-foreground);
         /* slightly brighter neon purple */
-        --primary: 50 95% 50%; /* hsl(268, 83%, 66%) */
+        --primary: 50 75% 50%; /* hsl(268, 83%, 66%) */
         --primary-foreground: 0 0% 98%;
         /* dark grayish-blue for secondary elements */
-        --secondary: 240 5% 18%; /* hsl(240, 5%, 18%) */
+        --secondary: 240 5% 1%; /* hsl(240, 5%, 18%) */
         --secondary-foreground: 0 0% 98%;
         /* deeper background accent for muted elements */
         --muted: 240 5% 14%; /* hsl(240, 5%, 14%) */
         --muted-foreground: 240 3% 64%;
         /* bright neon purple accent matching primary */
-        --accent: 50 95% 60%;
+        --accent: 50 95% 50%;
         --accent-foreground: 0 0% 98%;
         /* pinkish red for destructive actions */
         --destructive: 355 70% 50%; /* hsl(355, 70%, 50%) */
         --destructive-foreground: 0 0% 98%;
         /* dark background for borders and inputs */
-        --border: 240 5% 14%; /* hsl(240, 5%, 14%) */
-        --input: 240 5% 14%;
+        --border: 50 50% 50%; /* hsl(240, 5%, 14%) */
+        --input: 240 5% 1%;
         /* neon purple ring for focus */
         --ring: 50 100% 50%;
         /* chart color #1: bright saturated blue */
@@ -136,7 +136,7 @@
         --sidebar-primary: 50 50% 50%;
         --sidebar-primary-foreground: 0 0% 100%;
         /* deeper shade for sidebar accent elements */
-        --sidebar-accent: 240 5% 14%;
+        --sidebar-accent: 240 5% 1%;
         --sidebar-accent-foreground: 240 4.8% 95.9%;
         --sidebar-border: 50 50% 50%;
         --sidebar-ring: 50 60% 50%;
