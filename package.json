@@ -100,5 +100,14 @@
     "tailwindcss": "^3.4.1",
     "tsx": "^4.19.1",
     "typescript": "^5.6.3"
-  }
+  },
+  "description": "<a href=\"https://chat.vercel.ai/\">\r   <img alt=\"Next.js 14 and App Router-ready AI chatbot.\" src=\"app/(chat)/opengraph-image.png\">\r   <h1 align=\"center\">Next.js AI Chatbot</h1>\r </a>",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "lib": "lib"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
