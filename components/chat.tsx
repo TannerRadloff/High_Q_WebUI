@@ -66,7 +66,7 @@ export function Chat({
 
   return (
     <>
-      <div className="flex flex-col min-w-0 h-dvh bg-background">
+      <div className="flex flex-col min-w-0 h-dvh bg-background space-bg">
         <ChatHeader
           chatId={id}
           selectedModelId={selectedChatModel}
@@ -85,7 +85,7 @@ export function Chat({
           isArtifactVisible={isArtifactVisible}
         />
 
-        <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
+        <form className="flex mx-auto px-4 bg-background/80 backdrop-blur-sm pb-4 md:pb-6 gap-2 w-full md:max-w-3xl border-t border-border/30">
           {!isReadonly && (
             <MultimodalInput
               chatId={id}

@@ -116,6 +116,8 @@ const PurePreviewMessage = ({
                   className={cn('flex flex-col gap-4', {
                     'bg-primary text-primary-foreground px-3 py-2 rounded-xl':
                       message.role === 'user',
+                    'bg-secondary text-secondary-foreground px-3 py-2 rounded-xl backdrop-blur-sm border border-secondary/30 shadow-md':
+                      message.role === 'assistant',
                   })}
                 >
                   <Markdown>{message.content as string}</Markdown>
@@ -243,26 +245,27 @@ export const ThinkingMessage = () => {
 
   return (
     <motion.div
-      className="w-full mx-auto max-w-3xl px-4 group/message "
+      className="w-full mx-auto max-w-3xl px-4 group/message"
       initial={{ y: 5, opacity: 0 }}
       animate={{ y: 0, opacity: 1, transition: { delay: 1 } }}
       data-role={role}
     >
       <div
-        className={cx(
-          'flex gap-4 group-data-[role=user]/message:px-3 w-full group-data-[role=user]/message:w-fit group-data-[role=user]/message:ml-auto group-data-[role=user]/message:max-w-2xl group-data-[role=user]/message:py-2 rounded-xl',
-          {
-            'group-data-[role=user]/message:bg-muted': true,
-          },
-        )}
+        className="flex gap-4 w-full"
       >
-        <div className="size-8 flex items-center rounded-full justify-center ring-1 shrink-0 ring-border">
-          <SparklesIcon size={14} />
+        <div className="size-8 flex items-center rounded-full justify-center ring-1 shrink-0 ring-border bg-secondary/30 backdrop-blur-sm shadow-sm">
+          <div className="animate-pulse text-secondary-foreground">
+            <SparklesIcon size={14} />
+          </div>
         </div>
 
         <div className="flex flex-col gap-2 w-full">
-          <div className="flex flex-col gap-4 text-muted-foreground">
-            Thinking...
+          <div className="flex flex-col gap-4 bg-secondary/30 text-secondary-foreground px-3 py-2 rounded-xl backdrop-blur-sm border border-secondary/30 shadow-md w-fit">
+            <div className="flex space-x-2">
+              <div className="h-2 w-2 rounded-full bg-primary animate-pulse"></div>
+              <div className="h-2 w-2 rounded-full bg-primary animate-pulse delay-150"></div>
+              <div className="h-2 w-2 rounded-full bg-primary animate-pulse delay-300"></div>
+            </div>
           </div>
         </div>
       </div>

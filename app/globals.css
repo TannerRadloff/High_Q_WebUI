@@ -4,17 +4,17 @@
 
 :root {
     /* Minimal root-level RGB variables */
-    --foreground-rgb: 0, 0, 0;
-    --background-start-rgb: 235, 246, 255;
-    --background-end-rgb: 255, 255, 255;
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 10, 15, 30;
+    --background-end-rgb: 5, 5, 15;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
         /* Dark-mode RGB overrides */
         --foreground-rgb: 255, 255, 255;
-        --background-start-rgb: 10, 10, 20;
-        --background-end-rgb: 0, 0, 0;
+        --background-start-rgb: 10, 15, 30;
+        --background-end-rgb: 5, 5, 15;
     }
 }
 
@@ -22,116 +22,142 @@
     .text-balance {
         text-wrap: balance;
     }
-    /* Subtle glow utility */
+    /* Futuristic glow utility */
     .glow {
-        box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
+        box-shadow: 0 0 15px rgba(138, 43, 226, 0.7);
+    }
+    /* Holographic effect */
+    .holographic {
+        background: linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(0, 191, 255, 0.2));
+        backdrop-filter: blur(5px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    /* Space background with stars */
+    .space-bg {
+        background-color: #0a0a18;
+        background-image: radial-gradient(white, rgba(255, 255, 255, 0.2) 2px, transparent 2px);
+        background-size: 100px 100px;
     }
 }
 
 @layer base {
-    /* Light theme variables */
+    /* Dark theme variables (default) */
     :root {
-        /* cream background with a warm tint */
-        --background: 42 30% 98%; /* cream */
-        /* deep navy text */
-        --foreground: 220 60% 15%; /* navy */
-        /* pure white background with a slight warm tint */
-        --card: 42 30% 100%; 
-        --card-foreground: 220 60% 15%;
+        /* Deep space background */
+        --background: 230 30% 8%; /* deep blue-black */
+        /* Light text for contrast */
+        --foreground: 210 40% 98%; /* almost white with blue tint */
+        /* Slightly lighter card background */
+        --card: 230 25% 12%; 
+        --card-foreground: 210 40% 98%;
         --popover: var(--card);
         --popover-foreground: var(--card-foreground);
-        /* Gold */
-        --primary: 42 80% 50%; /* gold */
-        /* navy text for high contrast */
-        --primary-foreground: 220 60% 15%; 
-        /* light gold */
-        --secondary: 42 60% 85%; 
-        --secondary-foreground: 220 60% 15%;
-        /* pale cream for muted elements */
-        --muted: 42 30% 95%; 
-        --muted-foreground: 220 10% 40%;
-        /* accent uses gold */
-        --accent: 42 80% 50%;
-        --accent-foreground: 220 60% 15%;
-        /* bright red for destructive actions */
+        /* Electric blue primary */
+        --primary: 210 100% 60%; /* electric blue */
+        /* Dark text for high contrast on primary */
+        --primary-foreground: 230 30% 10%; 
+        /* Deep purple secondary */
+        --secondary: 270 70% 30%; 
+        --secondary-foreground: 210 40% 98%;
+        /* Muted deep space blue */
+        --muted: 230 25% 15%; 
+        --muted-foreground: 210 40% 80%;
+        /* Purple accent */
+        --accent: 270 80% 50%;
+        --accent-foreground: 210 40% 98%;
+        /* Bright red for destructive actions */
         --destructive: 355 80% 60%; 
         --destructive-foreground: 0 0% 100%;
-        /* subtle light gold border/input */
-        --border: 42 30% 85%; 
-        --input: 42 20% 85%;
-        /* gold ring color for focus outlines */
-        --ring: 42 80% 50%;
+        /* Subtle metallic border */
+        --border: 230 20% 25%; 
+        --input: 230 20% 20%;
+        /* Purple glow for focus */
+        --ring: 270 80% 50%;
         /* chart colors */
-        --chart-1: 190 70% 55%; 
-        --chart-2: 160 60% 45%; 
-        --chart-3: 30 80% 55%; 
-        --chart-4: 280 65% 60%; 
-        --chart-5: 340 75% 55%; 
-        /* slightly rounded corners */
+        --chart-1: 210 100% 60%; 
+        --chart-2: 270 80% 50%; 
+        --chart-3: 190 90% 60%; 
+        --chart-4: 320 80% 60%; 
+        --chart-5: 40 90% 60%; 
+        /* Smooth rounded corners */
         --radius: 0.75rem;
-        /* cream background for sidebar */
-        --sidebar-background: 42 30% 98%; 
-        --sidebar-foreground: 220 60% 15%;
-        /* gold for sidebar primary */
-        --sidebar-primary: 42 80% 50%;
-        --sidebar-primary-foreground: 220 60% 15%;
-        /* light gold for sidebar accent */
-        --sidebar-accent: 42 60% 85%;
-        --sidebar-accent-foreground: 220 60% 15%;
-        /* subtle gold border for sidebar */
-        --sidebar-border: 42 30% 85%;
-        /* gold ring */
-        --sidebar-ring: 42 80% 50%;
+        /* Deep space background for sidebar */
+        --sidebar-background: 230 35% 6%; 
+        --sidebar-foreground: 210 40% 98%;
+        /* Electric blue for sidebar primary */
+        --sidebar-primary: 210 100% 60%;
+        --sidebar-primary-foreground: 230 30% 10%;
+        /* Deep purple for sidebar accent */
+        --sidebar-accent: 270 70% 30%;
+        --sidebar-accent-foreground: 210 40% 98%;
+        /* Subtle metallic border for sidebar */
+        --sidebar-border: 230 20% 25%;
+        /* Purple ring */
+        --sidebar-ring: 270 80% 50%;
+        
+        /* Message bubble colors */
+        --user-message-bg: 210 100% 60%; /* electric blue */
+        --user-message-text: 230 30% 10%; /* dark text */
+        --ai-message-bg: 270 70% 30%; /* deep purple */
+        --ai-message-text: 210 40% 98%; /* light text */
     }
 
-    /* Dark theme overrides */
-    .dark {
-        /* deep navy background */
-        --background: 220 60% 10%; 
-        /* cream text color */
-        --foreground: 42 30% 95%; 
-        /* slightly lighter navy for cards/popovers */
-        --card: 220 50% 15%; 
-        --card-foreground: 42 30% 95%;
+    /* Light theme overrides */
+    .light {
+        /* Soft dark blue background */
+        --background: 230 20% 15%; 
+        /* Light text with blue tint */
+        --foreground: 210 40% 98%; 
+        /* Slightly lighter card background */
+        --card: 230 20% 20%; 
+        --card-foreground: 210 40% 98%;
         --popover: var(--card);
         --popover-foreground: var(--card-foreground);
-        /* rich gold */
-        --primary: 42 80% 50%; 
-        --primary-foreground: 220 60% 10%;
-        /* dark navy for secondary elements */
-        --secondary: 220 40% 20%; 
-        --secondary-foreground: 42 30% 95%;
-        /* deeper navy for muted elements */
-        --muted: 220 40% 15%; 
-        --muted-foreground: 42 20% 80%;
-        /* gold accent matching primary */
-        --accent: 42 80% 50%;
-        --accent-foreground: 220 60% 10%;
-        /* red for destructive actions */
+        /* Bright electric blue */
+        --primary: 210 100% 60%; 
+        --primary-foreground: 230 30% 10%;
+        /* Rich purple for secondary elements */
+        --secondary: 270 70% 40%; 
+        --secondary-foreground: 210 40% 98%;
+        /* Muted dark blue */
+        --muted: 230 20% 25%; 
+        --muted-foreground: 210 40% 90%;
+        /* Vibrant purple accent */
+        --accent: 270 80% 55%;
+        --accent-foreground: 210 40% 98%;
+        /* Red for destructive actions */
         --destructive: 355 70% 50%; 
         --destructive-foreground: 0 0% 98%;
-        /* dark navy for borders and inputs */
-        --border: 220 40% 25%; 
-        --input: 220 40% 20%;
-        /* gold ring for focus */
-        --ring: 42 80% 50%;
+        /* Metallic borders */
+        --border: 230 20% 30%; 
+        --input: 230 20% 25%;
+        /* Purple ring for focus */
+        --ring: 270 80% 55%;
         /* chart colors */
-        --chart-1: 220 70% 60%; 
-        --chart-2: 160 60% 45%; 
-        --chart-3: 30 80% 55%; 
-        --chart-4: 280 65% 60%; 
-        --chart-5: 340 75% 55%; 
-        /* deep navy background for sidebar */
-        --sidebar-background: 220 60% 8%; 
-        --sidebar-foreground: 42 30% 95%;
-        /* gold for sidebar primary */
-        --sidebar-primary: 42 80% 50%;
-        --sidebar-primary-foreground: 220 60% 10%;
-        /* darker gold for sidebar accent elements */
-        --sidebar-accent: 42 60% 40%;
-        --sidebar-accent-foreground: 42 30% 95%;
-        --sidebar-border: 220 40% 25%;
-        --sidebar-ring: 42 80% 50%;
+        --chart-1: 210 100% 60%; 
+        --chart-2: 270 80% 50%; 
+        --chart-3: 190 90% 60%; 
+        --chart-4: 320 80% 60%; 
+        --chart-5: 40 90% 60%; 
+        /* Deep space background for sidebar */
+        --sidebar-background: 230 25% 10%; 
+        --sidebar-foreground: 210 40% 98%;
+        /* Electric blue for sidebar primary */
+        --sidebar-primary: 210 100% 60%;
+        --sidebar-primary-foreground: 230 30% 10%;
+        /* Rich purple for sidebar accent */
+        --sidebar-accent: 270 70% 40%;
+        --sidebar-accent-foreground: 210 40% 98%;
+        /* Metallic border for sidebar */
+        --sidebar-border: 230 20% 30%;
+        /* Purple ring */
+        --sidebar-ring: 270 80% 55%;
+        
+        /* Message bubble colors */
+        --user-message-bg: 210 100% 60%; /* electric blue */
+        --user-message-text: 230 30% 10%; /* dark text */
+        --ai-message-bg: 270 70% 40%; /* rich purple */
+        --ai-message-text: 210 40% 98%; /* light text */
     }
 
     /* Global style applications */
@@ -141,8 +167,29 @@
 
     body {
         @apply bg-background text-foreground;
-        background-image: radial-gradient(at 20% 20%, hsla(var(--primary), 0.05), transparent 30%);
-        font-family: "geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background-image: 
+            radial-gradient(at 20% 20%, hsla(var(--primary), 0.15), transparent 40%),
+            radial-gradient(at 80% 80%, hsla(var(--accent), 0.15), transparent 40%);
+        font-family: "Helvetica Neue", "Futura", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background-attachment: fixed;
+    }
+
+    /* Add subtle star effect to background */
+    body::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        background-image: 
+            radial-gradient(white, rgba(255, 255, 255, 0.2) 1px, transparent 1px),
+            radial-gradient(white, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+        background-size: 100px 100px, 50px 50px;
+        background-position: 0 0, 25px 25px;
+        opacity: 0.1;
+        z-index: -1;
     }
 
     @font-face {

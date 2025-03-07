@@ -194,81 +194,101 @@ function PureMultimodalInput({
   );
 
   return (
-    <div className="relative w-full flex flex-col gap-4">
-      {messages.length === 0 &&
-        attachments.length === 0 &&
-        uploadQueue.length === 0 && (
-          <SuggestedActions append={append} chatId={chatId} />
-        )}
-
-      <input
-        type="file"
-        className="fixed -top-4 -left-4 size-0.5 opacity-0 pointer-events-none"
-        ref={fileInputRef}
-        multiple
-        onChange={handleFileChange}
-        tabIndex={-1}
-      />
-
-      {(attachments.length > 0 || uploadQueue.length > 0) && (
-        <div className="flex flex-row gap-2 overflow-x-scroll items-end">
+    <div
+      className={cx(
+        'relative flex w-full flex-col items-center rounded-xl border border-border/40 bg-background/80 backdrop-blur-sm shadow-sm hover:shadow-[0_0_15px_rgba(0,150,255,0.15)] transition-all duration-300',
+        className,
+      )}
+    >
+      {attachments.length > 0 && (
+        <div className="flex w-full flex-row flex-wrap gap-2 p-2 border-b border-border/20">
           {attachments.map((attachment) => (
-            <PreviewAttachment key={attachment.url} attachment={attachment} />
-          ))}
-
-          {uploadQueue.map((filename) => (
-            <PreviewAttachment
-              key={filename}
-              attachment={{
-                url: '',
-                name: filename,
-                contentType: '',
-              }}
-              isUploading={true}
-            />
+            <div key={attachment.url} className="relative">
+              <PreviewAttachment attachment={attachment} />
+              <button
+                className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs"
+                onClick={() => {
+                  setAttachments(
+                    attachments.filter((a) => a.url !== attachment.url),
+                  );
+                }}
+              >
+                ×
+              </button>
+            </div>
           ))}
         </div>
       )}
 
-      <Textarea
-        ref={textareaRef}
-        placeholder="Send a message..."
-        value={input}
-        onChange={handleInput}
-        className={cx(
-          'min-h-[24px] max-h-[calc(75dvh)] overflow-hidden resize-none rounded-2xl !text-base bg-muted pb-10 dark:border-zinc-700',
-          className,
-        )}
-        rows={2}
-        autoFocus
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
-
-            if (isLoading) {
-              toast.error('Please wait for the model to finish its response!');
-            } else {
-              submitForm();
-            }
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (uploadQueue.length > 0) {
+            toast.info('Please wait for all files to upload');
+            return;
           }
+          handleSubmit(e);
+          resetHeight();
+          setLocalStorageInput('');
         }}
-      />
+        className="flex w-full flex-row items-end gap-2 p-2"
+      >
+        <AttachmentsButton
+          fileInputRef={fileInputRef}
+          isLoading={isLoading || uploadQueue.length > 0}
+        />
 
-      <div className="absolute bottom-0 p-2 w-fit flex flex-row justify-start">
-        <AttachmentsButton fileInputRef={fileInputRef} isLoading={isLoading} />
-      </div>
-
-      <div className="absolute bottom-0 right-0 p-2 w-fit flex flex-row justify-end">
-        {isLoading ? (
-          <StopButton stop={stop} setMessages={setMessages} />
-        ) : (
-          <SendButton
-            input={input}
-            submitForm={submitForm}
-            uploadQueue={uploadQueue}
+        <div className="relative w-full">
+          <Textarea
+            ref={textareaRef}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (uploadQueue.length > 0) {
+                  toast.info('Please wait for all files to upload');
+                  return;
+                }
+                handleSubmit();
+                resetHeight();
+                setLocalStorageInput('');
+              }
+            }}
+            placeholder="Message..."
+            className="min-h-[40px] w-full resize-none overflow-hidden rounded-xl pr-12 py-3 focus-visible:ring-primary/70 focus-visible:border-primary/50 focus-visible:shadow-[0_0_10px_rgba(0,150,255,0.3)]"
+            value={input}
+            onChange={handleInput}
+            disabled={isLoading || uploadQueue.length > 0}
           />
-        )}
-      </div>
+
+          {isLoading ? (
+            <StopButton stop={stop} setMessages={setMessages} />
+          ) : (
+            <SendButton
+              submitForm={() => {
+                if (uploadQueue.length > 0) {
+                  toast.info('Please wait for all files to upload');
+                  return;
+                }
+                handleSubmit();
+                resetHeight();
+                setLocalStorageInput('');
+              }}
+              input={input}
+              uploadQueue={uploadQueue}
+            />
+          )}
+        </div>
+      </form>
+
+      {!isLoading && messages.length > 0 && (
+        <div className="w-full px-2 pb-2">
+          <SuggestedActions
+            chatId={chatId}
+            append={append}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -293,15 +313,14 @@ function PureAttachmentsButton({
 }) {
   return (
     <Button
-      className="rounded-md rounded-bl-lg p-[7px] h-fit border-border hover:bg-primary/10 hover:text-primary"
-      onClick={(event) => {
-        event.preventDefault();
-        fileInputRef.current?.click();
-      }}
+      type="button"
+      variant="outline"
+      size="icon"
+      className="h-10 w-10 shrink-0 rounded-xl border-border/40 bg-background/50 hover:bg-primary/10 hover:text-primary hover:border-primary/50 hover:shadow-[0_0_10px_rgba(0,150,255,0.3)]"
+      onClick={() => fileInputRef.current?.click()}
       disabled={isLoading}
-      variant="ghost"
     >
-      <PaperclipIcon size={14} />
+      <PaperclipIcon />
     </Button>
   );
 }
@@ -317,14 +336,16 @@ function PureStopButton({
 }) {
   return (
     <Button
-      className="rounded-full p-1.5 h-fit border border-border hover:bg-primary/10 hover:text-primary"
-      onClick={(event) => {
-        event.preventDefault();
+      type="button"
+      size="icon"
+      variant="ghost"
+      className="absolute bottom-1 right-1 h-8 w-8 rounded-xl hover:bg-destructive/10 hover:text-destructive"
+      onClick={() => {
         stop();
         setMessages((messages) => sanitizeUIMessages(messages));
       }}
     >
-      <StopIcon size={14} />
+      <StopIcon />
     </Button>
   );
 }
@@ -342,14 +363,14 @@ function PureSendButton({
 }) {
   return (
     <Button
-      className="rounded-full p-1.5 h-fit border border-border hover:bg-primary/10 hover:text-primary"
-      onClick={(event) => {
-        event.preventDefault();
-        submitForm();
-      }}
-      disabled={input.length === 0 || uploadQueue.length > 0}
+      type="button"
+      size="icon"
+      variant="ghost"
+      className="absolute bottom-1 right-1 h-8 w-8 rounded-xl hover:bg-primary/10 hover:text-primary"
+      disabled={!input.trim() && uploadQueue.length === 0}
+      onClick={submitForm}
     >
-      <ArrowUpIcon size={14} />
+      <ArrowUpIcon />
     </Button>
   );
 }
