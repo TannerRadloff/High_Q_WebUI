@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useState, Suspense } from 'react';
 import { toast } from 'sonner';
 import Form from 'next/form';
 
@@ -12,7 +12,7 @@ import { SubmitButton } from '@/components/submit-button';
 
 import { resetPassword, type ResetPasswordActionState } from '../actions';
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
@@ -137,5 +137,22 @@ export default function ResetPasswordPage() {
         </Form>
       </div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-dvh w-screen items-center justify-center bg-background">
+        <div className="w-full max-w-md overflow-hidden rounded-2xl flex flex-col gap-4 p-8">
+          <h3 className="text-xl font-semibold text-center dark:text-zinc-50">Loading...</h3>
+          <p className="text-sm text-gray-500 text-center dark:text-zinc-400">
+            Please wait while we load your reset page.
+          </p>
+        </div>
+      </div>
+    }>
+      <ResetPasswordContent />
+    </Suspense>
   );
 } 
