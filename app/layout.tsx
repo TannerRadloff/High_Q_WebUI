@@ -26,13 +26,7 @@ const THEME_COLOR_SCRIPT = `\
     meta.setAttribute('name', 'theme-color');
     document.head.appendChild(meta);
   }
-  function updateThemeColor() {
-    var isDark = html.classList.contains('dark');
-    meta.setAttribute('content', isDark ? '${DARK_THEME_COLOR}' : '${LIGHT_THEME_COLOR}');
-  }
-  var observer = new MutationObserver(updateThemeColor);
-  observer.observe(html, { attributes: true, attributeFilter: ['class'] });
-  updateThemeColor();
+  meta.setAttribute('content', '${DARK_THEME_COLOR}');
 })();`;
 
 export default async function RootLayout({
@@ -59,8 +53,7 @@ export default async function RootLayout({
       <body className="antialiased">
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="dark"
           disableTransitionOnChange
         >
           <Toaster position="top-center" />
