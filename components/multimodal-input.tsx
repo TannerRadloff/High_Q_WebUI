@@ -29,6 +29,7 @@ import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { SuggestedActions } from './suggested-actions';
 import equal from 'fast-deep-equal';
+import { motion, AnimatePresence } from 'framer-motion';
 
 function PureMultimodalInput({
   chatId,
@@ -67,6 +68,7 @@ function PureMultimodalInput({
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
+  const [isFocused, setIsFocused] = useState(false);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -194,14 +196,24 @@ function PureMultimodalInput({
   );
 
   return (
-    <div
+    <motion.div
       className={cx(
-        'relative flex w-full flex-col items-center rounded-xl border border-border/40 bg-background/80 backdrop-blur-sm shadow-sm hover:shadow-[0_0_15px_rgba(0,150,255,0.15)] transition-all duration-300',
+        'relative flex w-full flex-col items-center rounded-xl border border-border/40 bg-gradient-to-b from-background/90 to-background/70 backdrop-blur-sm shadow-sm transition-all duration-300',
+        isFocused ? 'shadow-[0_0_20px_rgba(0,150,255,0.25)] border-primary/30' : 'hover:shadow-[0_0_15px_rgba(0,150,255,0.15)]',
         className,
       )}
+      initial={{ y: 10, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ duration: 0.3 }}
     >
       {attachments.length > 0 && (
-        <div className="flex w-full flex-row flex-wrap gap-2 p-2 border-b border-border/20">
+        <motion.div 
+          className="flex w-full flex-row flex-wrap gap-2 p-2 border-b border-border/20"
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.2 }}
+        >
           {attachments.map((attachment) => (
             <div key={attachment.url} className="relative">
               <PreviewAttachment attachment={attachment} />
@@ -217,7 +229,7 @@ function PureMultimodalInput({
               </button>
             </div>
           ))}
-        </div>
+        </motion.div>
       )}
 
       <form
@@ -242,6 +254,8 @@ function PureMultimodalInput({
           <Textarea
             ref={textareaRef}
             tabIndex={0}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -255,7 +269,7 @@ function PureMultimodalInput({
               }
             }}
             placeholder="Message..."
-            className="min-h-[40px] w-full resize-none overflow-hidden rounded-xl pr-12 py-3 focus-visible:ring-primary/70 focus-visible:border-primary/50 focus-visible:shadow-[0_0_10px_rgba(0,150,255,0.3)]"
+            className="min-h-[40px] w-full resize-none overflow-hidden rounded-xl pr-12 py-3 focus-visible:ring-primary/70 focus-visible:border-primary/50 focus-visible:shadow-[0_0_10px_rgba(0,150,255,0.3)] bg-background/40"
             value={input}
             onChange={handleInput}
             disabled={isLoading || uploadQueue.length > 0}
@@ -281,15 +295,23 @@ function PureMultimodalInput({
         </div>
       </form>
 
-      {!isLoading && messages.length > 0 && (
-        <div className="w-full px-2 pb-2">
-          <SuggestedActions
-            chatId={chatId}
-            append={append}
-          />
-        </div>
-      )}
-    </div>
+      <AnimatePresence>
+        {!isLoading && messages.length > 0 && (
+          <motion.div 
+            className="w-full px-2 pb-2"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            <SuggestedActions
+              chatId={chatId}
+              append={append}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
