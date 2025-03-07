@@ -113,7 +113,7 @@ const PurePreviewMessage = ({
                 )}
 
                 <div
-                  className={cn('flex flex-col gap-4', {
+                  className={cn('flex flex-col gap-4 message-bubble', {
                     'bg-primary text-primary-foreground px-3 py-2 rounded-xl':
                       message.role === 'user',
                     'bg-secondary text-secondary-foreground px-3 py-2 rounded-xl backdrop-blur-sm border border-secondary/30 shadow-md':
@@ -260,7 +260,7 @@ export const ThinkingMessage = () => {
         </div>
 
         <div className="flex flex-col gap-2 w-full">
-          <div className="flex flex-col gap-4 bg-secondary/30 text-secondary-foreground px-3 py-2 rounded-xl backdrop-blur-sm border border-secondary/30 shadow-md w-fit">
+          <div className="flex flex-col gap-4 bg-secondary/30 text-secondary-foreground px-3 py-2 rounded-xl backdrop-blur-sm border border-secondary/30 shadow-md w-fit message-bubble">
             <div className="flex space-x-2">
               <div className="size-2 rounded-full bg-primary animate-pulse"></div>
               <div className="size-2 rounded-full bg-primary animate-pulse delay-150"></div>

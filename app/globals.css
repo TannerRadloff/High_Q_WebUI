@@ -672,3 +672,29 @@
 .suggestion-highlight {
     @apply bg-primary/20 hover:bg-primary/30 dark:hover:bg-primary/40 dark:text-primary-foreground dark:bg-primary/30;
 }
+
+/* Ensure animations are visible in the messages container */
+.messages-container .aurora,
+.messages-container .shooting-star,
+.messages-container .cosmic-dust,
+.messages-container .pulsating-stars,
+.messages-container .parallax-stars {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  z-index: -1;
+}
+
+/* Make sure animations are visible and not hidden by other elements */
+.messages-container {
+  position: relative;
+  z-index: 0;
+}
+
+/* Ensure message bubbles are above animations */
+.message-bubble {
+  position: relative;
+  z-index: 1;
+}

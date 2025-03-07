@@ -2,7 +2,7 @@ import { ChatRequestOptions, Message } from 'ai';
 import { PreviewMessage, ThinkingMessage } from './message';
 import { useScrollToBottom } from './use-scroll-to-bottom';
 import { Overview } from './overview';
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 import { Vote } from '@/lib/db/schema';
 import equal from 'fast-deep-equal';
 
@@ -33,11 +33,52 @@ function PureMessages({
   const [messagesContainerRef, messagesEndRef] =
     useScrollToBottom<HTMLDivElement>();
 
+  // Initialize animation variables when component mounts
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--animation-play-state', 'running');
+    root.style.setProperty('--nebula-opacity', '0.7');
+    root.style.setProperty('--stars-opacity', '0.7');
+    root.style.setProperty('--shooting-stars-display', 'block');
+  }, []);
+
   return (
     <div
       ref={messagesContainerRef}
-      className="flex flex-col min-w-0 gap-6 flex-1 overflow-y-scroll pt-4"
+      className="flex flex-col min-w-0 gap-6 flex-1 overflow-y-scroll pt-4 relative messages-container"
     >
+      {/* Animation background elements */}
+      <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="aurora">
+          <div className="light"></div>
+          <div className="light light-2"></div>
+          <div className="light light-3"></div>
+        </div>
+        
+        <div className="shooting-star">
+          <div className="star-1"></div>
+          <div className="star-2"></div>
+          <div className="star-3"></div>
+        </div>
+        
+        <div className="cosmic-dust"></div>
+        
+        <div className="pulsating-stars">
+          <div className="star star-1"></div>
+          <div className="star star-2"></div>
+          <div className="star star-3"></div>
+          <div className="star star-4"></div>
+          <div className="star star-5"></div>
+          <div className="star star-6"></div>
+        </div>
+        
+        <div className="parallax-stars">
+          <div className="layer layer-1"></div>
+          <div className="layer layer-2"></div>
+          <div className="layer layer-3"></div>
+        </div>
+      </div>
+
       {messages.length === 0 && <Overview />}
 
       {messages.map((message, index) => (
