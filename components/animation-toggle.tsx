@@ -34,7 +34,7 @@ export function AnimationToggle() {
     setNebulaEnabled(newState);
     document.documentElement.style.setProperty(
       '--nebula-opacity',
-      newState ? '0.4' : '0'
+      newState ? '0.7' : '0'
     );
   };
 
@@ -43,7 +43,7 @@ export function AnimationToggle() {
     setStarsEnabled(newState);
     document.documentElement.style.setProperty(
       '--stars-opacity',
-      newState ? '0.3' : '0'
+      newState ? '0.7' : '0'
     );
   };
 
@@ -63,8 +63,8 @@ export function AnimationToggle() {
     setShootingStarsEnabled(true);
     
     document.documentElement.style.setProperty('--animation-play-state', 'running');
-    document.documentElement.style.setProperty('--nebula-opacity', '0.4');
-    document.documentElement.style.setProperty('--stars-opacity', '0.3');
+    document.documentElement.style.setProperty('--nebula-opacity', '0.7');
+    document.documentElement.style.setProperty('--stars-opacity', '0.7');
     document.documentElement.style.setProperty('--shooting-stars-display', 'block');
     
     // Force animation restart

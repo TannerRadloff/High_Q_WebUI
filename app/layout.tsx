@@ -34,8 +34,8 @@ const ANIMATION_INIT_SCRIPT = `\
 (function() {
   // Set animation variables
   document.documentElement.style.setProperty('--animation-play-state', 'running');
-  document.documentElement.style.setProperty('--nebula-opacity', '0.4');
-  document.documentElement.style.setProperty('--stars-opacity', '0.3');
+  document.documentElement.style.setProperty('--nebula-opacity', '0.7');
+  document.documentElement.style.setProperty('--stars-opacity', '0.7');
   document.documentElement.style.setProperty('--shooting-stars-display', 'block');
   
   // Force animation restart by briefly pausing and resuming
