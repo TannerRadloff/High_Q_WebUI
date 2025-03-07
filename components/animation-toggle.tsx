@@ -128,8 +128,9 @@ export function AnimationToggle() {
     );
     
     // Also set body background visibility
-    document.body.style.setProperty('--body-before-opacity', newState ? '1' : '0');
-    document.body.style.setProperty('--body-after-opacity', newState ? '1' : '0');
+    document.documentElement.style.setProperty('--body-before-opacity', newState ? '1' : '0');
+    document.documentElement.style.setProperty('--body-after-opacity', newState ? '1' : '0');
+    document.documentElement.style.setProperty('--body-bg-opacity', newState ? '1' : '0');
   };
 
   const toggleNebula = () => {
@@ -143,7 +144,10 @@ export function AnimationToggle() {
     );
     
     // Set body::after opacity directly
-    document.body.style.setProperty('--body-after-opacity', newState ? '1' : '0');
+    document.documentElement.style.setProperty('--body-after-opacity', newState ? '1' : '0');
+    
+    // Also control the body background gradients
+    document.documentElement.style.setProperty('--body-bg-opacity', newState ? '1' : '0');
     
     // Toggle all aurora elements
     const { auroras } = findAllAnimationElements();
@@ -167,7 +171,10 @@ export function AnimationToggle() {
     );
     
     // Set body::before opacity directly
-    document.body.style.setProperty('--body-before-opacity', newState ? '1' : '0');
+    document.documentElement.style.setProperty('--body-before-opacity', newState ? '1' : '0');
+    
+    // Also control the body background gradients (they're part of the starry effect)
+    document.documentElement.style.setProperty('--body-bg-opacity', newState ? '1' : '0');
     
     // Toggle all star-related elements
     const { pulsatingStars, parallaxStars, cosmicDusts } = findAllAnimationElements();
@@ -223,8 +230,9 @@ export function AnimationToggle() {
     document.documentElement.style.setProperty('--shooting-stars-display', 'block');
     
     // Reset body pseudo-elements
-    document.body.style.setProperty('--body-before-opacity', '1');
-    document.body.style.setProperty('--body-after-opacity', '1');
+    document.documentElement.style.setProperty('--body-before-opacity', '1');
+    document.documentElement.style.setProperty('--body-after-opacity', '1');
+    document.documentElement.style.setProperty('--body-bg-opacity', '1');
     
     // Ensure all animation elements exist
     ensureAnimationElementsExist();

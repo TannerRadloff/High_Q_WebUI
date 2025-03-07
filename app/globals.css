@@ -16,6 +16,7 @@
     --shooting-stars-display: block;
     --body-before-opacity: 1;
     --body-after-opacity: 1;
+    --body-bg-opacity: 1;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -180,8 +181,8 @@
     body {
         @apply bg-background text-foreground;
         background-image: 
-            radial-gradient(at 20% 20%, hsla(var(--primary), 0.15), transparent 40%),
-            radial-gradient(at 80% 80%, hsla(var(--accent), 0.15), transparent 40%);
+            radial-gradient(at 20% 20%, hsla(var(--primary), calc(0.15 * var(--body-bg-opacity))), transparent 40%),
+            radial-gradient(at 80% 80%, hsla(var(--accent), calc(0.15 * var(--body-bg-opacity))), transparent 40%);
         font-family: "Helvetica Neue", "Futura", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         background-attachment: fixed;
         position: relative;
