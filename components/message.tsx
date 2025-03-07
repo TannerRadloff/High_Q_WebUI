@@ -26,6 +26,37 @@ import { MessageEditor } from './message-editor';
 import { DocumentPreview } from './document-preview';
 import { MessageReasoning } from './message-reasoning';
 
+// Function to determine metal type based on message ID
+const getMetalType = (messageId: string, role: string) => {
+  // Default metals for each role
+  const defaultUserMetal = 'message-gold-border';
+  const defaultAssistantMetal = 'message-titanium-border';
+  
+  // If no message ID, return defaults
+  if (!messageId) {
+    return role === 'user' ? defaultUserMetal : defaultAssistantMetal;
+  }
+  
+  // Use the last character of the message ID to determine metal type
+  const lastChar = messageId.charAt(messageId.length - 1);
+  const charCode = lastChar.charCodeAt(0);
+  
+  if (role === 'user') {
+    // For user messages, alternate between gold and platinum
+    return charCode % 2 === 0 ? 'message-gold-border' : 'message-platinum-border';
+  } else {
+    // For assistant messages, use a wider variety
+    const metalTypes = [
+      'message-silver-border',
+      'message-titanium-border',
+      'message-chrome-border',
+      'message-bronze-border'
+    ];
+    
+    return metalTypes[charCode % metalTypes.length];
+  }
+};
+
 const PurePreviewMessage = ({
   chatId,
   message,
@@ -48,6 +79,7 @@ const PurePreviewMessage = ({
   isReadonly: boolean;
 }) => {
   const [mode, setMode] = useState<'view' | 'edit'>('view');
+  const metalBorderClass = getMetalType(message.id, message.role);
 
   return (
     <AnimatePresence>
@@ -113,14 +145,14 @@ const PurePreviewMessage = ({
                 )}
 
                 <div
-                  className={cn('flex flex-col gap-4', {
-                    'bg-primary text-primary-foreground px-3 py-2 rounded-xl':
+                  className={cn('flex flex-col gap-4 message-metal-border metallic-shine brushed-metal', {
+                    [`bg-primary/90 text-primary-foreground px-3 py-2 rounded-xl ${metalBorderClass}`]:
                       message.role === 'user',
-                    'bg-secondary text-secondary-foreground px-3 py-2 rounded-xl backdrop-blur-sm border border-secondary/30 shadow-md':
+                    [`bg-secondary/90 text-secondary-foreground px-3 py-2 rounded-xl backdrop-blur-sm shadow-md ${metalBorderClass}`]:
                       message.role === 'assistant',
                   })}
                 >
-                  <Markdown>{message.content as string}</Markdown>
+                  <Markdown className="embossed-text">{message.content as string}</Markdown>
                 </div>
               </div>
             )}
@@ -253,14 +285,14 @@ export const ThinkingMessage = () => {
       <div
         className="flex gap-4 w-full"
       >
-        <div className="size-8 flex items-center rounded-full justify-center ring-1 shrink-0 ring-border bg-secondary/30 backdrop-blur-sm shadow-sm">
+        <div className="size-8 flex items-center rounded-full justify-center ring-1 shrink-0 ring-border bg-secondary/30 backdrop-blur-sm shadow-sm message-metal-border message-silver-border metallic-shine">
           <div className="animate-pulse text-secondary-foreground">
             <SparklesIcon size={14} />
           </div>
         </div>
 
         <div className="flex flex-col gap-2 w-full">
-          <div className="flex flex-col gap-4 bg-secondary/30 text-secondary-foreground px-3 py-2 rounded-xl backdrop-blur-sm border border-secondary/30 shadow-md w-fit">
+          <div className="flex flex-col gap-4 bg-secondary/30 text-secondary-foreground px-3 py-2 rounded-xl backdrop-blur-sm shadow-md w-fit message-metal-border message-platinum-border metallic-shine brushed-metal">
             <div className="flex space-x-2">
               <div className="h-2 w-2 rounded-full bg-primary animate-pulse"></div>
               <div className="h-2 w-2 rounded-full bg-primary animate-pulse delay-150"></div>
