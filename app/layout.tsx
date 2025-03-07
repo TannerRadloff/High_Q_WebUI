@@ -29,6 +29,24 @@ const THEME_COLOR_SCRIPT = `\
   meta.setAttribute('content', '${DARK_THEME_COLOR}');
 })();`;
 
+// Script to ensure animations are properly initialized
+const ANIMATION_INIT_SCRIPT = `\
+(function() {
+  // Set animation variables
+  document.documentElement.style.setProperty('--animation-play-state', 'running');
+  document.documentElement.style.setProperty('--nebula-opacity', '0.4');
+  document.documentElement.style.setProperty('--stars-opacity', '0.3');
+  document.documentElement.style.setProperty('--shooting-stars-display', 'block');
+  
+  // Force animation restart by briefly pausing and resuming
+  setTimeout(function() {
+    document.documentElement.style.setProperty('--animation-play-state', 'paused');
+    setTimeout(function() {
+      document.documentElement.style.setProperty('--animation-play-state', 'running');
+    }, 50);
+  }, 100);
+})();`;
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -47,6 +65,11 @@ export default async function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: THEME_COLOR_SCRIPT,
+          }}
+        />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: ANIMATION_INIT_SCRIPT,
           }}
         />
       </head>

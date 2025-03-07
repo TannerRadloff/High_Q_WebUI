@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animation Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background-color: #0a0f1e; /* --background-start-rgb: 10, 15, 30 */
+            color: white;
+            font-family: Arial, sans-serif;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Star background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: 
+                radial-gradient(1px 1px at 25% 30%, rgba(255, 255, 255, 0.6), transparent),
+                radial-gradient(1px 1px at 50% 50%, rgba(255, 255, 255, 0.4), transparent),
+                radial-gradient(2px 2px at 75% 70%, rgba(255, 255, 255, 0.5), transparent),
+                radial-gradient(2px 2px at 20% 20%, rgba(255, 255, 255, 0.3), transparent),
+                radial-gradient(2px 2px at 35% 60%, rgba(255, 255, 255, 0.4), transparent),
+                radial-gradient(2px 2px at 65% 40%, rgba(255, 255, 255, 0.5), transparent),
+                radial-gradient(3px 3px at 15% 75%, rgba(255, 255, 255, 0.2), transparent),
+                radial-gradient(3px 3px at 85% 25%, rgba(255, 255, 255, 0.3), transparent);
+            background-size: 550px 550px, 350px 350px, 250px 250px, 150px 150px, 100px 100px, 200px 200px, 300px 300px, 400px 400px;
+            opacity: 0.3;
+            z-index: -1;
+            animation: twinkling 120s linear infinite;
+        }
+
+        /* Nebula effect */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(138, 43, 226, 0.15), transparent 40%),
+                radial-gradient(circle at 80% 20%, rgba(0, 150, 255, 0.1), transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(255, 0, 255, 0.08), transparent 40%),
+                radial-gradient(circle at 70% 60%, rgba(0, 255, 255, 0.06), transparent 60%);
+            filter: blur(20px);
+            opacity: 0.4;
+            z-index: -2;
+            animation: nebula-drift 180s ease-in-out infinite alternate;
+        }
+
+        /* Shooting stars */
+        .shooting-star {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .shooting-star::before,
+        .shooting-star::after,
+        .shooting-star .star-1::before,
+        .shooting-star .star-2::before,
+        .shooting-star .star-3::before {
+            content: "";
+            position: absolute;
+            height: 1px;
+            background: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(255, 255, 255, 0.8), rgba(0, 0, 0, 0));
+            border-radius: 50%;
+            animation: shooting 10s linear infinite;
+            opacity: 0;
+        }
+
+        .shooting-star::before {
+            width: 150px;
+            top: 30%;
+            left: 10%;
+            animation-delay: 5s;
+            transform: rotate(15deg);
+        }
+
+        .shooting-star::after {
+            width: 100px;
+            top: 60%;
+            left: 80%;
+            animation-delay: 8s;
+            transform: rotate(-20deg);
+        }
+
+        .shooting-star .star-1::before {
+            width: 200px;
+            top: 15%;
+            left: 70%;
+            animation-delay: 3s;
+            transform: rotate(-35deg);
+        }
+
+        .shooting-star .star-2::before {
+            width: 120px;
+            top: 45%;
+            left: 20%;
+            animation-delay: 12s;
+            transform: rotate(25deg);
+        }
+
+        .shooting-star .star-3::before {
+            width: 180px;
+            top: 85%;
+            left: 40%;
+            animation-delay: 15s;
+            transform: rotate(40deg);
+        }
+
+        @keyframes twinkling {
+            0% {
+                background-position: 
+                    0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+            }
+            100% {
+                background-position: 
+                    550px 550px, -350px 350px, 250px -250px, -150px 150px, 100px -100px, -200px 200px, 300px -300px, -400px 400px;
+            }
+        }
+
+        @keyframes nebula-drift {
+            0% {
+                background-position: 0% 0%, 0% 0%, 0% 0%, 0% 0%;
+                opacity: 0.3;
+            }
+            50% {
+                opacity: 0.5;
+            }
+            100% {
+                background-position: 5% 10%, -5% -10%, 10% -5%, -10% 5%;
+                opacity: 0.3;
+            }
+        }
+
+        @keyframes shooting {
+            0% {
+                transform: translateX(0) translateY(0);
+                opacity: 0;
+            }
+            1% {
+                opacity: 1;
+            }
+            3% {
+                opacity: 0.8;
+                box-shadow: 0 0 5px rgba(255, 255, 255, 0.7);
+            }
+            5% {
+                transform: translateX(500px) translateY(500px);
+                opacity: 0;
+                box-shadow: 0 0 0px rgba(255, 255, 255, 0);
+            }
+            100% {
+                opacity: 0;
+            }
+        }
+
+        .content {
+            position: relative;
+            z-index: 1;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .controls {
+            margin-top: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            background: rgba(138, 43, 226, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: rgba(138, 43, 226, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="shooting-star">
+        <div class="star-1"></div>
+        <div class="star-2"></div>
+        <div class="star-3"></div>
+    </div>
+
+    <div class="content">
+        <h1>Animation Test</h1>
+        <p>This page tests the cosmic background animations.</p>
+        <p>You should see:</p>
+        <ul style="text-align: left; display: inline-block;">
+            <li>A dark blue background with white dots (stars)</li>
+            <li>Stars twinkling (moving slowly)</li>
+            <li>Colored nebula effects (purple, blue, pink, cyan gradients)</li>
+            <li>Occasional shooting stars</li>
+        </ul>
+
+        <div class="controls">
+            <button id="toggleAnimations">Toggle Animations</button>
+            <button id="toggleNebula">Toggle Nebula Effect</button>
+            <button id="toggleStars">Toggle Star Background</button>
+            <button id="toggleShootingStars">Toggle Shooting Stars</button>
+        </div>
+    </div>
+
+    <script>
+        // Simple controls to toggle different effects
+        document.getElementById('toggleAnimations').addEventListener('click', function() {
+            document.body.style.setProperty('animation-play-state', 
+                document.body.style.getPropertyValue('animation-play-state') === 'paused' ? 'running' : 'paused');
+            
+            const allAnimatedElements = document.querySelectorAll('*[style*="animation"]');
+            allAnimatedElements.forEach(el => {
+                el.style.setProperty('animation-play-state', 
+                    el.style.getPropertyValue('animation-play-state') === 'paused' ? 'running' : 'paused');
+            });
+        });
+
+        document.getElementById('toggleNebula').addEventListener('click', function() {
+            const currentOpacity = getComputedStyle(document.body, '::after').opacity;
+            document.body.style.setProperty('--nebula-opacity', 
+                currentOpacity === '0' ? '0.4' : '0');
+            document.body.style.setProperty('--nebula-filter', 
+                currentOpacity === '0' ? 'blur(20px)' : 'none');
+        });
+
+        document.getElementById('toggleStars').addEventListener('click', function() {
+            const currentOpacity = getComputedStyle(document.body, '::before').opacity;
+            document.body.style.setProperty('--stars-opacity', 
+                currentOpacity === '0' ? '0.3' : '0');
+        });
+
+        document.getElementById('toggleShootingStars').addEventListener('click', function() {
+            const shootingStars = document.querySelector('.shooting-star');
+            shootingStars.style.display = shootingStars.style.display === 'none' ? 'block' : 'none';
+        });
+    </script>
+</body>
+</html> 
