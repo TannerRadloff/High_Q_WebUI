@@ -9,10 +9,10 @@ const config: Config = {
   ],
   theme: {
     fontFamily: {
-      sans: ['Space Grotesk', 'geist', 'sans-serif'],
-      mono: ['geist-mono'],
-      display: ['Space Grotesk', 'sans-serif'],
-      body: ['Inter', 'sans-serif']
+      sans: ['Cormorant Garamond', 'geist', 'sans-serif'],
+      mono: ['geist-mono', 'monospace'],
+      display: ['Cormorant Garamond', 'serif'],
+      body: ['geist', 'sans-serif']
     },
     extend: {
       borderRadius: {
@@ -71,16 +71,44 @@ const config: Config = {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))'
         },
-        brandBg: '#0d0f1f',
-        brandPrimary: '#66f3ec',
-        brandSecondary: '#feeaa6',
-        brandAccent: '#ffba3f',
-        brandNeutral: '#e6e8f0',
-        brandDanger: '#cc2936'
+        luxury: {
+          gold: '#D4AF37',
+          cream: '#F5F5F0',
+          navy: '#1A2A3A',
+          lavender: '#E6E6FA',
+          rose: '#F8C8DC',
+          sage: '#BCB88A',
+          charcoal: '#36454F'
+        }
       },
       boxShadow: {
-        soft: '0 2px 10px rgba(102,243,236,0.08)',
-        glow: '0 0 20px rgba(102,243,236,0.45)'
+        soft: '0 2px 10px rgba(212, 175, 55, 0.08)',
+        glow: '0 0 20px rgba(212, 175, 55, 0.25)',
+        'luxury-card': '0 4px 20px rgba(0, 0, 0, 0.05)',
+        'luxury-button': '0 2px 8px rgba(212, 175, 55, 0.15)'
+      },
+      backgroundImage: {
+        'gradient-luxury': 'linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(230, 230, 250, 0.05))',
+        'gradient-luxury-dark': 'linear-gradient(135deg, rgba(26, 42, 58, 0.8), rgba(54, 69, 79, 0.8))'
+      },
+      animation: {
+        'shimmer': 'shimmer 2s infinite linear',
+        'fade-in': 'fadeIn 0.5s ease-in-out',
+        'slide-up': 'slideUp 0.3s ease-out'
+      },
+      keyframes: {
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' }
+        },
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' }
+        },
+        slideUp: {
+          '0%': { transform: 'translateY(10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' }
+        }
       },
       spacing: {
         '128': '32rem',

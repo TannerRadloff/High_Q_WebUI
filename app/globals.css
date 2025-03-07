@@ -4,17 +4,17 @@
 
 :root {
     /* Minimal root-level RGB variables */
-    --foreground-rgb: 0, 0, 0;
-    --background-start-rgb: 235, 246, 255;
+    --foreground-rgb: 20, 20, 30;
+    --background-start-rgb: 245, 245, 250;
     --background-end-rgb: 255, 255, 255;
 }
 
 @media (prefers-color-scheme: dark) {
     :root {
         /* Dark-mode RGB overrides */
-        --foreground-rgb: 255, 255, 255;
-        --background-start-rgb: 10, 10, 20;
-        --background-end-rgb: 0, 0, 0;
+        --foreground-rgb: 240, 240, 245;
+        --background-start-rgb: 15, 15, 25;
+        --background-end-rgb: 10, 10, 20;
     }
 }
 
@@ -24,122 +24,139 @@
     }
     /* Subtle glow utility */
     .glow {
-        box-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
+        box-shadow: 0 0 18px rgba(180, 160, 255, 0.4);
+    }
+    /* Glass effect */
+    .glass {
+        backdrop-filter: blur(8px);
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .dark .glass {
+        background: rgba(20, 20, 35, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    /* Luxury gradient */
+    .luxury-gradient {
+        background: linear-gradient(135deg, rgba(180, 160, 255, 0.1), rgba(255, 220, 180, 0.05));
+    }
+    .dark .luxury-gradient {
+        background: linear-gradient(135deg, rgba(100, 90, 180, 0.15), rgba(180, 120, 200, 0.05));
     }
 }
 
 @layer base {
     /* Light theme variables */
     :root {
-        /* near-white background with a bluish tint */
-        --background: 42 100% 98%; /* hsl(230, 100%, 98%) */
-        /* deep neutral text with a cool undertone */
-        --foreground: 42 6% 10%; /* hsl(240, 6%, 10%) */
-        /* pure white background with a slight cool tint */
-        --card: 230 100% 100%; /* hsl(230, 100%, 100%) */
-        --card-foreground: 42 6% 10%;
+        /* Soft cream background with subtle warmth */
+        --background: 40 30% 98%; /* hsl(40, 30%, 98%) */
+        /* Deep navy-blue text */
+        --foreground: 225 30% 15%; /* hsl(225, 30%, 15%) */
+        /* Pure white background with subtle warmth */
+        --card: 40 30% 100%; /* hsl(40, 30%, 100%) */
+        --card-foreground: 225 30% 15%;
         --popover: var(--card);
         --popover-foreground: var(--card-foreground);
-        /* Gold */
-        --primary: 42 100% 42%; /* hsl(268, 83%, 60%) */
-        /* white text for high contrast */
-        --primary-foreground: 0 0% 100%; /* hsl(0, 0%, 100%) */
-        /* light pastel lavender */
-        --secondary: 42 100% 42%; /* hsl(230, 25%, 94%) */
-        --secondary-foreground: 42 0% 39%;
-        /* pale grayish-blue for muted elements */
-        --muted: 42 100% 90%; /* hsl(228, 16%, 90%) */
-        --muted-foreground: 42 8% 30%;
-        /* accent uses the same neon purple as primary */
-        --accent: 42 75% 42%;
-        --accent-foreground: 0 0% 100%;
-        /* bright pinkish red for destructive actions */
-        --destructive: 355 80% 60%; /* hsl(355, 80%, 60%) */
+        /* Soft gold */
+        --primary: 35 80% 50%; /* hsl(35, 80%, 50%) */
+        /* Deep navy for contrast */
+        --primary-foreground: 225 30% 15%; /* hsl(225, 30%, 15%) */
+        /* Soft lavender */
+        --secondary: 250 30% 90%; /* hsl(250, 30%, 90%) */
+        --secondary-foreground: 250 40% 30%;
+        /* Pale cream for muted elements */
+        --muted: 40 20% 92%; /* hsl(40, 20%, 92%) */
+        --muted-foreground: 225 10% 40%;
+        /* Soft gold accent */
+        --accent: 35 80% 50%;
+        --accent-foreground: 225 30% 15%;
+        /* Muted red for destructive actions */
+        --destructive: 355 60% 50%; /* hsl(355, 60%, 50%) */
         --destructive-foreground: 0 0% 100%;
-        /* subtle light gray-blue border/input */
-        --border: 230 20% 0%; /* hsl(230, 20%, 85%) */
-        --input: 42 20% 85%;
-        /* neon purple ring color for focus outlines */
-        --ring: 42 95% 42%;
-        /* chart color #1: medium teal */
-        --chart-1: 190 70% 55%; /* hsl(190, 70%, 55%) */
-        /* chart color #2: medium green */
-        --chart-2: 160 60% 45%; /* hsl(160, 60%, 45%) */
-        /* chart color #3: bright orange */
-        --chart-3: 30 80% 55%; /* hsl(30, 80%, 55%) */
-        /* chart color #4: bright pinkish purple */
-        --chart-4: 280 65% 60%; /* hsl(280, 65%, 60%) */
-        /* chart color #5: bright pinkish magenta */
-        --chart-5: 340 75% 55%; /* hsl(340, 75%, 55%) */
-        /* slightly rounded corners */
-        --radius: 0.75rem;
-        /* near-white background for sidebar */
-        --sidebar-background: 230 20% 98%; /* hsl(230, 20%, 98%) */
-        --sidebar-foreground: 240 5.3% 26.1%;
-        /* neon purple for sidebar primary */
-        --sidebar-primary: 42 42% 42%;
-        --sidebar-primary-foreground: 0 0% 100%;
-        /* pastel lavender for sidebar accent */
-        --sidebar-accent: 230 25% 94%;
-        --sidebar-accent-foreground: 240 5.9% 10%;
-        /* subtle cool gray border for sidebar */
-        --sidebar-border: 220 13% 91%;
-        /* neon purple ring */
-        --sidebar-ring: 42 75% 42%;
+        /* Subtle warm gray border/input */
+        --border: 40 10% 85%; /* hsl(40, 10%, 85%) */
+        --input: 40 10% 85%;
+        /* Gold ring color for focus outlines */
+        --ring: 35 80% 50%;
+        /* chart color #1: soft teal */
+        --chart-1: 180 60% 50%; /* hsl(180, 60%, 50%) */
+        /* chart color #2: soft sage */
+        --chart-2: 150 40% 50%; /* hsl(150, 40%, 50%) */
+        /* chart color #3: soft gold */
+        --chart-3: 35 80% 50%; /* hsl(35, 80%, 50%) */
+        /* chart color #4: soft lavender */
+        --chart-4: 270 40% 60%; /* hsl(270, 40%, 60%) */
+        /* chart color #5: soft rose */
+        --chart-5: 340 40% 60%; /* hsl(340, 40%, 60%) */
+        /* Slightly rounded corners */
+        --radius: 0.5rem;
+        /* Soft cream background for sidebar */
+        --sidebar-background: 40 30% 97%; /* hsl(40, 30%, 97%) */
+        --sidebar-foreground: 225 20% 25%;
+        /* Gold for sidebar primary */
+        --sidebar-primary: 35 80% 50%;
+        --sidebar-primary-foreground: 225 30% 15%;
+        /* Soft lavender for sidebar accent */
+        --sidebar-accent: 250 30% 90%;
+        --sidebar-accent-foreground: 250 40% 30%;
+        /* Subtle warm gray border for sidebar */
+        --sidebar-border: 40 10% 85%;
+        /* Gold ring */
+        --sidebar-ring: 35 80% 50%;
     }
 
     /* Dark theme overrides */
     .dark {
-        /* very dark bluish-purple background */
-        --background: 42 100% 0%; /* hsl(240, 8%, 9%) */
-        /* near-white text color */
-        --foreground: 42 75% 100%; /* hsl(0, 0%, 98%) */
-        /* slightly lighter than background for cards/popovers */
-        --card: 42 100% 10%; /* hsl(240, 8%, 11%) */
-        --card-foreground: 0 0% 100%;
+        /* Deep navy-blue background */
+        --background: 225 30% 8%; /* hsl(225, 30%, 8%) */
+        /* Soft cream text color */
+        --foreground: 40 30% 92%; /* hsl(40, 30%, 92%) */
+        /* Slightly lighter navy for cards/popovers */
+        --card: 225 25% 12%; /* hsl(225, 25%, 12%) */
+        --card-foreground: 40 30% 92%;
         --popover: var(--card);
         --popover-foreground: var(--card-foreground);
-        /* slightly brighter neon purple */
-        --primary: 42 80% 50%; /* hsl(268, 83%, 66%) */
-        --primary-foreground: 0 0% 0%;
-        /* dark grayish-blue for secondary elements */
-        --secondary: 42 100% 50%; /* hsl(240, 5%, 18%) */
-        --secondary-foreground: 42 100% 35%;
-        /* deeper background accent for muted elements */
-        --muted: 42 5% 14%; /* hsl(240, 5%, 14%) */
-        --muted-foreground: 42 3% 64%;
-        /* bright neon purple accent matching primary */
-        --accent: 42 100% 50%;
-        --accent-foreground: 0 0% 0%;
-        /* pinkish red for destructive actions */
-        --destructive: 355 70% 42%; /* hsl(355, 70%, 42%) */
+        /* Soft gold */
+        --primary: 35 80% 50%; /* hsl(35, 80%, 50%) */
+        --primary-foreground: 225 30% 15%;
+        /* Deep lavender for secondary elements */
+        --secondary: 250 20% 20%; /* hsl(250, 20%, 20%) */
+        --secondary-foreground: 250 30% 80%;
+        /* Deeper navy for muted elements */
+        --muted: 225 20% 15%; /* hsl(225, 20%, 15%) */
+        --muted-foreground: 40 15% 70%;
+        /* Soft gold accent matching primary */
+        --accent: 35 80% 50%;
+        --accent-foreground: 225 30% 15%;
+        /* Muted red for destructive actions */
+        --destructive: 355 50% 40%; /* hsl(355, 50%, 40%) */
         --destructive-foreground: 0 0% 98%;
-        /* dark background for borders and inputs */
-        --border: 42 60% 50%; /* hsl(240, 5%, 14%) */
-        --input: 42 5% 50%;
-        /* neon purple ring for focus */
-        --ring: 42 100% 50%;
-        /* chart color #1: bright saturated blue */
-        --chart-1: 220 70% 42%; /* hsl(220, 70%, 42%) */
-        /* chart color #2: medium green */
-        --chart-2: 160 60% 45%; /* hsl(160, 60%, 45%) */
-        /* chart color #3: bright orange */
-        --chart-3: 30 80% 55%; /* hsl(30, 80%, 55%) */
-        /* chart color #4: bright pinkish purple */
-        --chart-4: 280 65% 60%; /* hsl(280, 65%, 60%) */
-        /* chart color #5: bright pinkish magenta */
-        --chart-5: 340 75% 55%; /* hsl(340, 75%, 55%) */
-        /* very dark bluish-purple background for sidebar */
-        --sidebar-background: 240 0% 10%; /* hsl(240, 5.9%, 10%) */
-        --sidebar-foreground: 42 50% 50%;
-        /* neon purple for sidebar primary */
-        --sidebar-primary: 42 75% 50%;
-        --sidebar-primary-foreground: 0 0% 0%;
-        /* deeper shade for sidebar accent elements */
-        --sidebar-accent: 42 75% 42%;
-        --sidebar-accent-foreground: 240 4.8% 0%;
-        --sidebar-border: 42 90% 55%;
-        --sidebar-ring: 42 60% 42%;
+        /* Deep navy for borders and inputs */
+        --border: 225 20% 18%; /* hsl(225, 20%, 18%) */
+        --input: 225 20% 18%;
+        /* Gold ring for focus */
+        --ring: 35 80% 50%;
+        /* chart color #1: soft teal */
+        --chart-1: 180 60% 40%; /* hsl(180, 60%, 40%) */
+        /* chart color #2: soft sage */
+        --chart-2: 150 40% 40%; /* hsl(150, 40%, 40%) */
+        /* chart color #3: soft gold */
+        --chart-3: 35 80% 50%; /* hsl(35, 80%, 50%) */
+        /* chart color #4: soft lavender */
+        --chart-4: 270 40% 50%; /* hsl(270, 40%, 50%) */
+        /* chart color #5: soft rose */
+        --chart-5: 340 40% 50%; /* hsl(340, 40%, 50%) */
+        /* Deep navy background for sidebar */
+        --sidebar-background: 225 30% 10%; /* hsl(225, 30%, 10%) */
+        --sidebar-foreground: 40 20% 85%;
+        /* Gold for sidebar primary */
+        --sidebar-primary: 35 80% 50%;
+        --sidebar-primary-foreground: 225 30% 15%;
+        /* Deeper lavender for sidebar accent elements */
+        --sidebar-accent: 250 20% 25%;
+        --sidebar-accent-foreground: 250 30% 80%;
+        --sidebar-border: 225 20% 18%;
+        --sidebar-ring: 35 80% 50%;
     }
 
     /* Global style applications */
@@ -149,8 +166,11 @@
 
     body {
         @apply bg-background text-foreground;
-        background-image: radial-gradient(at 20% 20%, hsla(var(--primary), 0.05), transparent 30%);
+        background-image: 
+            radial-gradient(at 20% 20%, hsla(var(--primary), 0.05), transparent 30%),
+            radial-gradient(at 80% 80%, hsla(250, 30%, 60%, 0.05), transparent 30%);
         font-family: "geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: 0.01em;
     }
 
     @font-face {
@@ -178,15 +198,15 @@
 
 *[class^="text-"] {
     color: transparent;
-    @apply rounded-md bg-foreground/20 select-none animate-pulse;
+    @apply rounded-md bg-foreground/10 select-none animate-pulse;
 }
 
 .skeleton-bg {
-    @apply bg-foreground/10;
+    @apply bg-foreground/5;
 }
 
 .skeleton-div {
-    @apply bg-foreground/20 animate-pulse;
+    @apply bg-foreground/10 animate-pulse;
 }
 
 }
@@ -198,13 +218,13 @@
 
 .cm-editor,
 .cm-gutters {
-    @apply bg-background dark:bg-zinc-800 outline-none selection:bg-zinc-900 !important;
+    @apply bg-background dark:bg-zinc-800/80 outline-none selection:bg-zinc-900/20 !important;
 }
 
 .\u036Co.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground,
 .\u036Co.cm-selectionBackground,
 .\u036Co.cm-content::selection {
-    @apply bg-zinc-200 dark:bg-zinc-900 !important;
+    @apply bg-zinc-200/70 dark:bg-zinc-700/50 !important;
 }
 
 .cm-activeLine,
@@ -229,5 +249,38 @@
 }
 
 .suggestion-highlight {
-    @apply bg-blue-200 hover:bg-blue-300 dark:hover:bg-blue-400/50 dark:text-blue-50 dark:bg-blue-500/40;
+    @apply bg-primary/20 hover:bg-primary/30 dark:hover:bg-primary/40 dark:text-primary-foreground dark:bg-primary/30;
+}
+
+/* Message styling */
+.message-user {
+    @apply border border-border/30 bg-card/50 backdrop-blur-sm;
+}
+
+.message-ai {
+    @apply border border-primary/10 bg-card/70 backdrop-blur-sm;
+}
+
+/* Input styling */
+.luxury-input {
+    @apply border border-border/50 bg-background/80 backdrop-blur-sm focus:border-primary/50 focus:ring-1 focus:ring-primary/30;
+}
+
+/* Button styling */
+.luxury-button {
+    @apply bg-primary/90 text-primary-foreground hover:bg-primary shadow-sm hover:shadow transition-all duration-200;
+}
+
+.luxury-button-secondary {
+    @apply bg-secondary/80 text-secondary-foreground hover:bg-secondary/90 shadow-sm hover:shadow transition-all duration-200;
+}
+
+/* Sidebar styling */
+.luxury-sidebar {
+    @apply bg-sidebar/90 backdrop-blur-sm border-r border-sidebar-border/50;
+}
+
+/* Card styling */
+.luxury-card {
+    @apply bg-card/80 backdrop-blur-sm border border-border/30 shadow-sm hover:shadow-md transition-all duration-200;
 }
