@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Toaster } from 'sonner';
+import Script from 'next/script';
 
 import { ThemeProvider } from '@/components/theme-provider';
 import { AnimationToggle } from '@/components/animation-toggle';
@@ -30,7 +31,7 @@ const THEME_COLOR_SCRIPT = `\
   meta.setAttribute('content', '${DARK_THEME_COLOR}');
 })();`;
 
-// Script to ensure animations are properly initialized
+// Enhanced animation initialization script
 const ANIMATION_INIT_SCRIPT = `\
 (function() {
   // Set animation variables
@@ -39,13 +40,107 @@ const ANIMATION_INIT_SCRIPT = `\
   document.documentElement.style.setProperty('--stars-opacity', '0.7');
   document.documentElement.style.setProperty('--shooting-stars-display', 'block');
   
-  // Force animation restart by briefly pausing and resuming
+  // Check if animation elements exist, if not, create them
+  const body = document.body;
+  
+  function createAnimationElements() {
+    if (!document.querySelector('.aurora')) {
+      const aurora = document.createElement('div');
+      aurora.className = 'aurora';
+      
+      const light1 = document.createElement('div');
+      light1.className = 'light';
+      
+      const light2 = document.createElement('div');
+      light2.className = 'light light-2';
+      
+      const light3 = document.createElement('div');
+      light3.className = 'light light-3';
+      
+      aurora.appendChild(light1);
+      aurora.appendChild(light2);
+      aurora.appendChild(light3);
+      
+      body.prepend(aurora);
+    }
+    
+    if (!document.querySelector('.shooting-star')) {
+      const shootingStar = document.createElement('div');
+      shootingStar.className = 'shooting-star';
+      
+      const star1 = document.createElement('div');
+      star1.className = 'star-1';
+      
+      const star2 = document.createElement('div');
+      star2.className = 'star-2';
+      
+      const star3 = document.createElement('div');
+      star3.className = 'star-3';
+      
+      shootingStar.appendChild(star1);
+      shootingStar.appendChild(star2);
+      shootingStar.appendChild(star3);
+      
+      body.prepend(shootingStar);
+    }
+    
+    if (!document.querySelector('.cosmic-dust')) {
+      const cosmicDust = document.createElement('div');
+      cosmicDust.className = 'cosmic-dust';
+      body.prepend(cosmicDust);
+    }
+    
+    if (!document.querySelector('.pulsating-stars')) {
+      const pulsatingStars = document.createElement('div');
+      pulsatingStars.className = 'pulsating-stars';
+      
+      for (let i = 1; i <= 6; i++) {
+        const star = document.createElement('div');
+        star.className = 'star star-' + i;
+        pulsatingStars.appendChild(star);
+      }
+      
+      body.prepend(pulsatingStars);
+    }
+    
+    if (!document.querySelector('.parallax-stars')) {
+      const parallaxStars = document.createElement('div');
+      parallaxStars.className = 'parallax-stars';
+      
+      for (let i = 1; i <= 3; i++) {
+        const layer = document.createElement('div');
+        layer.className = 'layer layer-' + i;
+        parallaxStars.appendChild(layer);
+      }
+      
+      body.prepend(parallaxStars);
+    }
+  }
+  
+  // Create animation elements immediately
+  createAnimationElements();
+  
+  // Also try again after a short delay to handle any race conditions
   setTimeout(function() {
+    createAnimationElements();
+    
+    // Force animation restart by briefly pausing and resuming
     document.documentElement.style.setProperty('--animation-play-state', 'paused');
     setTimeout(function() {
       document.documentElement.style.setProperty('--animation-play-state', 'running');
     }, 50);
   }, 100);
+  
+  // And try one more time after the page has fully loaded
+  window.addEventListener('load', function() {
+    createAnimationElements();
+    
+    // Force animation restart
+    document.documentElement.style.setProperty('--animation-play-state', 'paused');
+    setTimeout(function() {
+      document.documentElement.style.setProperty('--animation-play-state', 'running');
+    }, 50);
+  });
 })();`;
 
 export default async function RootLayout({
@@ -80,30 +175,8 @@ export default async function RootLayout({
           defaultTheme="dark"
           disableTransitionOnChange
         >
-          <div className="aurora">
-            <div className="light"></div>
-            <div className="light light-2"></div>
-            <div className="light light-3"></div>
-          </div>
-          <div className="shooting-star">
-            <div className="star-1"></div>
-            <div className="star-2"></div>
-            <div className="star-3"></div>
-          </div>
-          <div className="cosmic-dust"></div>
-          <div className="pulsating-stars">
-            <div className="star star-1"></div>
-            <div className="star star-2"></div>
-            <div className="star star-3"></div>
-            <div className="star star-4"></div>
-            <div className="star star-5"></div>
-            <div className="star star-6"></div>
-          </div>
-          <div className="parallax-stars">
-            <div className="layer layer-1"></div>
-            <div className="layer layer-2"></div>
-            <div className="layer layer-3"></div>
-          </div>
+          {/* Animation elements are now created by the script */}
+          <Script src="/animation-diagnostic.js" strategy="afterInteractive" />
           <AnimationToggle />
           <Toaster position="top-center" />
           {children}

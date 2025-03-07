@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animation Test</title>
+    <style>
+        :root {
+            /* Animation control variables */
+            --animation-play-state: running;
+            --nebula-opacity: 0.7;
+            --stars-opacity: 0.7;
+            --shooting-stars-display: block;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background-color: #0a0f1e; /* Deep blue background */
+            color: white;
+            font-family: Arial, sans-serif;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Star background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: 
+                radial-gradient(1px 1px at 25% 30%, rgba(255, 255, 255, 0.9), transparent),
+                radial-gradient(1px 1px at 50% 50%, rgba(255, 255, 255, 0.8), transparent),
+                radial-gradient(2px 2px at 75% 70%, rgba(255, 255, 255, 0.9), transparent),
+                radial-gradient(2px 2px at 20% 20%, rgba(255, 255, 255, 0.7), transparent),
+                radial-gradient(2px 2px at 35% 60%, rgba(255, 255, 255, 0.8), transparent),
+                radial-gradient(2px 2px at 65% 40%, rgba(255, 255, 255, 0.9), transparent),
+                radial-gradient(3px 3px at 15% 75%, rgba(255, 255, 255, 0.6), transparent),
+                radial-gradient(3px 3px at 85% 25%, rgba(255, 255, 255, 0.7), transparent);
+            background-size: 550px 550px, 350px 350px, 250px 250px, 150px 150px, 100px 100px, 200px 200px, 300px 300px, 400px 400px;
+            opacity: var(--stars-opacity);
+            z-index: -1;
+            animation: twinkling 120s linear infinite;
+            animation-play-state: var(--animation-play-state);
+        }
+
+        /* Nebula effect */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(138, 43, 226, 0.4), transparent 40%),
+                radial-gradient(circle at 80% 20%, rgba(0, 150, 255, 0.3), transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(255, 0, 255, 0.25), transparent 40%),
+                radial-gradient(circle at 70% 60%, rgba(0, 255, 255, 0.2), transparent 60%);
+            filter: blur(15px);
+            opacity: var(--nebula-opacity);
+            z-index: -2;
+            animation: nebula-drift 180s ease-in-out infinite alternate;
+            animation-play-state: var(--animation-play-state);
+        }
+
+        /* Shooting stars */
+        .shooting-star {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+            overflow: hidden;
+            display: var(--shooting-stars-display);
+        }
+
+        .shooting-star .star-1::before,
+        .shooting-star .star-2::before,
+        .shooting-star .star-3::before {
+            content: "";
+            position: absolute;
+            height: 2px;
+            background: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(255, 255, 255, 1), rgba(0, 0, 0, 0));
+            border-radius: 50%;
+            animation: shooting 10s linear infinite;
+            opacity: 0;
+        }
+
+        .shooting-star .star-1::before {
+            width: 150px;
+            top: 15%;
+            left: 60%;
+            animation-delay: 3s;
+            transform: rotate(55deg);
+        }
+
+        .shooting-star .star-2::before {
+            width: 80px;
+            top: 50%;
+            left: 30%;
+            animation-delay: 12s;
+            transform: rotate(30deg);
+        }
+
+        .shooting-star .star-3::before {
+            width: 180px;
+            top: 85%;
+            left: 40%;
+            animation-delay: 15s;
+            transform: rotate(40deg);
+        }
+
+        /* Cosmic dust */
+        .cosmic-dust {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: -3;
+        }
+
+        .cosmic-dust::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='10' cy='10' r='1' fill='rgba(255,255,255,0.3)'/%3E%3Ccircle cx='30' cy='40' r='0.5' fill='rgba(255,255,255,0.2)'/%3E%3Ccircle cx='50' cy='20' r='0.8' fill='rgba(255,255,255,0.25)'/%3E%3Ccircle cx='70' cy='70' r='0.4' fill='rgba(255,255,255,0.15)'/%3E%3Ccircle cx='90' cy='30' r='0.7' fill='rgba(255,255,255,0.2)'/%3E%3Ccircle cx='20' cy='80' r='0.6' fill='rgba(255,255,255,0.18)'/%3E%3Ccircle cx='60' cy='50' r='0.3' fill='rgba(255,255,255,0.12)'/%3E%3C/svg%3E");
+            background-size: 150px 150px;
+            opacity: 0.2;
+            animation: dust-drift 60s linear infinite;
+        }
+
+        /* Pulsating stars */
+        .pulsating-stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -2;
+        }
+
+        .pulsating-stars .star {
+            position: absolute;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.8);
+            animation: pulse 4s ease-in-out infinite;
+        }
+
+        .pulsating-stars .star-1 {
+            width: 2px;
+            height: 2px;
+            top: 15%;
+            left: 25%;
+            animation-delay: 0s;
+        }
+
+        .pulsating-stars .star-2 {
+            width: 3px;
+            height: 3px;
+            top: 35%;
+            left: 65%;
+            animation-delay: 1s;
+        }
+
+        .pulsating-stars .star-3 {
+            width: 2px;
+            height: 2px;
+            top: 75%;
+            left: 35%;
+            animation-delay: 2s;
+        }
+
+        .pulsating-stars .star-4 {
+            width: 4px;
+            height: 4px;
+            top: 45%;
+            left: 85%;
+            animation-delay: 3s;
+        }
+
+        .pulsating-stars .star-5 {
+            width: 3px;
+            height: 3px;
+            top: 85%;
+            left: 15%;
+            animation-delay: 2.5s;
+        }
+
+        .pulsating-stars .star-6 {
+            width: 2px;
+            height: 2px;
+            top: 25%;
+            left: 45%;
+            animation-delay: 1.5s;
+        }
+
+        /* Parallax stars */
+        .parallax-stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -3;
+            perspective: 1000px;
+        }
+
+        .parallax-stars .layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: 400px 400px;
+            opacity: 0.3;
+        }
+
+        .parallax-stars .layer-1 {
+            background-image: radial-gradient(1px 1px at 25% 30%, rgba(255, 255, 255, 0.6), transparent 100%),
+                            radial-gradient(1px 1px at 50% 50%, rgba(255, 255, 255, 0.4), transparent 100%),
+                            radial-gradient(2px 2px at 75% 70%, rgba(255, 255, 255, 0.5), transparent 100%);
+            animation: parallax-1 60s ease-in-out infinite alternate;
+            transform: translateZ(-100px);
+        }
+
+        .parallax-stars .layer-2 {
+            background-image: radial-gradient(1.5px 1.5px at 35% 25%, rgba(255, 255, 255, 0.5), transparent 100%),
+                            radial-gradient(1.5px 1.5px at 65% 45%, rgba(255, 255, 255, 0.3), transparent 100%),
+                            radial-gradient(2.5px 2.5px at 40% 80%, rgba(255, 255, 255, 0.4), transparent 100%);
+            animation: parallax-2 75s ease-in-out infinite alternate;
+            transform: translateZ(-200px);
+        }
+
+        .parallax-stars .layer-3 {
+            background-image: radial-gradient(2px 2px at 15% 15%, rgba(255, 255, 255, 0.4), transparent 100%),
+                            radial-gradient(2px 2px at 60% 30%, rgba(255, 255, 255, 0.2), transparent 100%),
+                            radial-gradient(3px 3px at 85% 65%, rgba(255, 255, 255, 0.3), transparent 100%);
+            animation: parallax-3 90s ease-in-out infinite alternate;
+            transform: translateZ(-300px);
+        }
+
+        /* Aurora effect */
+        .aurora {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -4;
+            overflow: hidden;
+        }
+
+        .aurora .light {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            top: -50%;
+            left: -50%;
+            background: linear-gradient(
+                90deg,
+                rgba(138, 43, 226, 0.05) 0%,
+                rgba(0, 150, 255, 0.05) 25%,
+                rgba(0, 255, 200, 0.05) 50%,
+                rgba(138, 43, 226, 0.05) 75%,
+                rgba(0, 150, 255, 0.05) 100%
+            );
+            filter: blur(60px);
+            opacity: 0.3;
+            animation: aurora-shift 30s ease infinite;
+            transform-origin: center;
+        }
+
+        .aurora .light-2 {
+            top: -30%;
+            left: -30%;
+            animation-delay: -5s;
+            animation-duration: 45s;
+            opacity: 0.2;
+        }
+
+        .aurora .light-3 {
+            top: -40%;
+            left: -40%;
+            animation-delay: -10s;
+            animation-duration: 60s;
+            opacity: 0.1;
+        }
+
+        /* Animation keyframes */
+        @keyframes twinkling {
+            0% {
+                background-position: 
+                    0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+            }
+            100% {
+                background-position: 
+                    550px 550px, -350px 350px, 250px -250px, -150px 150px, 100px -100px, -200px 200px, 300px -300px, -400px 400px;
+            }
+        }
+
+        @keyframes nebula-drift {
+            0% {
+                background-position: 0% 0%, 0% 0%, 0% 0%, 0% 0%;
+                opacity: 0.6;
+            }
+            50% {
+                opacity: 0.8;
+            }
+            100% {
+                background-position: 5% 10%, -5% -10%, 10% -5%, -10% 5%;
+                opacity: 0.6;
+            }
+        }
+
+        @keyframes shooting {
+            0% {
+                transform: translateX(0) translateY(0);
+                opacity: 0;
+            }
+            1% {
+                opacity: 1;
+            }
+            3% {
+                opacity: 0.9;
+                box-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+            }
+            5% {
+                transform: translateX(500px) translateY(500px);
+                opacity: 0;
+                box-shadow: 0 0 0px rgba(255, 255, 255, 0);
+            }
+            100% {
+                opacity: 0;
+            }
+        }
+
+        @keyframes dust-drift {
+            0% {
+                background-position: 0 0;
+            }
+            100% {
+                background-position: 150px 150px;
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+            50% {
+                transform: scale(1.5);
+                opacity: 1;
+                box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.5);
+            }
+        }
+
+        @keyframes parallax-1 {
+            0% {
+                transform: translateX(0) translateY(0) translateZ(-100px);
+            }
+            100% {
+                transform: translateX(-20px) translateY(-10px) translateZ(-100px);
+            }
+        }
+
+        @keyframes parallax-2 {
+            0% {
+                transform: translateX(0) translateY(0) translateZ(-200px);
+            }
+            100% {
+                transform: translateX(15px) translateY(-15px) translateZ(-200px);
+            }
+        }
+
+        @keyframes parallax-3 {
+            0% {
+                transform: translateX(0) translateY(0) translateZ(-300px);
+            }
+            100% {
+                transform: translateX(-10px) translateY(20px) translateZ(-300px);
+            }
+        }
+
+        @keyframes aurora-shift {
+            0% {
+                transform: rotate(0deg) scale(1);
+            }
+            25% {
+                transform: rotate(5deg) scale(1.1);
+            }
+            50% {
+                transform: rotate(0deg) scale(1);
+            }
+            75% {
+                transform: rotate(-5deg) scale(0.9);
+            }
+            100% {
+                transform: rotate(0deg) scale(1);
+            }
+        }
+
+        /* Controls */
+        .content {
+            position: relative;
+            z-index: 10;
+            padding: 2rem;
+            text-align: center;
+            background-color: rgba(10, 15, 30, 0.7);
+            border-radius: 10px;
+            margin: 2rem auto;
+            max-width: 800px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .controls {
+            margin-top: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            background: rgba(138, 43, 226, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: rgba(138, 43, 226, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="aurora">
+        <div class="light"></div>
+        <div class="light light-2"></div>
+        <div class="light light-3"></div>
+    </div>
+    
+    <div class="shooting-star">
+        <div class="star-1"></div>
+        <div class="star-2"></div>
+        <div class="star-3"></div>
+    </div>
+    
+    <div class="cosmic-dust"></div>
+    
+    <div class="pulsating-stars">
+        <div class="star star-1"></div>
+        <div class="star star-2"></div>
+        <div class="star star-3"></div>
+        <div class="star star-4"></div>
+        <div class="star star-5"></div>
+        <div class="star star-6"></div>
+    </div>
+    
+    <div class="parallax-stars">
+        <div class="layer layer-1"></div>
+        <div class="layer layer-2"></div>
+        <div class="layer layer-3"></div>
+    </div>
+
+    <div class="content">
+        <h1>Animation Test</h1>
+        <p>This page tests the cosmic background animations.</p>
+        <p>You should see:</p>
+        <ul style="text-align: left; display: inline-block;">
+            <li>A dark blue background with white dots (stars)</li>
+            <li>Stars twinkling (moving slowly)</li>
+            <li>Colored nebula effects (purple, blue, pink, cyan gradients)</li>
+            <li>Occasional shooting stars</li>
+            <li>Pulsating stars</li>
+            <li>Aurora effects</li>
+        </ul>
+
+        <div class="controls">
+            <button id="toggleAnimations">Toggle Animations</button>
+            <button id="toggleNebula">Toggle Nebula Effect</button>
+            <button id="toggleStars">Toggle Star Background</button>
+            <button id="toggleShootingStars">Toggle Shooting Stars</button>
+            <button id="resetAnimations">Reset All Animations</button>
+        </div>
+    </div>
+
+    <script>
+        // Animation controls
+        document.getElementById('toggleAnimations').addEventListener('click', function() {
+            const root = document.documentElement;
+            const currentState = getComputedStyle(root).getPropertyValue('--animation-play-state').trim();
+            root.style.setProperty('--animation-play-state', 
+                currentState === 'paused' ? 'running' : 'paused');
+            
+            this.textContent = currentState === 'paused' ? 'Pause Animations' : 'Play Animations';
+        });
+
+        document.getElementById('toggleNebula').addEventListener('click', function() {
+            const root = document.documentElement;
+            const currentOpacity = getComputedStyle(root).getPropertyValue('--nebula-opacity').trim();
+            const newOpacity = currentOpacity === '0' ? '0.7' : '0';
+            
+            root.style.setProperty('--nebula-opacity', newOpacity);
+            this.textContent = newOpacity === '0' ? 'Show Nebula' : 'Hide Nebula';
+        });
+
+        document.getElementById('toggleStars').addEventListener('click', function() {
+            const root = document.documentElement;
+            const currentOpacity = getComputedStyle(root).getPropertyValue('--stars-opacity').trim();
+            const newOpacity = currentOpacity === '0' ? '0.7' : '0';
+            
+            root.style.setProperty('--stars-opacity', newOpacity);
+            this.textContent = newOpacity === '0' ? 'Show Stars' : 'Hide Stars';
+        });
+
+        document.getElementById('toggleShootingStars').addEventListener('click', function() {
+            const root = document.documentElement;
+            const currentDisplay = getComputedStyle(root).getPropertyValue('--shooting-stars-display').trim();
+            const newDisplay = currentDisplay === 'none' ? 'block' : 'none';
+            
+            root.style.setProperty('--shooting-stars-display', newDisplay);
+            this.textContent = newDisplay === 'none' ? 'Show Shooting Stars' : 'Hide Shooting Stars';
+        });
+
+        document.getElementById('resetAnimations').addEventListener('click', function() {
+            const root = document.documentElement;
+            
+            // Reset all animation variables
+            root.style.setProperty('--animation-play-state', 'running');
+            root.style.setProperty('--nebula-opacity', '0.7');
+            root.style.setProperty('--stars-opacity', '0.7');
+            root.style.setProperty('--shooting-stars-display', 'block');
+            
+            // Update button text
+            document.getElementById('toggleAnimations').textContent = 'Pause Animations';
+            document.getElementById('toggleNebula').textContent = 'Hide Nebula';
+            document.getElementById('toggleStars').textContent = 'Hide Stars';
+            document.getElementById('toggleShootingStars').textContent = 'Hide Shooting Stars';
+            
+            // Force animation restart
+            setTimeout(function() {
+                root.style.setProperty('--animation-play-state', 'paused');
+                setTimeout(function() {
+                    root.style.setProperty('--animation-play-state', 'running');
+                }, 50);
+            }, 100);
+        });
+    </script>
+</body>
+</html> 
