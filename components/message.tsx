@@ -132,13 +132,7 @@ const PurePreviewMessage = ({
                 message={message}
                 setMessages={setMessages}
                 setMode={setMode}
-              />
-            )}
-
-            {message.documentId && (
-              <DocumentPreview
-                documentId={message.documentId}
-                isLoading={isLoading}
+                reload={reload}
               />
             )}
 
