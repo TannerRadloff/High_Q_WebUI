@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Toaster } from 'sonner';
 
 import { ThemeProvider } from '@/components/theme-provider';
+import { AnimationToggle } from '@/components/animation-toggle';
 
 import './globals.css';
 
@@ -103,6 +104,7 @@ export default async function RootLayout({
             <div className="layer layer-2"></div>
             <div className="layer layer-3"></div>
           </div>
+          <AnimationToggle />
           <Toaster position="top-center" />
           {children}
         </ThemeProvider>

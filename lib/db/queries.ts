@@ -15,6 +15,8 @@ import {
   type Message,
   message,
   vote,
+  passwordReset,
+  type PasswordReset,
 } from './schema';
 import { ArtifactKind } from '@/components/artifact';
 
@@ -342,6 +344,70 @@ export async function updateChatVisiblityById({
     return await db.update(chat).set({ visibility }).where(eq(chat.id, chatId));
   } catch (error) {
     console.error('Failed to update chat visibility in database');
+    throw error;
+  }
+}
+
+// Password reset functions
+export async function createPasswordResetToken(userId: string, token: string, expiresAt: Date) {
+  try {
+    return await db.insert(passwordReset).values({
+      userId,
+      token,
+      expiresAt,
+      createdAt: new Date(),
+      used: false,
+    });
+  } catch (error) {
+    console.error('Failed to create password reset token in database');
+    throw error;
+  }
+}
+
+export async function getPasswordResetByToken(token: string): Promise<PasswordReset | undefined> {
+  try {
+    const [resetToken] = await db
+      .select()
+      .from(passwordReset)
+      .where(eq(passwordReset.token, token));
+    
+    return resetToken;
+  } catch (error) {
+    console.error('Failed to get password reset token from database');
+    throw error;
+  }
+}
+
+export async function markPasswordResetTokenAsUsed(id: string) {
+  try {
+    return await db
+      .update(passwordReset)
+      .set({ used: true })
+      .where(eq(passwordReset.id, id));
+  } catch (error) {
+    console.error('Failed to mark password reset token as used in database');
+    throw error;
+  }
+}
+
+export async function getUserById(id: string): Promise<User | undefined> {
+  try {
+    const [selectedUser] = await db.select().from(user).where(eq(user.id, id));
+    return selectedUser;
+  } catch (error) {
+    console.error('Failed to get user by id from database');
+    throw error;
+  }
+}
+
+export async function updateUserPassword(userId: string, hashedPassword: string) {
+  try {
+    return await db
+      .update(user)
+      .set({ password: hashedPassword })
+      .where(eq(user.id, userId));
+  } catch (error) {
+    console.error('Failed to update user password in database');
     throw error;
   }
 }
