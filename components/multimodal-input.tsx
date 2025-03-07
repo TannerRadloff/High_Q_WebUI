@@ -236,7 +236,7 @@ function PureMultimodalInput({
         value={input}
         onChange={handleInput}
         className={cx(
-          'min-h-[24px] max-h-[calc(75dvh)] overflow-hidden resize-none rounded-2xl !text-base luxury-input pb-10 backdrop-blur-sm shadow-sm',
+          'min-h-[24px] max-h-[calc(75dvh)] overflow-hidden resize-none rounded-2xl !text-base bg-muted pb-10 dark:border-zinc-700',
           className,
         )}
         rows={2}
@@ -293,15 +293,15 @@ function PureAttachmentsButton({
 }) {
   return (
     <Button
-      variant="ghost"
-      className="rounded-md p-[7px] h-fit backdrop-blur-sm hover:bg-accent/10 transition-all duration-200"
+      className="rounded-md rounded-bl-lg p-[7px] h-fit border-border hover:bg-primary/10 hover:text-primary"
       onClick={(event) => {
         event.preventDefault();
         fileInputRef.current?.click();
       }}
       disabled={isLoading}
+      variant="ghost"
     >
-      <PaperclipIcon />
+      <PaperclipIcon size={14} />
     </Button>
   );
 }
@@ -313,19 +313,18 @@ function PureStopButton({
   setMessages,
 }: {
   stop: () => void;
-  setMessages: (messages: Message[] | ((messages: Message[]) => Message[])) => void;
+  setMessages: Dispatch<SetStateAction<Array<Message>>>;
 }) {
   return (
     <Button
-      variant="outline"
-      className="rounded-md p-[7px] h-fit backdrop-blur-sm border-destructive/30 hover:bg-destructive/10 hover:text-destructive transition-all duration-200"
+      className="rounded-full p-1.5 h-fit border border-border hover:bg-primary/10 hover:text-primary"
       onClick={(event) => {
         event.preventDefault();
         stop();
         setMessages((messages) => sanitizeUIMessages(messages));
       }}
     >
-      <StopIcon />
+      <StopIcon size={14} />
     </Button>
   );
 }
@@ -333,27 +332,24 @@ function PureStopButton({
 const StopButton = memo(PureStopButton);
 
 function PureSendButton({
-  input,
   submitForm,
+  input,
   uploadQueue,
 }: {
-  input: string;
   submitForm: () => void;
+  input: string;
   uploadQueue: Array<string>;
 }) {
-  const disabled = (input.trim().length === 0 && uploadQueue.length === 0) || uploadQueue.length > 0;
-
   return (
     <Button
-      variant="luxury"
-      className="rounded-md p-[7px] h-fit shadow-sm hover:shadow transition-all duration-200"
+      className="rounded-full p-1.5 h-fit border border-border hover:bg-primary/10 hover:text-primary"
       onClick={(event) => {
         event.preventDefault();
         submitForm();
       }}
-      disabled={disabled}
+      disabled={input.length === 0 || uploadQueue.length > 0}
     >
-      <ArrowUpIcon />
+      <ArrowUpIcon size={14} />
     </Button>
   );
 }

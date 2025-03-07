@@ -52,7 +52,7 @@ export function Chat({
       mutate('/api/history');
     },
     onError: (error) => {
-      toast.error('An error occurred, please try again!');
+      toast.error('An error occured, please try again!');
     },
   });
 
@@ -66,7 +66,7 @@ export function Chat({
 
   return (
     <>
-      <div className="flex flex-col min-w-0 h-dvh bg-background luxury-gradient animate-fade-in">
+      <div className="flex flex-col min-w-0 h-dvh bg-background">
         <ChatHeader
           chatId={id}
           selectedModelId={selectedChatModel}
@@ -85,7 +85,7 @@ export function Chat({
           isArtifactVisible={isArtifactVisible}
         />
 
-        <form className="flex mx-auto px-4 bg-background/50 backdrop-blur-sm pb-6 md:pb-8 gap-2 w-full md:max-w-3xl border-t border-border/10">
+        <form className="flex mx-auto px-4 bg-background pb-4 md:pb-6 gap-2 w-full md:max-w-3xl">
           {!isReadonly && (
             <MultimodalInput
               chatId={id}

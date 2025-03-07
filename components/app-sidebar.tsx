@@ -23,8 +23,8 @@ export function AppSidebar({ user }: { user: User | undefined }) {
   const { setOpenMobile } = useSidebar();
 
   return (
-    <Sidebar className="luxury-sidebar group-data-[side=left]:border-r-0">
-      <SidebarHeader className="bg-sidebar/50 backdrop-blur-sm border-b border-sidebar-border/20">
+    <Sidebar className="group-data-[side=left]:border-r-0">
+      <SidebarHeader>
         <SidebarMenu>
           <div className="flex flex-row justify-between items-center">
             <Link
@@ -34,16 +34,16 @@ export function AppSidebar({ user }: { user: User | undefined }) {
               }}
               className="flex flex-row gap-3 items-center"
             >
-              <span className="text-lg font-semibold px-2 hover:bg-muted/30 rounded-md cursor-pointer transition-colors">
+              <span className="text-lg font-semibold px-2 hover:bg-primary/10 hover:text-primary rounded-md cursor-pointer">
                 Chatbot
               </span>
             </Link>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="luxury"
+                  variant="ghost"
                   type="button"
-                  className="p-2 h-fit"
+                  className="p-2 h-fit hover:bg-primary/10 hover:text-primary"
                   onClick={() => {
                     setOpenMobile(false);
                     router.push('/');
@@ -58,12 +58,10 @@ export function AppSidebar({ user }: { user: User | undefined }) {
           </div>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent className="bg-sidebar/30 backdrop-blur-sm">
+      <SidebarContent>
         <SidebarHistory user={user} />
       </SidebarContent>
-      <SidebarFooter className="bg-sidebar/50 backdrop-blur-sm border-t border-sidebar-border/20">
-        {user && <SidebarUserNav user={user} />}
-      </SidebarFooter>
+      <SidebarFooter>{user && <SidebarUserNav user={user} />}</SidebarFooter>
     </Sidebar>
   );
 }

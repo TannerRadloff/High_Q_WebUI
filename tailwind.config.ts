@@ -9,10 +9,10 @@ const config: Config = {
   ],
   theme: {
     fontFamily: {
-      sans: ['Cormorant Garamond', 'geist', 'sans-serif'],
-      mono: ['geist-mono', 'monospace'],
-      display: ['Cormorant Garamond', 'serif'],
-      body: ['geist', 'sans-serif']
+      sans: ['Space Grotesk', 'geist', 'sans-serif'],
+      mono: ['geist-mono'],
+      display: ['Space Grotesk', 'sans-serif'],
+      body: ['Inter', 'sans-serif']
     },
     extend: {
       borderRadius: {
@@ -73,41 +73,33 @@ const config: Config = {
         },
         luxury: {
           gold: '#D4AF37',
-          cream: '#F5F5F0',
-          navy: '#1A2A3A',
-          lavender: '#E6E6FA',
-          rose: '#F8C8DC',
-          sage: '#BCB88A',
-          charcoal: '#36454F'
+          cream: '#F5F5DC',
+          navy: '#0A1428',
+          charcoal: '#36454F',
+          pearl: '#F0EAD6'
         }
       },
       boxShadow: {
-        soft: '0 2px 10px rgba(212, 175, 55, 0.08)',
-        glow: '0 0 20px rgba(212, 175, 55, 0.25)',
-        'luxury-card': '0 4px 20px rgba(0, 0, 0, 0.05)',
-        'luxury-button': '0 2px 8px rgba(212, 175, 55, 0.15)'
+        soft: '0 2px 10px rgba(212,175,55,0.08)',
+        glow: '0 0 20px rgba(212,175,55,0.45)'
       },
       backgroundImage: {
-        'gradient-luxury': 'linear-gradient(135deg, rgba(212, 175, 55, 0.1), rgba(230, 230, 250, 0.05))',
-        'gradient-luxury-dark': 'linear-gradient(135deg, rgba(26, 42, 58, 0.8), rgba(54, 69, 79, 0.8))'
+        'gradient-luxury': 'linear-gradient(to right, #D4AF37, #F5F5DC)',
+        'gradient-navy': 'linear-gradient(to right, #0A1428, #36454F)',
+        'gradient-gold': 'linear-gradient(135deg, #D4AF37 0%, #F5F5DC 50%, #D4AF37 100%)'
       },
       animation: {
-        'shimmer': 'shimmer 2s infinite linear',
-        'fade-in': 'fadeIn 0.5s ease-in-out',
-        'slide-up': 'slideUp 0.3s ease-out'
+        'shimmer': 'shimmer 2s linear infinite',
+        'pulse-gold': 'pulse-gold 4s cubic-bezier(0.4, 0, 0.6, 1) infinite'
       },
       keyframes: {
         shimmer: {
-          '0%': { backgroundPosition: '-200% 0' },
-          '100%': { backgroundPosition: '200% 0' }
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.5' }
         },
-        fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' }
-        },
-        slideUp: {
-          '0%': { transform: 'translateY(10px)', opacity: '0' },
-          '100%': { transform: 'translateY(0)', opacity: '1' }
+        'pulse-gold': {
+          '0%, 100%': { boxShadow: '0 0 15px rgba(212,175,55,0.7)' },
+          '50%': { boxShadow: '0 0 5px rgba(212,175,55,0.3)' }
         }
       },
       spacing: {
