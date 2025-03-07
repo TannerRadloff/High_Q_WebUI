@@ -673,6 +673,11 @@
     @apply bg-primary/20 hover:bg-primary/30 dark:hover:bg-primary/40 dark:text-primary-foreground dark:bg-primary/30;
 }
 
+/* Ensure animations are visible in the chat interface */
+.bg-background {
+  background-color: transparent !important;
+}
+
 /* Ensure animations are visible in the messages container */
 .messages-container .aurora,
 .messages-container .shooting-star,
@@ -695,6 +700,20 @@
 
 /* Ensure message bubbles are above animations */
 .message-bubble {
+  position: relative;
+  z-index: 1;
+}
+
+/* Ensure chat header is above animations */
+.chat-header {
+  position: relative;
+  z-index: 1;
+  background-color: rgba(var(--background-start-rgb), 0.7) !important;
+  backdrop-filter: blur(8px);
+}
+
+/* Ensure input area is above animations */
+.input-area {
   position: relative;
   z-index: 1;
 }

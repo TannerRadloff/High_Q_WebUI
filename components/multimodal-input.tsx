@@ -198,7 +198,7 @@ function PureMultimodalInput({
   return (
     <motion.div
       className={cx(
-        'relative flex w-full flex-col items-center rounded-xl border border-border/40 bg-gradient-to-b from-background/90 to-background/70 backdrop-blur-sm shadow-sm transition-all duration-300',
+        'relative flex w-full flex-col items-center rounded-xl border border-border/40 bg-gradient-to-b from-background/90 to-background/70 backdrop-blur-sm shadow-sm transition-all duration-300 input-area',
         isFocused ? 'shadow-[0_0_20px_rgba(0,150,255,0.25)] border-primary/30' : 'hover:shadow-[0_0_15px_rgba(0,150,255,0.15)]',
         className,
       )}
