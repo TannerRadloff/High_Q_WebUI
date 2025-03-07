@@ -14,6 +14,8 @@
     --nebula-opacity: 0.7;
     --stars-opacity: 0.7;
     --shooting-stars-display: block;
+    --body-before-opacity: 1;
+    --body-after-opacity: 1;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -205,7 +207,7 @@
             radial-gradient(3px 3px at 15% 75%, rgba(255, 255, 255, 0.6), transparent),
             radial-gradient(3px 3px at 85% 25%, rgba(255, 255, 255, 0.7), transparent);
         background-size: 550px 550px, 350px 350px, 250px 250px, 150px 150px, 100px 100px, 200px 200px, 300px 300px, 400px 400px;
-        opacity: var(--stars-opacity);
+        opacity: calc(var(--stars-opacity) * var(--body-before-opacity));
         z-index: -1;
         animation: twinkling 120s linear infinite;
         animation-play-state: var(--animation-play-state);
@@ -226,7 +228,7 @@
             radial-gradient(circle at 40% 80%, rgba(255, 0, 255, 0.25), transparent 40%),
             radial-gradient(circle at 70% 60%, rgba(0, 255, 255, 0.2), transparent 60%);
         filter: blur(15px);
-        opacity: var(--nebula-opacity);
+        opacity: calc(var(--nebula-opacity) * var(--body-after-opacity));
         z-index: -2;
         animation: nebula-drift 180s ease-in-out infinite alternate;
         animation-play-state: var(--animation-play-state);

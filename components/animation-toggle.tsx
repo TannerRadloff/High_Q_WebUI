@@ -99,28 +99,59 @@ export function AnimationToggle() {
     }
   };
 
+  // Helper function to find all animation elements, including those in the chat component
+  const findAllAnimationElements = () => {
+    // Get all animation elements, including those in the chat component
+    const auroras = document.querySelectorAll('.aurora') as NodeListOf<HTMLElement>;
+    const shootingStars = document.querySelectorAll('.shooting-star') as NodeListOf<HTMLElement>;
+    const cosmicDusts = document.querySelectorAll('.cosmic-dust') as NodeListOf<HTMLElement>;
+    const pulsatingStars = document.querySelectorAll('.pulsating-stars') as NodeListOf<HTMLElement>;
+    const parallaxStars = document.querySelectorAll('.parallax-stars') as NodeListOf<HTMLElement>;
+    
+    return {
+      auroras,
+      shootingStars,
+      cosmicDusts,
+      pulsatingStars,
+      parallaxStars
+    };
+  };
+
   const toggleAnimations = () => {
     const newState = !animationsEnabled;
     setAnimationsEnabled(newState);
+    
+    // Set CSS variable for animation play state
     document.documentElement.style.setProperty(
       '--animation-play-state',
       newState ? 'running' : 'paused'
     );
+    
+    // Also set body background visibility
+    document.body.style.setProperty('--body-before-opacity', newState ? '1' : '0');
+    document.body.style.setProperty('--body-after-opacity', newState ? '1' : '0');
   };
 
   const toggleNebula = () => {
     const newState = !nebulaEnabled;
     setNebulaEnabled(newState);
+    
+    // Set CSS variable for nebula opacity
     document.documentElement.style.setProperty(
       '--nebula-opacity',
       newState ? '0.7' : '0'
     );
     
-    // Ensure the aurora element exists and is visible
-    const aurora = document.querySelector('.aurora') as HTMLElement | null;
-    if (aurora) {
+    // Set body::after opacity directly
+    document.body.style.setProperty('--body-after-opacity', newState ? '1' : '0');
+    
+    // Toggle all aurora elements
+    const { auroras } = findAllAnimationElements();
+    auroras.forEach(aurora => {
       aurora.style.display = newState ? 'block' : 'none';
-    } else if (newState) {
+    });
+    
+    if (newState) {
       ensureAnimationElementsExist();
     }
   };
@@ -128,24 +159,32 @@ export function AnimationToggle() {
   const toggleStars = () => {
     const newState = !starsEnabled;
     setStarsEnabled(newState);
+    
+    // Set CSS variable for stars opacity
     document.documentElement.style.setProperty(
       '--stars-opacity',
       newState ? '0.7' : '0'
     );
     
-    // Ensure the stars elements exist and are visible
-    const pulsatingStars = document.querySelector('.pulsating-stars') as HTMLElement | null;
-    const parallaxStars = document.querySelector('.parallax-stars') as HTMLElement | null;
+    // Set body::before opacity directly
+    document.body.style.setProperty('--body-before-opacity', newState ? '1' : '0');
     
-    if (pulsatingStars) {
-      pulsatingStars.style.display = newState ? 'block' : 'none';
-    }
+    // Toggle all star-related elements
+    const { pulsatingStars, parallaxStars, cosmicDusts } = findAllAnimationElements();
     
-    if (parallaxStars) {
-      parallaxStars.style.display = newState ? 'block' : 'none';
-    }
+    pulsatingStars.forEach(element => {
+      element.style.display = newState ? 'block' : 'none';
+    });
     
-    if (newState && (!pulsatingStars || !parallaxStars)) {
+    parallaxStars.forEach(element => {
+      element.style.display = newState ? 'block' : 'none';
+    });
+    
+    cosmicDusts.forEach(element => {
+      element.style.display = newState ? 'block' : 'none';
+    });
+    
+    if (newState) {
       ensureAnimationElementsExist();
     }
   };
@@ -153,16 +192,20 @@ export function AnimationToggle() {
   const toggleShootingStars = () => {
     const newState = !shootingStarsEnabled;
     setShootingStarsEnabled(newState);
+    
+    // Set CSS variable for shooting stars display
     document.documentElement.style.setProperty(
       '--shooting-stars-display',
       newState ? 'block' : 'none'
     );
     
-    // Ensure the shooting star element exists and is visible
-    const shootingStar = document.querySelector('.shooting-star') as HTMLElement | null;
-    if (shootingStar) {
-      shootingStar.style.display = newState ? 'block' : 'none';
-    } else if (newState) {
+    // Toggle all shooting star elements
+    const { shootingStars } = findAllAnimationElements();
+    shootingStars.forEach(element => {
+      element.style.display = newState ? 'block' : 'none';
+    });
+    
+    if (newState) {
       ensureAnimationElementsExist();
     }
   };
@@ -173,26 +216,27 @@ export function AnimationToggle() {
     setStarsEnabled(true);
     setShootingStarsEnabled(true);
     
+    // Reset all CSS variables
     document.documentElement.style.setProperty('--animation-play-state', 'running');
     document.documentElement.style.setProperty('--nebula-opacity', '0.7');
     document.documentElement.style.setProperty('--stars-opacity', '0.7');
     document.documentElement.style.setProperty('--shooting-stars-display', 'block');
     
+    // Reset body pseudo-elements
+    document.body.style.setProperty('--body-before-opacity', '1');
+    document.body.style.setProperty('--body-after-opacity', '1');
+    
     // Ensure all animation elements exist
     ensureAnimationElementsExist();
     
     // Make sure all elements are visible
-    const aurora = document.querySelector('.aurora') as HTMLElement | null;
-    const shootingStar = document.querySelector('.shooting-star') as HTMLElement | null;
-    const cosmicDust = document.querySelector('.cosmic-dust') as HTMLElement | null;
-    const pulsatingStars = document.querySelector('.pulsating-stars') as HTMLElement | null;
-    const parallaxStars = document.querySelector('.parallax-stars') as HTMLElement | null;
+    const { auroras, shootingStars, cosmicDusts, pulsatingStars, parallaxStars } = findAllAnimationElements();
     
-    if (aurora) aurora.style.display = 'block';
-    if (shootingStar) shootingStar.style.display = 'block';
-    if (cosmicDust) cosmicDust.style.display = 'block';
-    if (pulsatingStars) pulsatingStars.style.display = 'block';
-    if (parallaxStars) parallaxStars.style.display = 'block';
+    auroras.forEach(element => { element.style.display = 'block'; });
+    shootingStars.forEach(element => { element.style.display = 'block'; });
+    cosmicDusts.forEach(element => { element.style.display = 'block'; });
+    pulsatingStars.forEach(element => { element.style.display = 'block'; });
+    parallaxStars.forEach(element => { element.style.display = 'block'; });
     
     // Force animation restart
     setTimeout(() => {
