@@ -1,7 +1,7 @@
-import nodemailer from 'nodemailer';
+import { createTransport } from 'nodemailer';
 
 // Configure nodemailer with environment variables
-const transporter = nodemailer.createTransport({
+const transporter = createTransport({
   host: process.env.EMAIL_SERVER_HOST,
   port: Number(process.env.EMAIL_SERVER_PORT),
   auth: {

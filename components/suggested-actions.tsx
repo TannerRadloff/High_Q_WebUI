@@ -122,7 +122,7 @@ function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
       {/* Carousel container */}
       <div 
         ref={carouselRef}
-        className="flex overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-2 py-1 px-1"
+        className="flex overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-2 p-1"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
@@ -135,7 +135,7 @@ function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.05 * index, duration: 0.2 }}
             key={`suggested-action-${suggestedAction.title}-${index}`}
-            className="snap-start flex-shrink-0 min-w-[200px] sm:min-w-[220px]"
+            className="snap-start shrink-0 min-w-[200px] sm:min-w-[220px]"
           >
             <Button
               variant="ghost"

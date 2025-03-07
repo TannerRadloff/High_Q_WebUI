@@ -262,9 +262,9 @@ export const ThinkingMessage = () => {
         <div className="flex flex-col gap-2 w-full">
           <div className="flex flex-col gap-4 bg-secondary/30 text-secondary-foreground px-3 py-2 rounded-xl backdrop-blur-sm border border-secondary/30 shadow-md w-fit">
             <div className="flex space-x-2">
-              <div className="h-2 w-2 rounded-full bg-primary animate-pulse"></div>
-              <div className="h-2 w-2 rounded-full bg-primary animate-pulse delay-150"></div>
-              <div className="h-2 w-2 rounded-full bg-primary animate-pulse delay-300"></div>
+              <div className="size-2 rounded-full bg-primary animate-pulse"></div>
+              <div className="size-2 rounded-full bg-primary animate-pulse delay-150"></div>
+              <div className="size-2 rounded-full bg-primary animate-pulse delay-300"></div>
             </div>
           </div>
         </div>

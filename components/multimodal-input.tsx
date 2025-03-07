@@ -218,14 +218,14 @@ function PureMultimodalInput({
             <div key={attachment.url} className="relative">
               <PreviewAttachment attachment={attachment} />
               <button
-                className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs"
+                className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs"
                 onClick={() => {
                   setAttachments(
                     attachments.filter((a) => a.url !== attachment.url),
                   );
                 }}
               >
-                ×
+                &times;
               </button>
             </div>
           ))}
@@ -338,7 +338,7 @@ function PureAttachmentsButton({
       type="button"
       variant="outline"
       size="icon"
-      className="h-10 w-10 shrink-0 rounded-xl border-border/40 bg-background/50 hover:bg-primary/10 hover:text-primary hover:border-primary/50 hover:shadow-[0_0_10px_rgba(0,150,255,0.3)]"
+      className="size-10 shrink-0 rounded-xl border-border/40 bg-background/50 hover:bg-primary/10 hover:text-primary hover:border-primary/50 hover:shadow-[0_0_10px_rgba(0,150,255,0.3)]"
       onClick={() => fileInputRef.current?.click()}
       disabled={isLoading}
     >
@@ -361,7 +361,7 @@ function PureStopButton({
       type="button"
       size="icon"
       variant="ghost"
-      className="absolute bottom-1 right-1 h-8 w-8 rounded-xl hover:bg-destructive/10 hover:text-destructive"
+      className="absolute bottom-1 right-1 size-8 rounded-xl hover:bg-destructive/10 hover:text-destructive"
       onClick={() => {
         stop();
         setMessages((messages) => sanitizeUIMessages(messages));
@@ -388,7 +388,7 @@ function PureSendButton({
       type="button"
       size="icon"
       variant="ghost"
-      className="absolute bottom-1 right-1 h-8 w-8 rounded-xl hover:bg-primary/10 hover:text-primary"
+      className="absolute bottom-1 right-1 size-8 rounded-xl hover:bg-primary/10 hover:text-primary"
       disabled={!input.trim() && uploadQueue.length === 0}
       onClick={submitForm}
     >
