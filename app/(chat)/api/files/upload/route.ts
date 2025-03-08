@@ -6,6 +6,9 @@ import { auth } from '@/app/(auth)/auth';
 import { parsePdf } from '@/lib/server/pdf-parser';
 import { extractTextFromFile } from '@/lib/utils';
 
+// Maximum size for text content in characters to return in the response
+const MAX_TEXT_CONTENT_SIZE = 15000;
+
 // Use Blob instead of File since File is not available in Node.js environment
 const FileSchema = z.object({
   file: z
@@ -54,11 +57,25 @@ export async function POST(request: Request) {
 
     // Extract text content from PDF and TXT files
     let textContent = null;
+    let isContentTruncated = false;
+    
     if (file.type === 'text/plain') {
       textContent = await extractTextFromFile(fileBuffer, file.type);
+      
+      // Check if text content is too large and truncate if necessary
+      if (textContent && textContent.length > MAX_TEXT_CONTENT_SIZE) {
+        textContent = textContent.substring(0, MAX_TEXT_CONTENT_SIZE);
+        isContentTruncated = true;
+      }
     } else if (file.type === 'application/pdf') {
       // Direct server-side PDF parsing (since this is a server component)
       textContent = await parsePdf(fileBuffer);
+      
+      // Check if text content is too large and truncate if necessary
+      if (textContent && textContent.length > MAX_TEXT_CONTENT_SIZE) {
+        textContent = textContent.substring(0, MAX_TEXT_CONTENT_SIZE);
+        isContentTruncated = true;
+      }
     }
 
     try {
@@ -70,12 +87,16 @@ export async function POST(request: Request) {
       // Include the extracted text content in the response
       return NextResponse.json({
         ...data,
-        textContent,
+        textContent: isContentTruncated 
+          ? `${textContent}... (content truncated due to size, full content will be processed)`
+          : textContent,
       });
     } catch (error) {
+      console.error('Error uploading to blob storage:', error);
       return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
     }
   } catch (error) {
+    console.error('Error processing file upload request:', error);
     return NextResponse.json(
       { error: 'Failed to process request' },
       { status: 500 },

@@ -29,6 +29,9 @@ import { getWeather } from '@/lib/ai/tools/get-weather';
 
 export const maxDuration = 60;
 
+// Maximum size for file content in characters
+const MAX_FILE_CONTENT_SIZE = 10000;
+
 export async function POST(request: Request) {
   const {
     id,
@@ -65,91 +68,105 @@ export async function POST(request: Request) {
     messages: [{ ...userMessage, createdAt: new Date(), chatId: id }],
   });
 
-  // Process file attachments with text content
-  let fileContents = '';
-  if (experimental_attachments && experimental_attachments.length > 0) {
-    fileContents = experimental_attachments
-      .filter(attachment => attachment.textContent)
-      .map(attachment => {
-        return `File: ${attachment.name}\nContent: ${attachment.textContent}\n\n`;
-      })
-      .join('');
-  }
-
-  // Create an enhanced system prompt that includes file contents
-  const enhancedSystemPrompt = (model: string) => {
-    const basePrompt = systemPrompt({ selectedChatModel: model });
-    if (fileContents) {
-      return `${basePrompt}\n\nThe user has attached the following files. Use this information to assist them:\n\n${fileContents}`;
+  try {
+    // Process file attachments with text content
+    let fileContents = '';
+    if (experimental_attachments && experimental_attachments.length > 0) {
+      fileContents = experimental_attachments
+        .filter(attachment => attachment.textContent)
+        .map(attachment => {
+          // Limit the size of each file's content
+          const truncatedContent = attachment.textContent && attachment.textContent.length > MAX_FILE_CONTENT_SIZE
+            ? attachment.textContent.substring(0, MAX_FILE_CONTENT_SIZE) + '... (content truncated due to size)'
+            : attachment.textContent;
+          
+          return `File: ${attachment.name}\nContent: ${truncatedContent}\n\n`;
+        })
+        .join('');
     }
-    return basePrompt;
-  };
 
-  return createDataStreamResponse({
-    execute: (dataStream) => {
-      const result = streamText({
-        model: myProvider.languageModel(selectedChatModel),
-        system: enhancedSystemPrompt(selectedChatModel),
-        messages,
-        maxSteps: 5,
-        experimental_activeTools:
-          selectedChatModel === 'chat-model-reasoning'
-            ? []
-            : [
-                'getWeather',
-                'createDocument',
-                'updateDocument',
-                'requestSuggestions',
-              ],
-        experimental_transform: smoothStream({ chunking: 'word' }),
-        experimental_generateMessageId: generateUUID,
-        tools: {
-          getWeather,
-          createDocument: createDocument({ session, dataStream }),
-          updateDocument: updateDocument({ session, dataStream }),
-          requestSuggestions: requestSuggestions({
-            session,
-            dataStream,
-          }),
-        },
-        onFinish: async ({ response, reasoning }) => {
-          if (session.user?.id) {
-            try {
-              const sanitizedResponseMessages = sanitizeResponseMessages({
-                messages: response.messages,
-                reasoning,
-              });
+    // Create an enhanced system prompt that includes file contents
+    const enhancedSystemPrompt = (model: string) => {
+      const basePrompt = systemPrompt({ selectedChatModel: model });
+      if (fileContents) {
+        return `${basePrompt}\n\nThe user has attached the following files. Use this information to assist them:\n\n${fileContents}`;
+      }
+      return basePrompt;
+    };
 
-              await saveMessages({
-                messages: sanitizedResponseMessages.map((message) => {
-                  return {
-                    id: message.id,
-                    chatId: id,
-                    role: message.role,
-                    content: message.content,
-                    createdAt: new Date(),
-                  };
-                }),
-              });
-            } catch (error) {
-              console.error('Failed to save chat');
+    return createDataStreamResponse({
+      execute: (dataStream) => {
+        const result = streamText({
+          model: myProvider.languageModel(selectedChatModel),
+          system: enhancedSystemPrompt(selectedChatModel),
+          messages,
+          maxSteps: 5,
+          experimental_activeTools:
+            selectedChatModel === 'chat-model-reasoning'
+              ? []
+              : [
+                  'getWeather',
+                  'createDocument',
+                  'updateDocument',
+                  'requestSuggestions',
+                ],
+          experimental_transform: smoothStream({ chunking: 'word' }),
+          experimental_generateMessageId: generateUUID,
+          tools: {
+            getWeather,
+            createDocument: createDocument({ session, dataStream }),
+            updateDocument: updateDocument({ session, dataStream }),
+            requestSuggestions: requestSuggestions({
+              session,
+              dataStream,
+            }),
+          },
+          onFinish: async ({ response, reasoning }) => {
+            if (session.user?.id) {
+              try {
+                const sanitizedResponseMessages = sanitizeResponseMessages({
+                  messages: response.messages,
+                  reasoning,
+                });
+
+                await saveMessages({
+                  messages: sanitizedResponseMessages.map((message) => {
+                    return {
+                      id: message.id,
+                      chatId: id,
+                      role: message.role,
+                      content: message.content,
+                      createdAt: new Date(),
+                    };
+                  }),
+                });
+              } catch (error) {
+                console.error('Failed to save chat');
+              }
             }
-          }
-        },
-        experimental_telemetry: {
-          isEnabled: true,
-          functionId: 'stream-text',
-        },
-      });
+          },
+          experimental_telemetry: {
+            isEnabled: true,
+            functionId: 'stream-text',
+          },
+        });
 
-      result.mergeIntoDataStream(dataStream, {
-        sendReasoning: true,
-      });
-    },
-    onError: () => {
-      return 'Oops, an error occured!';
-    },
-  });
+        result.mergeIntoDataStream(dataStream, {
+          sendReasoning: true,
+        });
+      },
+      onError: (error) => {
+        console.error('Chat API error:', error);
+        if (error.message && error.message.includes('context length')) {
+          return 'The file content is too large for the model to process. Please try with a smaller file or extract the most relevant parts.';
+        }
+        return 'Oops, an error occurred while processing your request. Please try again with a smaller file or different content.';
+      },
+    });
+  } catch (error) {
+    console.error('Unexpected error in chat API:', error);
+    return new Response('An unexpected error occurred. Please try again.', { status: 500 });
+  }
 }
 
 export async function DELETE(request: Request) {

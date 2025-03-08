@@ -242,7 +242,22 @@ export async function extractTextFromFile(
     // For text files, convert ArrayBuffer to string
     if (contentType === 'text/plain') {
       const decoder = new TextDecoder('utf-8');
-      return decoder.decode(fileBuffer);
+      try {
+        return decoder.decode(fileBuffer);
+      } catch (decodeError) {
+        console.error('Error decoding text file:', decodeError);
+        // Fallback to a more memory-efficient approach for very large files
+        const bytes = new Uint8Array(fileBuffer);
+        let result = '';
+        const chunkSize = 65536; // Process 64KB chunks
+        
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          const chunk = bytes.slice(i, i + chunkSize);
+          result += decoder.decode(chunk, { stream: i + chunkSize < bytes.length });
+        }
+        
+        return result;
+      }
     }
     
     // For PDF files, we need to handle this differently
