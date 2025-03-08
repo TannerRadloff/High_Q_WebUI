@@ -66,35 +66,35 @@ export async function POST(request: Request) {
     return new Response('No user message found', { status: 400 });
   }
 
-  // Get or create the chat
-  const chat = await getChatById({ id });
-
-  if (!chat) {
-    // For new chats with only artifacts, use a generic title
-    let title = 'New Document';
-    if (userMessage) {
-      title = await generateTitleFromUserMessage({ message: userMessage });
-    } else if (hasArtifacts) {
-      // Try to use the artifact title if available
-      const artifactMessage = messages.find(message => 
-        message.role === 'system' && 'artifactTitle' in message
-      );
-      if (artifactMessage && 'artifactTitle' in artifactMessage) {
-        title = `Document: ${artifactMessage.artifactTitle}`;
-      }
-    }
-    
-    await saveChat({ id, userId: session.user.id, title });
-  }
-
-  // Save the user message to the database (if any)
-  if (userMessage) {
-    await saveMessages({
-      messages: [{ ...userMessage, createdAt: new Date(), chatId: id }],
-    });
-  }
-
   try {
+    // Get or create the chat
+    const chat = await getChatById({ id });
+
+    if (!chat) {
+      // For new chats with only artifacts, use a generic title
+      let title = 'New Document';
+      if (userMessage) {
+        title = await generateTitleFromUserMessage({ message: userMessage });
+      } else if (hasArtifacts) {
+        // Try to use the artifact title if available
+        const artifactMessage = messages.find(message => 
+          message.role === 'system' && 'artifactTitle' in message
+        );
+        if (artifactMessage && 'artifactTitle' in artifactMessage) {
+          title = `Document: ${artifactMessage.artifactTitle}`;
+        }
+      }
+      
+      await saveChat({ id, userId: session.user.id, title });
+    }
+
+    // Save the user message to the database (if any)
+    if (userMessage) {
+      await saveMessages({
+        messages: [{ ...userMessage, createdAt: new Date(), chatId: id }],
+      });
+    }
+
     // Find document artifacts in messages and save them if they're new
     const documentMessages = messages.filter(message => 
       message.role === 'system' && 'documentId' in message && message.documentId
@@ -125,16 +125,21 @@ export async function POST(request: Request) {
       return systemPrompt({ selectedChatModel: model });
     };
 
-    // Filter messages to remove document artifacts from those sent to the model
-    // This prevents wasting tokens on messages that don't contribute to the conversation
-    // We'll preserve user messages and actual assistant responses
+    // Filter messages for the model to avoid token waste
+    // We need to filter out system messages with document artifacts
+    // but keep the messages that are needed for conversation history
     const filteredMessages = messages.filter(message => {
+      // Keep all user and assistant messages for conversation history
+      if (message.role === 'user' || message.role === 'assistant') {
+        return true;
+      }
+      
       // Filter out system messages with document artifacts
       if (message.role === 'system' && 'documentId' in message) {
         return false;
       }
       
-      // Keep all other messages
+      // Keep any other system messages
       return true;
     });
 

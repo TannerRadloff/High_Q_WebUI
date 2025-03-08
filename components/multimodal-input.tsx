@@ -233,8 +233,7 @@ function PureMultimodalInput({
             setMessages(currentMessages => [...currentMessages, documentMessage]);
             
             // Make a direct API call to create the chat with just the artifact
-            // This ensures the chat is created in the database before the user sends a message
-            await fetch('/api/chat', {
+            const chatResponse = await fetch('/api/chat', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -245,6 +244,35 @@ function PureMultimodalInput({
                 selectedChatModel: 'chat-model-small', // Default model
               }),
             });
+            
+            if (chatResponse.ok) {
+              // Add a user message that displays the artifact
+              const toolInvocation = {
+                toolName: 'createDocument',
+                toolCallId: generateUUID(),
+                state: 'result' as const,
+                args: {
+                  title: artifactData.title,
+                },
+                result: {
+                  id: artifactData.documentId,
+                  kind: 'text',
+                  title: artifactData.title,
+                }
+              };
+
+              // Create an assistant message to display the artifact
+              const assistantMessage: Message = {
+                id: generateUUID(),
+                role: 'assistant',
+                content: `I've created a document "${artifactData.title}" from your uploaded text file.`,
+                createdAt: new Date(),
+                toolInvocations: [toolInvocation],
+              };
+
+              // Add the assistant message to show the artifact in the UI
+              setMessages(currentMessages => [...currentMessages, assistantMessage]);
+            }
             
             toast.success(`Created document from ${textAttachment.name}`);
           }
@@ -278,15 +306,24 @@ function PureMultimodalInput({
         return;
       }
       
-      // Process any text file attachments first
-      const remainingAttachments = await processTextFiles([...attachments]);
+      // Track if we processed any text files
+      let processedTextFiles = false;
       
-      // If there's input text, proceed with normal submission
-      if (input.trim()) {
+      // Process any text file attachments first
+      if (attachments.length > 0) {
+        const initialAttachmentCount = attachments.length;
+        const remainingAttachments = await processTextFiles([...attachments]);
+        processedTextFiles = remainingAttachments.length < initialAttachmentCount;
+      }
+      
+      // Only proceed with regular submission if there's input text or non-text file attachments
+      if (input.trim() || (attachments.length > 0 && !processedTextFiles)) {
         // Then handle the submission with remaining attachments
         handleSubmit(event, {
           ...chatRequestOptions,
-          experimental_attachments: remainingAttachments,
+          experimental_attachments: attachments.filter(
+            attachment => attachment.contentType !== 'text/plain' || !attachment.textContent
+          ),
         });
       }
       
