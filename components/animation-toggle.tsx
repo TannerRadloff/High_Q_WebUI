@@ -123,8 +123,8 @@ export function AnimationToggle() {
     
     // Reset all CSS variables
     document.documentElement.style.setProperty('--animation-play-state', 'running');
-    document.documentElement.style.setProperty('--nebula-opacity', '0.7');
-    document.documentElement.style.setProperty('--stars-opacity', '0.7');
+    document.documentElement.style.setProperty('--nebula-opacity', '0.9');
+    document.documentElement.style.setProperty('--stars-opacity', '0.8');
     document.documentElement.style.setProperty('--shooting-stars-display', 'block');
     
     // Make sure all elements are visible

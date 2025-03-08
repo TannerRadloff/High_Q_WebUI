@@ -14,8 +14,8 @@ const ANIMATION_INIT_SCRIPT = `\
 (function() {
   // Set animation variables
   document.documentElement.style.setProperty('--animation-play-state', 'running');
-  document.documentElement.style.setProperty('--nebula-opacity', '0.7');
-  document.documentElement.style.setProperty('--stars-opacity', '0.7');
+  document.documentElement.style.setProperty('--nebula-opacity', '0.9');
+  document.documentElement.style.setProperty('--stars-opacity', '0.8');
   document.documentElement.style.setProperty('--shooting-stars-display', 'block');
   
   // Force animation restart by briefly pausing and resuming
@@ -56,15 +56,7 @@ const ANIMATION_INIT_SCRIPT = `\
     const star1 = document.createElement('div');
     star1.className = 'star-1';
     
-    const star2 = document.createElement('div');
-    star2.className = 'star-2';
-    
-    const star3 = document.createElement('div');
-    star3.className = 'star-3';
-    
     shootingStar.appendChild(star1);
-    shootingStar.appendChild(star2);
-    shootingStar.appendChild(star3);
     
     body.prepend(shootingStar);
   }
