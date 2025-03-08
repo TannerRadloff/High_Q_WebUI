@@ -52,23 +52,47 @@ export async function POST(request: Request) {
     return new Response('Unauthorized', { status: 401 });
   }
 
+  // Check if there are any document artifact messages
+  const hasArtifacts = messages.some(message => 
+    message.role === 'system' && 'documentId' in message && message.documentId
+  );
+
+  // Find the most recent user message
   const userMessage = getMostRecentUserMessage(messages);
 
-  if (!userMessage) {
+  // If there's no user message but there are artifacts, this is an initial artifact-only state
+  // We'll create a chat but won't require a user message yet
+  if (!userMessage && !hasArtifacts) {
     return new Response('No user message found', { status: 400 });
   }
 
+  // Get or create the chat
   const chat = await getChatById({ id });
 
   if (!chat) {
-    const title = await generateTitleFromUserMessage({ message: userMessage });
+    // For new chats with only artifacts, use a generic title
+    let title = 'New Document';
+    if (userMessage) {
+      title = await generateTitleFromUserMessage({ message: userMessage });
+    } else if (hasArtifacts) {
+      // Try to use the artifact title if available
+      const artifactMessage = messages.find(message => 
+        message.role === 'system' && 'artifactTitle' in message
+      );
+      if (artifactMessage && 'artifactTitle' in artifactMessage) {
+        title = `Document: ${artifactMessage.artifactTitle}`;
+      }
+    }
+    
     await saveChat({ id, userId: session.user.id, title });
   }
 
-  // Save the user message to the database
-  await saveMessages({
-    messages: [{ ...userMessage, createdAt: new Date(), chatId: id }],
-  });
+  // Save the user message to the database (if any)
+  if (userMessage) {
+    await saveMessages({
+      messages: [{ ...userMessage, createdAt: new Date(), chatId: id }],
+    });
+  }
 
   try {
     // Find document artifacts in messages and save them if they're new
@@ -83,6 +107,16 @@ export async function POST(request: Request) {
           chatId: id,
           createdAt: new Date(),
         })),
+      });
+    }
+
+    // If there's no user message yet (just artifacts), we're done
+    if (!userMessage) {
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: 'Artifacts saved' 
+      }), {
+        headers: { 'Content-Type': 'application/json' },
       });
     }
 

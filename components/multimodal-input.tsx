@@ -197,6 +197,8 @@ function PureMultimodalInput({
     // Process text files to create artifacts
     for (const textAttachment of textFileAttachments) {
       try {
+        console.log('Creating text artifact for:', textAttachment.name);
+        
         const artifactResponse = await fetch('/api/text-artifact', {
           method: 'POST',
           headers: {
@@ -212,23 +214,47 @@ function PureMultimodalInput({
 
         if (artifactResponse.ok) {
           const artifactData = await artifactResponse.json();
+          console.log('Text artifact created:', artifactData);
           
           // Only add the document artifact to the chat
           if (artifactData.documentId) {
-            await append({
+            // Create the message with the document
+            const documentMessage: MessageWithDocument = {
               id: generateUUID(),
               role: 'system',
               content: '',
+              createdAt: new Date(),
               documentId: artifactData.documentId,
               artifactTitle: artifactData.title,
               artifactKind: 'text',
-            } as MessageWithDocument);
+            };
+            
+            // Add the document message to the local message state
+            setMessages(currentMessages => [...currentMessages, documentMessage]);
+            
+            // Make a direct API call to create the chat with just the artifact
+            // This ensures the chat is created in the database before the user sends a message
+            await fetch('/api/chat', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                id: chatId,
+                messages: [documentMessage],
+                selectedChatModel: 'chat-model-small', // Default model
+              }),
+            });
+            
+            toast.success(`Created document from ${textAttachment.name}`);
           }
         } else {
-          console.error('Failed to create text artifact');
+          console.error('Failed to create text artifact, response:', await artifactResponse.text());
+          toast.error(`Failed to create document from ${textAttachment.name}`);
         }
       } catch (error) {
         console.error('Error creating text artifact:', error);
+        toast.error(`Error creating document from ${textAttachment.name}`);
       }
     }
     
@@ -247,21 +273,33 @@ function PureMultimodalInput({
         return;
       }
       
+      // If there is no input and no attachments, don't submit
+      if (!input.trim() && attachments.length === 0) {
+        return;
+      }
+      
       // Process any text file attachments first
       const remainingAttachments = await processTextFiles([...attachments]);
       
-      // Then handle the submission with remaining attachments
-      handleSubmit(event, {
-        ...chatRequestOptions,
-        experimental_attachments: remainingAttachments,
-      });
+      // If there's input text, proceed with normal submission
+      if (input.trim()) {
+        // Then handle the submission with remaining attachments
+        handleSubmit(event, {
+          ...chatRequestOptions,
+          experimental_attachments: remainingAttachments,
+        });
+      }
       
       // Clear attachments after submission
       setAttachments([]);
       setLocalStorageInput('');
       resetHeight();
+      
+      if (width && width > 768) {
+        textareaRef.current?.focus();
+      }
     },
-    [handleSubmit, attachments, setAttachments, uploadQueue, chatId, append, setLocalStorageInput, resetHeight]
+    [handleSubmit, attachments, setAttachments, uploadQueue, chatId, processTextFiles, input, setLocalStorageInput, resetHeight, width]
   );
 
   return (
