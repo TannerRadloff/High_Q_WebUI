@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { auth } from '@/app/(auth)/auth';
 import { parsePdf } from '@/lib/server/pdf-parser';
-import { extractTextFromFile } from '@/lib/utils';
+import { extractTextFromFile, identifyFileType } from '@/lib/utils';
 
 // Maximum size for text content in characters to return in the response
 const MAX_TEXT_CONTENT_SIZE = 15000;
@@ -54,20 +54,24 @@ export async function POST(request: Request) {
     // Get filename from formData since Blob doesn't have name property
     const filename = (formData.get('file') as File).name;
     const fileBuffer = await file.arrayBuffer();
+    
+    // Identify file type based on content and extension
+    const detectedContentType = await identifyFileType(fileBuffer, filename, file.type);
+    const contentType = detectedContentType || file.type;
 
     // Extract text content from PDF and TXT files
     let textContent = null;
     let isContentTruncated = false;
     
-    if (file.type === 'text/plain') {
-      textContent = await extractTextFromFile(fileBuffer, file.type);
+    if (contentType === 'text/plain') {
+      textContent = await extractTextFromFile(fileBuffer, contentType);
       
       // Check if text content is too large and truncate if necessary
       if (textContent && textContent.length > MAX_TEXT_CONTENT_SIZE) {
         textContent = textContent.substring(0, MAX_TEXT_CONTENT_SIZE);
         isContentTruncated = true;
       }
-    } else if (file.type === 'application/pdf') {
+    } else if (contentType === 'application/pdf') {
       // Direct server-side PDF parsing (since this is a server component)
       textContent = await parsePdf(fileBuffer);
       
@@ -81,12 +85,13 @@ export async function POST(request: Request) {
     try {
       const data = await put(`${filename}`, fileBuffer, {
         access: 'public',
-        contentType: file.type,
+        contentType: contentType,
       });
 
-      // Include the extracted text content in the response
+      // Include the extracted text content and detected content type in the response
       return NextResponse.json({
         ...data,
+        contentType: contentType,
         textContent: isContentTruncated 
           ? `${textContent}... (content truncated due to size, full content will be processed)`
           : textContent,

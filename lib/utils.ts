@@ -231,9 +231,53 @@ export function getDocumentTimestampByIndex(
 }
 
 /**
- * Extracts text content from a file buffer based on its MIME type
- * Note: PDF parsing is only available on the server side
+ * Identifies the file type based on content, filename, and provided content type
+ * @param fileBuffer The file content as ArrayBuffer
+ * @param filename The name of the file
+ * @param providedContentType The content type provided by the browser
+ * @returns The detected content type or null if unable to determine
  */
+export async function identifyFileType(
+  fileBuffer: ArrayBuffer,
+  filename: string,
+  providedContentType: string
+): Promise<string | null> {
+  // First check the file extension
+  const extension = filename.split('.').pop()?.toLowerCase();
+  
+  if (extension === 'txt') {
+    return 'text/plain';
+  } else if (extension === 'pdf') {
+    return 'application/pdf';
+  } else if (['jpg', 'jpeg'].includes(extension || '')) {
+    return 'image/jpeg';
+  } else if (extension === 'png') {
+    return 'image/png';
+  }
+  
+  // If extension check doesn't work, check the content
+  // For text files, try to decode as UTF-8
+  if (providedContentType === 'application/octet-stream' || !providedContentType) {
+    try {
+      // Check if it's a text file by trying to decode a small sample
+      const sample = fileBuffer.slice(0, Math.min(fileBuffer.byteLength, 1024));
+      const decoder = new TextDecoder('utf-8');
+      const text = decoder.decode(sample);
+      
+      // If we can decode it and it doesn't have too many non-printable characters, it's likely text
+      const nonPrintableCount = (text.match(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g) || []).length;
+      if (nonPrintableCount / text.length < 0.1) {
+        return 'text/plain';
+      }
+    } catch (e) {
+      // Not a text file
+    }
+  }
+  
+  // Fall back to the provided content type
+  return providedContentType;
+}
+
 export async function extractTextFromFile(
   fileBuffer: ArrayBuffer,
   contentType: string

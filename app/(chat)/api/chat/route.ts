@@ -13,6 +13,7 @@ import {
   getChatById,
   saveChat,
   saveMessages,
+  saveDocument,
 } from '@/lib/db/queries';
 import {
   generateUUID,
@@ -69,23 +70,75 @@ export async function POST(request: Request) {
   });
 
   try {
-    // Process file attachments with text content
+    // Process file attachments
     let fileContents = '';
+    let textFileAttachments = [];
+    let otherAttachments = [];
+
     if (experimental_attachments && experimental_attachments.length > 0) {
-      fileContents = experimental_attachments
-        .filter(attachment => attachment.textContent)
-        .map(attachment => {
-          // Limit the size of each file's content
-          const truncatedContent = attachment.textContent && attachment.textContent.length > MAX_FILE_CONTENT_SIZE
-            ? attachment.textContent.substring(0, MAX_FILE_CONTENT_SIZE) + '... (content truncated due to size)'
-            : attachment.textContent;
-          
-          return `File: ${attachment.name}\nContent: ${truncatedContent}\n\n`;
-        })
-        .join('');
+      // Separate text files from other attachments
+      textFileAttachments = experimental_attachments.filter(
+        attachment => attachment.contentType === 'text/plain' && attachment.textContent
+      );
+      
+      otherAttachments = experimental_attachments.filter(
+        attachment => attachment.contentType !== 'text/plain' || !attachment.textContent
+      );
+
+      // Create text artifacts for text files
+      for (const textAttachment of textFileAttachments) {
+        const documentId = generateUUID();
+        const title = textAttachment.name || 'Uploaded Text File';
+        
+        // Save the document to the database
+        await saveDocument({
+          id: documentId,
+          title,
+          content: textAttachment.textContent || '',
+          kind: 'text',
+          userId: session.user.id,
+        });
+
+        // Add a system message to inform about the text artifact
+        await saveMessages({
+          messages: [{
+            id: generateUUID(),
+            chatId: id,
+            role: 'system',
+            content: `Created text document "${title}" from uploaded file.`,
+            createdAt: new Date(),
+          }],
+        });
+
+        // Add the document ID to the message for the client to display
+        messages.push({
+          id: generateUUID(),
+          role: 'system',
+          content: '',
+          createdAt: new Date(),
+          documentId,
+          artifactTitle: title,
+          artifactKind: 'text',
+        } as Message);
+      }
+
+      // Process other attachments for the system prompt
+      if (otherAttachments.length > 0) {
+        fileContents = otherAttachments
+          .filter(attachment => attachment.textContent)
+          .map(attachment => {
+            // Limit the size of each file's content
+            const truncatedContent = attachment.textContent && attachment.textContent.length > MAX_FILE_CONTENT_SIZE
+              ? attachment.textContent.substring(0, MAX_FILE_CONTENT_SIZE) + '... (content truncated due to size)'
+              : attachment.textContent;
+            
+            return `File: ${attachment.name}\nContent: ${truncatedContent}\n\n`;
+          })
+          .join('');
+      }
     }
 
-    // Create an enhanced system prompt that includes file contents
+    // Create an enhanced system prompt that includes non-text file contents
     const enhancedSystemPrompt = (model: string) => {
       const basePrompt = systemPrompt({ selectedChatModel: model });
       if (fileContents) {
@@ -155,15 +208,15 @@ export async function POST(request: Request) {
           sendReasoning: true,
         });
       },
-      onError: (error) => {
+      onError: (error: unknown) => {
         console.error('Chat API error:', error);
-        if (error.message && error.message.includes('context length')) {
+        if (error instanceof Error && error.message && error.message.includes('context length')) {
           return 'The file content is too large for the model to process. Please try with a smaller file or extract the most relevant parts.';
         }
         return 'Oops, an error occurred while processing your request. Please try again with a smaller file or different content.';
       },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Unexpected error in chat API:', error);
     return new Response('An unexpected error occurred. Please try again.', { status: 500 });
   }
