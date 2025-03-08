@@ -47,6 +47,38 @@ function PureMessages({
       ref={messagesContainerRef}
       className="flex flex-col min-w-0 gap-6 flex-1 overflow-y-scroll pt-4 relative messages-container"
     >
+      {/* Animation background elements directly behind message bubbles */}
+      <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none messages-background">
+        <div className="aurora">
+          <div className="light"></div>
+          <div className="light light-2"></div>
+          <div className="light light-3"></div>
+        </div>
+        
+        <div className="shooting-star">
+          <div className="star-1"></div>
+          <div className="star-2"></div>
+          <div className="star-3"></div>
+        </div>
+        
+        <div className="cosmic-dust"></div>
+        
+        <div className="pulsating-stars">
+          <div className="star star-1"></div>
+          <div className="star star-2"></div>
+          <div className="star star-3"></div>
+          <div className="star star-4"></div>
+          <div className="star star-5"></div>
+          <div className="star star-6"></div>
+        </div>
+        
+        <div className="parallax-stars">
+          <div className="layer layer-1"></div>
+          <div className="layer layer-2"></div>
+          <div className="layer layer-3"></div>
+        </div>
+      </div>
+
       {messages.length === 0 && <Overview />}
 
       {messages.map((message, index) => (
