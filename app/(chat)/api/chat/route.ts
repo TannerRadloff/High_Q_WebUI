@@ -65,94 +65,35 @@ export async function POST(request: Request) {
     await saveChat({ id, userId: session.user.id, title });
   }
 
+  // Save only the user message, not any assistant messages that might have been added
+  // for file content (those are already saved by the client)
   await saveMessages({
     messages: [{ ...userMessage, createdAt: new Date(), chatId: id }],
   });
 
   try {
-    // Process file attachments
-    let fileContents = '';
-    let textFileAttachments = [];
-    let otherAttachments = [];
-
-    if (experimental_attachments && experimental_attachments.length > 0) {
-      // Separate text files from other attachments
-      textFileAttachments = experimental_attachments.filter(
-        attachment => attachment.contentType === 'text/plain' && attachment.textContent
-      );
-      
-      otherAttachments = experimental_attachments.filter(
-        attachment => attachment.contentType !== 'text/plain' || !attachment.textContent
-      );
-
-      // Create text artifacts for text files
-      for (const textAttachment of textFileAttachments) {
-        const documentId = generateUUID();
-        const title = textAttachment.name || 'Uploaded Text File';
-        
-        // Save the document to the database
-        await saveDocument({
-          id: documentId,
-          title,
-          content: textAttachment.textContent || '',
-          kind: 'text',
-          userId: session.user.id,
-        });
-
-        // Add a system message to inform about the text artifact
-        await saveMessages({
-          messages: [{
-            id: generateUUID(),
-            chatId: id,
-            role: 'system',
-            content: `Created text document "${title}" from uploaded file.`,
-            createdAt: new Date(),
-          }],
-        });
-
-        // Add the document ID to the message for the client to display
-        messages.push({
-          id: generateUUID(),
-          role: 'system',
-          content: '',
-          createdAt: new Date(),
-          documentId,
-          artifactTitle: title,
-          artifactKind: 'text',
-        } as Message);
-      }
-
-      // Process other attachments for the system prompt
-      if (otherAttachments.length > 0) {
-        fileContents = otherAttachments
-          .filter(attachment => attachment.textContent)
-          .map(attachment => {
-            // Limit the size of each file's content
-            const truncatedContent = attachment.textContent && attachment.textContent.length > MAX_FILE_CONTENT_SIZE
-              ? attachment.textContent.substring(0, MAX_FILE_CONTENT_SIZE) + '... (content truncated due to size)'
-              : attachment.textContent;
-            
-            return `File: ${attachment.name}\nContent: ${truncatedContent}\n\n`;
-          })
-          .join('');
-      }
-    }
-
-    // Create an enhanced system prompt that includes non-text file contents
+    // Use the base system prompt without any file content modifications
     const enhancedSystemPrompt = (model: string) => {
-      const basePrompt = systemPrompt({ selectedChatModel: model });
-      if (fileContents) {
-        return `${basePrompt}\n\nThe user has attached the following files. Use this information to assist them:\n\n${fileContents}`;
-      }
-      return basePrompt;
+      return systemPrompt({ selectedChatModel: model });
     };
+
+    // Filter out any assistant messages that were added for file content
+    // These are identified by the "I've analyzed the content of" prefix
+    const filteredMessages = messages.filter(message => {
+      if (message.role === 'assistant' && 
+          typeof message.content === 'string' && 
+          message.content.startsWith("I've analyzed the content of")) {
+        return false;
+      }
+      return true;
+    });
 
     return createDataStreamResponse({
       execute: (dataStream) => {
         const result = streamText({
           model: myProvider.languageModel(selectedChatModel),
           system: enhancedSystemPrompt(selectedChatModel),
-          messages,
+          messages: filteredMessages,
           maxSteps: 5,
           experimental_activeTools:
             selectedChatModel === 'chat-model-reasoning'

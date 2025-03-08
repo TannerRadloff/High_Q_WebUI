@@ -21,7 +21,7 @@ import {
 import { toast } from 'sonner';
 import { useLocalStorage, useWindowSize } from 'usehooks-ts';
 
-import { sanitizeUIMessages } from '@/lib/utils';
+import { sanitizeUIMessages, generateUUID } from '@/lib/utils';
 
 import { ArrowUpIcon, PaperclipIcon, StopIcon } from './icons';
 import { PreviewAttachment } from './preview-attachment';
@@ -156,11 +156,70 @@ function PureMultimodalInput({
         const data = await response.json();
         const { url, pathname, contentType, textContent } = data;
 
+        // If it's a text file, create a text artifact
+        if (contentType === 'text/plain' && textContent) {
+          try {
+            // Call our text-artifact API to create a text document
+            const artifactResponse = await fetch('/api/text-artifact', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                chatId,
+                fileUrl: url,
+                fileName: pathname,
+                textContent,
+              }),
+            });
+
+            if (artifactResponse.ok) {
+              // Add file content as an assistant message to the chat
+              await append({
+                id: generateUUID(),
+                role: 'assistant',
+                content: `I've analyzed the content of "${pathname}":\n\n${textContent}`,
+              });
+              
+              toast.success(`Added content from ${pathname} to the chat`);
+              return null;
+            } else {
+              // If creating the artifact failed, fall back to adding content as a message
+              console.error('Failed to create text artifact, adding content as message');
+              await append({
+                id: generateUUID(),
+                role: 'assistant',
+                content: `I've analyzed the content of "${pathname}":\n\n${textContent}`,
+              });
+              return null;
+            }
+          } catch (artifactError) {
+            console.error('Error creating text artifact:', artifactError);
+            // Still add the content as a message even if artifact creation fails
+            await append({
+              id: generateUUID(),
+              role: 'assistant',
+              content: `I've analyzed the content of "${pathname}":\n\n${textContent}`,
+            });
+            return null;
+          }
+        } else if (textContent) {
+          // For non-text files that have extracted text content (like PDFs)
+          // Add the content directly to the chat as an assistant message
+          await append({
+            id: generateUUID(),
+            role: 'assistant',
+            content: `I've analyzed the content of "${pathname}":\n\n${textContent}`,
+          });
+          toast.success(`Added content from ${pathname} to the chat`);
+          return null;
+        }
+
+        // For files without text content (like images)
         return {
           url,
           name: pathname,
           contentType: contentType,
-          ...(textContent && { textContent }),
         };
       }
       const { error } = await response.json();
@@ -180,7 +239,7 @@ function PureMultimodalInput({
         const uploadPromises = files.map((file) => uploadFile(file));
         const uploadedAttachments = await Promise.all(uploadPromises);
         const successfullyUploadedAttachments = uploadedAttachments.filter(
-          (attachment) => attachment !== undefined,
+          (attachment) => attachment !== undefined && attachment !== null,
         );
 
         setAttachments((currentAttachments) => [
@@ -193,7 +252,7 @@ function PureMultimodalInput({
         setUploadQueue([]);
       }
     },
-    [setAttachments],
+    [setAttachments, chatId, append],
   );
 
   return (
