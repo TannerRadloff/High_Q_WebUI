@@ -251,7 +251,7 @@ function PureMultimodalInput({
           onChange={handleFileChange}
           className="hidden"
           multiple
-          accept="image/*,application/pdf"
+          accept="image/*,application/pdf,text/plain"
         />
         
         <AttachmentsButton
