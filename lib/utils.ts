@@ -232,6 +232,7 @@ export function getDocumentTimestampByIndex(
 
 /**
  * Extracts text content from a file buffer based on its MIME type
+ * Note: PDF parsing is only available on the server side
  */
 export async function extractTextFromFile(
   fileBuffer: ArrayBuffer,
@@ -244,12 +245,11 @@ export async function extractTextFromFile(
       return decoder.decode(fileBuffer);
     }
     
-    // For PDF files, use pdf-parse to extract text
+    // For PDF files, we need to handle this differently
+    // This function should be called from a server component or API route
     if (contentType === 'application/pdf') {
-      // Dynamic import to avoid server-side issues
-      const pdfParse = (await import('pdf-parse')).default;
-      const pdfData = await pdfParse(Buffer.from(fileBuffer));
-      return pdfData.text;
+      // This will be handled by the server-side API
+      return null;
     }
     
     // For other file types, return null

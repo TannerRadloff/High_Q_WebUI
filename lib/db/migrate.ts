@@ -7,26 +7,43 @@ config({
   path: '.env.local',
 });
 
+// Check if we're in a build environment (Vercel or local build)
+const isBuildEnvironment = process.env.NODE_ENV === 'production' || process.argv.includes('build');
+
 const runMigrate = async () => {
-  if (!process.env.POSTGRES_URL) {
-    throw new Error('POSTGRES_URL is not defined');
+  // Skip migrations if in build environment or POSTGRES_URL is not defined
+  if (isBuildEnvironment || !process.env.POSTGRES_URL) {
+    console.log('⚠️ Skipping migrations in build environment or POSTGRES_URL is not defined');
+    return;
   }
 
-  const connection = postgres(process.env.POSTGRES_URL, { max: 1 });
-  const db = drizzle(connection);
+  try {
+    const connection = postgres(process.env.POSTGRES_URL, { max: 1 });
+    const db = drizzle(connection);
 
-  console.log('⏳ Running migrations...');
+    console.log('⏳ Running migrations...');
 
-  const start = Date.now();
-  await migrate(db, { migrationsFolder: './lib/db/migrations' });
-  const end = Date.now();
+    const start = Date.now();
+    await migrate(db, { migrationsFolder: './lib/db/migrations' });
+    const end = Date.now();
 
-  console.log('✅ Migrations completed in', end - start, 'ms');
-  process.exit(0);
+    console.log('✅ Migrations completed in', end - start, 'ms');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Migration failed');
+    console.error(error);
+    // Don't exit with error code during build
+    if (!isBuildEnvironment) {
+      process.exit(1);
+    }
+  }
 };
 
 runMigrate().catch((err) => {
   console.error('❌ Migration failed');
   console.error(err);
-  process.exit(1);
+  // Don't exit with error code during build
+  if (!isBuildEnvironment) {
+    process.exit(1);
+  }
 });

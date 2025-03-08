@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { auth } from '@/app/(auth)/auth';
+import { parsePdf } from '@/lib/server/pdf-parser';
 import { extractTextFromFile } from '@/lib/utils';
 
 // Use Blob instead of File since File is not available in Node.js environment
@@ -53,8 +54,11 @@ export async function POST(request: Request) {
 
     // Extract text content from PDF and TXT files
     let textContent = null;
-    if (file.type === 'application/pdf' || file.type === 'text/plain') {
+    if (file.type === 'text/plain') {
       textContent = await extractTextFromFile(fileBuffer, file.type);
+    } else if (file.type === 'application/pdf') {
+      // Direct server-side PDF parsing (since this is a server component)
+      textContent = await parsePdf(fileBuffer);
     }
 
     try {
