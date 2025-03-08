@@ -296,7 +296,7 @@ function PureMultimodalInput({
       </form>
 
       <AnimatePresence>
-        {!isLoading && messages.length > 0 && (
+        {!isLoading && messages.length === 0 && (
           <motion.div 
             className="w-full px-2 pb-2"
             initial={{ opacity: 0, y: -10 }}
