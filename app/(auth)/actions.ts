@@ -18,7 +18,7 @@ import { sendPasswordResetEmail } from '@/lib/email';
 import { signIn } from './auth';
 
 const authFormSchema = z.object({
-  email: z.string().email(),
+  email: z.string().min(1),
   password: z.string().min(6),
 });
 
