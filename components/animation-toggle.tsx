@@ -18,92 +18,11 @@ export function AnimationToggle() {
     setNebulaEnabled(parseFloat(computedStyle.getPropertyValue('--nebula-opacity') || '0') > 0);
     setStarsEnabled(parseFloat(computedStyle.getPropertyValue('--stars-opacity') || '0') > 0);
     setShootingStarsEnabled(computedStyle.getPropertyValue('--shooting-stars-display') !== 'none');
-    
-    // Ensure animation elements exist
-    ensureAnimationElementsExist();
   }, []);
 
-  const ensureAnimationElementsExist = () => {
-    // Look for the messages-background container
-    const messagesBackground = document.querySelector('.messages-background');
-    if (!messagesBackground) return; // If not found, exit early
-    
-    if (!messagesBackground.querySelector('.aurora')) {
-      const aurora = document.createElement('div');
-      aurora.className = 'aurora';
-      
-      const light1 = document.createElement('div');
-      light1.className = 'light';
-      
-      const light2 = document.createElement('div');
-      light2.className = 'light light-2';
-      
-      const light3 = document.createElement('div');
-      light3.className = 'light light-3';
-      
-      aurora.appendChild(light1);
-      aurora.appendChild(light2);
-      aurora.appendChild(light3);
-      
-      messagesBackground.appendChild(aurora);
-    }
-    
-    if (!messagesBackground.querySelector('.shooting-star')) {
-      const shootingStar = document.createElement('div');
-      shootingStar.className = 'shooting-star';
-      
-      const star1 = document.createElement('div');
-      star1.className = 'star-1';
-      
-      const star2 = document.createElement('div');
-      star2.className = 'star-2';
-      
-      const star3 = document.createElement('div');
-      star3.className = 'star-3';
-      
-      shootingStar.appendChild(star1);
-      shootingStar.appendChild(star2);
-      shootingStar.appendChild(star3);
-      
-      messagesBackground.appendChild(shootingStar);
-    }
-    
-    if (!messagesBackground.querySelector('.cosmic-dust')) {
-      const cosmicDust = document.createElement('div');
-      cosmicDust.className = 'cosmic-dust';
-      messagesBackground.appendChild(cosmicDust);
-    }
-    
-    if (!messagesBackground.querySelector('.pulsating-stars')) {
-      const pulsatingStars = document.createElement('div');
-      pulsatingStars.className = 'pulsating-stars';
-      
-      for (let i = 1; i <= 6; i++) {
-        const star = document.createElement('div');
-        star.className = `star star-${i}`;
-        pulsatingStars.appendChild(star);
-      }
-      
-      messagesBackground.appendChild(pulsatingStars);
-    }
-    
-    if (!messagesBackground.querySelector('.parallax-stars')) {
-      const parallaxStars = document.createElement('div');
-      parallaxStars.className = 'parallax-stars';
-      
-      for (let i = 1; i <= 3; i++) {
-        const layer = document.createElement('div');
-        layer.className = `layer layer-${i}`;
-        parallaxStars.appendChild(layer);
-      }
-      
-      messagesBackground.appendChild(parallaxStars);
-    }
-  };
-
-  // Helper function to find all animation elements, including those in the messages container
+  // Helper function to find all animation elements
   const findAllAnimationElements = () => {
-    // Get all animation elements, focusing on those in the messages container
+    // Get all animation elements from the messages-background
     const auroras = document.querySelectorAll('.messages-background .aurora') as NodeListOf<HTMLElement>;
     const shootingStars = document.querySelectorAll('.messages-background .shooting-star') as NodeListOf<HTMLElement>;
     const cosmicDusts = document.querySelectorAll('.messages-background .cosmic-dust') as NodeListOf<HTMLElement>;
@@ -151,10 +70,6 @@ export function AnimationToggle() {
     auroras.forEach(aurora => {
       aurora.style.display = newState ? 'block' : 'none';
     });
-    
-    if (newState) {
-      ensureAnimationElementsExist();
-    }
   };
 
   const toggleStars = () => {
@@ -181,10 +96,6 @@ export function AnimationToggle() {
     cosmicDusts.forEach(element => {
       element.style.display = newState ? 'block' : 'none';
     });
-    
-    if (newState) {
-      ensureAnimationElementsExist();
-    }
   };
 
   const toggleShootingStars = () => {
@@ -202,10 +113,6 @@ export function AnimationToggle() {
     shootingStars.forEach(element => {
       element.style.display = newState ? 'block' : 'none';
     });
-    
-    if (newState) {
-      ensureAnimationElementsExist();
-    }
   };
 
   const resetAnimations = () => {
@@ -219,9 +126,6 @@ export function AnimationToggle() {
     document.documentElement.style.setProperty('--nebula-opacity', '0.7');
     document.documentElement.style.setProperty('--stars-opacity', '0.7');
     document.documentElement.style.setProperty('--shooting-stars-display', 'block');
-    
-    // Ensure all animation elements exist
-    ensureAnimationElementsExist();
     
     // Make sure all elements are visible
     const { auroras, shootingStars, cosmicDusts, pulsatingStars, parallaxStars } = findAllAnimationElements();
