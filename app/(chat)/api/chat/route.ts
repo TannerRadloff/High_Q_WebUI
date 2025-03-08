@@ -19,6 +19,7 @@ import {
   getMostRecentUserMessage,
   sanitizeResponseMessages,
 } from '@/lib/utils';
+import { ExtendedAttachment } from '@/types';
 
 import { generateTitleFromUserMessage } from '../../actions';
 import { createDocument } from '@/lib/ai/tools/create-document';
@@ -33,8 +34,13 @@ export async function POST(request: Request) {
     id,
     messages,
     selectedChatModel,
-  }: { id: string; messages: Array<Message>; selectedChatModel: string } =
-    await request.json();
+    experimental_attachments,
+  }: { 
+    id: string; 
+    messages: Array<Message>; 
+    selectedChatModel: string;
+    experimental_attachments?: ExtendedAttachment[];
+  } = await request.json();
 
   const session = await auth();
 
@@ -59,11 +65,31 @@ export async function POST(request: Request) {
     messages: [{ ...userMessage, createdAt: new Date(), chatId: id }],
   });
 
+  // Process file attachments with text content
+  let fileContents = '';
+  if (experimental_attachments && experimental_attachments.length > 0) {
+    fileContents = experimental_attachments
+      .filter(attachment => attachment.textContent)
+      .map(attachment => {
+        return `File: ${attachment.name}\nContent: ${attachment.textContent}\n\n`;
+      })
+      .join('');
+  }
+
+  // Create an enhanced system prompt that includes file contents
+  const enhancedSystemPrompt = (model: string) => {
+    const basePrompt = systemPrompt({ selectedChatModel: model });
+    if (fileContents) {
+      return `${basePrompt}\n\nThe user has attached the following files. Use this information to assist them:\n\n${fileContents}`;
+    }
+    return basePrompt;
+  };
+
   return createDataStreamResponse({
     execute: (dataStream) => {
       const result = streamText({
         model: myProvider.languageModel(selectedChatModel),
-        system: systemPrompt({ selectedChatModel }),
+        system: enhancedSystemPrompt(selectedChatModel),
         messages,
         maxSteps: 5,
         experimental_activeTools:

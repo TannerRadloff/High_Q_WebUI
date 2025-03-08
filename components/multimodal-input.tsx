@@ -1,11 +1,11 @@
 'use client';
 
 import type {
-  Attachment,
   ChatRequestOptions,
   CreateMessage,
   Message,
 } from 'ai';
+import { ExtendedAttachment } from '@/types';
 import cx from 'classnames';
 import type React from 'react';
 import {
@@ -50,8 +50,8 @@ function PureMultimodalInput({
   setInput: (value: string) => void;
   isLoading: boolean;
   stop: () => void;
-  attachments: Array<Attachment>;
-  setAttachments: Dispatch<SetStateAction<Array<Attachment>>>;
+  attachments: Array<ExtendedAttachment>;
+  setAttachments: Dispatch<SetStateAction<Array<ExtendedAttachment>>>;
   messages: Array<Message>;
   setMessages: Dispatch<SetStateAction<Array<Message>>>;
   append: (
@@ -154,12 +154,13 @@ function PureMultimodalInput({
 
       if (response.ok) {
         const data = await response.json();
-        const { url, pathname, contentType } = data;
+        const { url, pathname, contentType, textContent } = data;
 
         return {
           url,
           name: pathname,
           contentType: contentType,
+          ...(textContent && { textContent }),
         };
       }
       const { error } = await response.json();

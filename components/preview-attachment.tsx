@@ -1,4 +1,4 @@
-import type { Attachment } from 'ai';
+import { ExtendedAttachment } from '@/types';
 
 import { LoaderIcon } from './icons';
 import { FileIcon, FileTextIcon } from 'lucide-react';
@@ -7,7 +7,7 @@ export const PreviewAttachment = ({
   attachment,
   isUploading = false,
 }: {
-  attachment: Attachment;
+  attachment: ExtendedAttachment;
   isUploading?: boolean;
 }) => {
   const { name, url, contentType } = attachment;

@@ -31,6 +31,7 @@ import { codeArtifact } from '@/artifacts/code/client';
 import { sheetArtifact } from '@/artifacts/sheet/client';
 import { textArtifact } from '@/artifacts/text/client';
 import equal from 'fast-deep-equal';
+import { ExtendedAttachment } from '@/types';
 
 export const artifactDefinitions = [
   textArtifact,
@@ -76,8 +77,8 @@ function PureArtifact({
   setInput: (input: string) => void;
   isLoading: boolean;
   stop: () => void;
-  attachments: Array<Attachment>;
-  setAttachments: Dispatch<SetStateAction<Array<Attachment>>>;
+  attachments: Array<ExtendedAttachment>;
+  setAttachments: Dispatch<SetStateAction<Array<ExtendedAttachment>>>;
   messages: Array<Message>;
   setMessages: Dispatch<SetStateAction<Array<Message>>>;
   votes: Array<Vote> | undefined;

@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 import { ChatHeader } from '@/components/chat-header';
 import type { Vote } from '@/lib/db/schema';
 import { fetcher, generateUUID } from '@/lib/utils';
+import { ExtendedAttachment } from '@/types';
 
 import { Artifact } from './artifact';
 import { MultimodalInput } from './multimodal-input';
@@ -62,7 +63,7 @@ export function Chat({
     fetcher,
   );
 
-  const [attachments, setAttachments] = useState<Array<Attachment>>([]);
+  const [attachments, setAttachments] = useState<Array<ExtendedAttachment>>([]);
   const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
 
   // Initialize animation variables when component mounts

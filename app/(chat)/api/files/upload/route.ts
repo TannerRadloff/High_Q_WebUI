@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { auth } from '@/app/(auth)/auth';
+import { extractTextFromFile } from '@/lib/utils';
 
 // Use Blob instead of File since File is not available in Node.js environment
 const FileSchema = z.object({
@@ -50,13 +51,23 @@ export async function POST(request: Request) {
     const filename = (formData.get('file') as File).name;
     const fileBuffer = await file.arrayBuffer();
 
+    // Extract text content from PDF and TXT files
+    let textContent = null;
+    if (file.type === 'application/pdf' || file.type === 'text/plain') {
+      textContent = await extractTextFromFile(fileBuffer, file.type);
+    }
+
     try {
       const data = await put(`${filename}`, fileBuffer, {
         access: 'public',
         contentType: file.type,
       });
 
-      return NextResponse.json(data);
+      // Include the extracted text content in the response
+      return NextResponse.json({
+        ...data,
+        textContent,
+      });
     } catch (error) {
       return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
     }

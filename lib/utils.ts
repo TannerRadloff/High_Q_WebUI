@@ -229,3 +229,33 @@ export function getDocumentTimestampByIndex(
 
   return documents[index].createdAt;
 }
+
+/**
+ * Extracts text content from a file buffer based on its MIME type
+ */
+export async function extractTextFromFile(
+  fileBuffer: ArrayBuffer,
+  contentType: string
+): Promise<string | null> {
+  try {
+    // For text files, convert ArrayBuffer to string
+    if (contentType === 'text/plain') {
+      const decoder = new TextDecoder('utf-8');
+      return decoder.decode(fileBuffer);
+    }
+    
+    // For PDF files, use pdf-parse to extract text
+    if (contentType === 'application/pdf') {
+      // Dynamic import to avoid server-side issues
+      const pdfParse = (await import('pdf-parse')).default;
+      const pdfData = await pdfParse(Buffer.from(fileBuffer));
+      return pdfData.text;
+    }
+    
+    // For other file types, return null
+    return null;
+  } catch (error) {
+    console.error('Error extracting text from file:', error);
+    return null;
+  }
+}
