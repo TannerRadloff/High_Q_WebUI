@@ -240,7 +240,9 @@ function PureMultimodalInput({
             toast.info('Please wait for all files to upload');
             return;
           }
-          handleSubmit(e);
+          handleSubmit(e, {
+            experimental_attachments: attachments,
+          });
           resetHeight();
           setLocalStorageInput('');
         }}
@@ -273,7 +275,9 @@ function PureMultimodalInput({
                   toast.info('Please wait for all files to upload');
                   return;
                 }
-                handleSubmit();
+                handleSubmit(undefined, {
+                  experimental_attachments: attachments,
+                });
                 resetHeight();
                 setLocalStorageInput('');
               }
@@ -294,7 +298,9 @@ function PureMultimodalInput({
                   toast.info('Please wait for all files to upload');
                   return;
                 }
-                handleSubmit();
+                handleSubmit(undefined, {
+                  experimental_attachments: attachments,
+                });
                 resetHeight();
                 setLocalStorageInput('');
               }}

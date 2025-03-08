@@ -7,12 +7,12 @@ export function AnimationToggleWrapper() {
   const pathname = usePathname();
   
   // Don't render the AnimationToggle on any auth-related pages
-  const isAuthPage = pathname.includes('/login') || 
-                     pathname.includes('/register') || 
-                     pathname.includes('/forgot-password') ||
-                     pathname.includes('/reset-password');
+  // Using a more robust check for auth routes
+  const authRoutes = ['/login', '/register', '/forgot-password', '/reset-password'];
+  const isAuthPage = authRoutes.some(route => pathname.includes(route));
   
-  if (isAuthPage) {
+  // Additional check for route groups
+  if (isAuthPage || pathname.startsWith('/(auth)')) {
     return null;
   }
   
