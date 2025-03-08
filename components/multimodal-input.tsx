@@ -31,6 +31,13 @@ import { SuggestedActions } from './suggested-actions';
 import equal from 'fast-deep-equal';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// Add an interface at the top of the file
+interface MessageWithDocument extends Message {
+  documentId?: string;
+  artifactTitle?: string;
+  artifactKind?: string;
+}
+
 function PureMultimodalInput({
   chatId,
   input,
@@ -174,12 +181,26 @@ function PureMultimodalInput({
             });
 
             if (artifactResponse.ok) {
+              const artifactData = await artifactResponse.json();
+              
               // Add file content as an assistant message to the chat
               await append({
                 id: generateUUID(),
                 role: 'assistant',
                 content: `I've analyzed the content of "${pathname}":\n\n${textContent}`,
               });
+              
+              // Add the document message to display the artifact
+              if (artifactData.documentId) {
+                await append({
+                  id: generateUUID(),
+                  role: 'system',
+                  content: '',
+                  documentId: artifactData.documentId,
+                  artifactTitle: artifactData.title,
+                  artifactKind: 'text',
+                } as MessageWithDocument);
+              }
               
               toast.success(`Added content from ${pathname} to the chat`);
               return null;

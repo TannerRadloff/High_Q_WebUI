@@ -77,14 +77,27 @@ export async function POST(request: Request) {
       return systemPrompt({ selectedChatModel: model });
     };
 
-    // Filter out any assistant messages that were added for file content
-    // These are identified by the "I've analyzed the content of" prefix
+    // Filter out assistant messages that were added for file content
+    // But keep system messages that contain document artifacts
     const filteredMessages = messages.filter(message => {
+      // Keep all user messages
+      if (message.role === 'user') {
+        return true;
+      }
+      
+      // Keep system messages with document artifacts
+      if (message.role === 'system' && 'documentId' in message) {
+        return true;
+      }
+      
+      // Filter out assistant messages with file content analysis
       if (message.role === 'assistant' && 
           typeof message.content === 'string' && 
           message.content.startsWith("I've analyzed the content of")) {
         return false;
       }
+      
+      // Keep all other messages
       return true;
     });
 
