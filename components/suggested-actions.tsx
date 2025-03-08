@@ -110,7 +110,7 @@ function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-background/80 backdrop-blur-sm rounded-full p-1 shadow-md border border-border/30 text-primary"
+          className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-background/90 backdrop-blur-md rounded-full p-1 shadow-md border border-border/50 text-primary"
           onClick={() => scroll('left')}
         >
           <div style={{ transform: 'rotate(-90deg)' }}>
@@ -147,7 +147,7 @@ function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
                   content: suggestedAction.action,
                 });
               }}
-              className="text-left border rounded-xl px-4 py-3.5 text-sm flex-1 gap-1 flex-col w-full h-auto justify-start items-start bg-background/40 hover:bg-primary/10 hover:border-primary/40 transition-all duration-200 hover:shadow-[0_0_10px_rgba(0,150,255,0.2)]"
+              className="text-left border rounded-xl px-4 py-3.5 text-sm flex-1 gap-1 flex-col w-full h-auto justify-start items-start bg-background/80 backdrop-blur-md hover:bg-primary/20 hover:border-primary/50 transition-all duration-200 hover:shadow-[0_0_15px_rgba(0,150,255,0.3)] shadow-sm"
             >
               <span className="font-medium text-foreground">{suggestedAction.title}</span>
               <span className="text-muted-foreground text-xs">
@@ -164,7 +164,7 @@ function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-background/80 backdrop-blur-sm rounded-full p-1 shadow-md border border-border/30 text-primary"
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-background/90 backdrop-blur-md rounded-full p-1 shadow-md border border-border/50 text-primary"
           onClick={() => scroll('right')}
         >
           <div style={{ transform: 'rotate(90deg)' }}>

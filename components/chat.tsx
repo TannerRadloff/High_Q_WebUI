@@ -133,7 +133,7 @@ export function Chat({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          <div className="absolute inset-0 -z-10 backdrop-blur-sm pointer-events-none" />
+          <div className="absolute inset-0 -z-10 pointer-events-none" />
           
           <form className="flex gap-2 w-full">
             {!isReadonly && (

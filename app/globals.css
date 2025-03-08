@@ -743,8 +743,8 @@
   z-index: 1;
 }
 
-/* Remove the gradient from the input area background */
+/* Make the layer behind the input message box completely transparent */
 .relative.mx-auto.px-4.pb-4.md\:pb-6.w-full.md\:max-w-3xl .absolute.inset-0 {
-  background: rgba(var(--background-start-rgb), 0.7) !important;
-  backdrop-filter: blur(8px);
+  background: transparent !important;
+  backdrop-filter: none !important;
 }
