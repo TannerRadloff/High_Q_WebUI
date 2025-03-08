@@ -30,6 +30,8 @@ import { Textarea } from './ui/textarea';
 import { SuggestedActions } from './suggested-actions';
 import equal from 'fast-deep-equal';
 import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '@/lib/utils';
+import { CrossIcon } from './icons';
 
 // Add an interface at the top of the file
 interface MessageWithDocument extends Message {
@@ -126,29 +128,6 @@ function PureMultimodalInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadQueue, setUploadQueue] = useState<Array<string>>([]);
 
-  const submitForm = useCallback(() => {
-    window.history.replaceState({}, '', `/chat/${chatId}`);
-
-    handleSubmit(undefined, {
-      experimental_attachments: attachments,
-    });
-
-    setAttachments([]);
-    setLocalStorageInput('');
-    resetHeight();
-
-    if (width && width > 768) {
-      textareaRef.current?.focus();
-    }
-  }, [
-    attachments,
-    handleSubmit,
-    setAttachments,
-    setLocalStorageInput,
-    width,
-    chatId,
-  ]);
-
   const uploadFile = async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -163,84 +142,13 @@ function PureMultimodalInput({
         const data = await response.json();
         const { url, pathname, contentType, textContent } = data;
 
-        // If it's a text file, create a text artifact
-        if (contentType === 'text/plain' && textContent) {
-          try {
-            // Call our text-artifact API to create a text document
-            const artifactResponse = await fetch('/api/text-artifact', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                chatId,
-                fileUrl: url,
-                fileName: pathname,
-                textContent,
-              }),
-            });
-
-            if (artifactResponse.ok) {
-              const artifactData = await artifactResponse.json();
-              
-              // Add file content as an assistant message to the chat
-              await append({
-                id: generateUUID(),
-                role: 'assistant',
-                content: `I've analyzed the content of "${pathname}":\n\n${textContent}`,
-              });
-              
-              // Add the document message to display the artifact
-              if (artifactData.documentId) {
-                await append({
-                  id: generateUUID(),
-                  role: 'system',
-                  content: '',
-                  documentId: artifactData.documentId,
-                  artifactTitle: artifactData.title,
-                  artifactKind: 'text',
-                } as MessageWithDocument);
-              }
-              
-              toast.success(`Added content from ${pathname} to the chat`);
-              return null;
-            } else {
-              // If creating the artifact failed, fall back to adding content as a message
-              console.error('Failed to create text artifact, adding content as message');
-              await append({
-                id: generateUUID(),
-                role: 'assistant',
-                content: `I've analyzed the content of "${pathname}":\n\n${textContent}`,
-              });
-              return null;
-            }
-          } catch (artifactError) {
-            console.error('Error creating text artifact:', artifactError);
-            // Still add the content as a message even if artifact creation fails
-            await append({
-              id: generateUUID(),
-              role: 'assistant',
-              content: `I've analyzed the content of "${pathname}":\n\n${textContent}`,
-            });
-            return null;
-          }
-        } else if (textContent) {
-          // For non-text files that have extracted text content (like PDFs)
-          // Add the content directly to the chat as an assistant message
-          await append({
-            id: generateUUID(),
-            role: 'assistant',
-            content: `I've analyzed the content of "${pathname}":\n\n${textContent}`,
-          });
-          toast.success(`Added content from ${pathname} to the chat`);
-          return null;
-        }
-
-        // For files without text content (like images)
+        // Simply return the file data for attachment
+        // We'll process it further when the user submits
         return {
           url,
           name: pathname,
           contentType: contentType,
+          ...(textContent && { textContent }),
         };
       }
       const { error } = await response.json();
@@ -273,58 +181,139 @@ function PureMultimodalInput({
         setUploadQueue([]);
       }
     },
-    [setAttachments, chatId, append],
+    [setAttachments],
+  );
+  
+  // New function to process text files as artifacts
+  const processTextFiles = async (attachmentsToProcess: ExtendedAttachment[]) => {
+    const textFileAttachments = attachmentsToProcess.filter(
+      attachment => attachment.contentType === 'text/plain' && attachment.textContent
+    );
+    
+    const otherAttachments = attachmentsToProcess.filter(
+      attachment => attachment.contentType !== 'text/plain' || !attachment.textContent
+    );
+    
+    // Process text files to create artifacts
+    for (const textAttachment of textFileAttachments) {
+      try {
+        const artifactResponse = await fetch('/api/text-artifact', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            chatId,
+            fileUrl: textAttachment.url,
+            fileName: textAttachment.name,
+            textContent: textAttachment.textContent,
+          }),
+        });
+
+        if (artifactResponse.ok) {
+          const artifactData = await artifactResponse.json();
+          
+          // Only add the document artifact to the chat
+          if (artifactData.documentId) {
+            await append({
+              id: generateUUID(),
+              role: 'system',
+              content: '',
+              documentId: artifactData.documentId,
+              artifactTitle: artifactData.title,
+              artifactKind: 'text',
+            } as MessageWithDocument);
+          }
+        } else {
+          console.error('Failed to create text artifact');
+        }
+      } catch (error) {
+        console.error('Error creating text artifact:', error);
+      }
+    }
+    
+    return otherAttachments;
+  };
+  
+  // Wrap the original handleSubmit to process text files first
+  const wrappedHandleSubmit = useCallback(
+    async (event?: { preventDefault?: () => void }, chatRequestOptions?: ChatRequestOptions) => {
+      if (event?.preventDefault) {
+        event.preventDefault();
+      }
+      
+      if (uploadQueue.length > 0) {
+        toast.info('Please wait for all files to upload');
+        return;
+      }
+      
+      // Process any text file attachments first
+      const remainingAttachments = await processTextFiles([...attachments]);
+      
+      // Then handle the submission with remaining attachments
+      handleSubmit(event, {
+        ...chatRequestOptions,
+        experimental_attachments: remainingAttachments,
+      });
+      
+      // Clear attachments after submission
+      setAttachments([]);
+      setLocalStorageInput('');
+      resetHeight();
+    },
+    [handleSubmit, attachments, setAttachments, uploadQueue, chatId, append, setLocalStorageInput, resetHeight]
   );
 
   return (
     <motion.div
-      className={cx(
-        'relative flex w-full flex-col items-center rounded-xl border border-border/40 bg-gradient-to-b from-background/95 to-background/85 backdrop-blur-md shadow-md transition-all duration-300 input-area',
-        isFocused ? 'shadow-[0_0_20px_rgba(0,150,255,0.35)] border-primary/40' : 'hover:shadow-[0_0_15px_rgba(0,150,255,0.25)]',
-        className,
-      )}
-      initial={{ y: 10, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.3 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className={cn('relative w-full max-w-screen-lg', className)}
     >
-      {attachments.length > 0 && (
-        <motion.div 
-          className="flex w-full flex-row flex-wrap gap-2 p-2 border-b border-border/20"
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          {attachments.map((attachment) => (
-            <div key={attachment.url} className="relative">
-              <PreviewAttachment attachment={attachment} />
-              <button
-                className="absolute -right-2 -top-2 flex size-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs"
-                onClick={() => {
-                  setAttachments(
-                    attachments.filter((a) => a.url !== attachment.url),
-                  );
-                }}
-              >
-                &times;
-              </button>
+      {/* Attachment preview section */}
+      <AnimatePresence>
+        {attachments.length > 0 ? (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.15, ease: 'easeInOut' }}
+            className="w-full"
+          >
+            <div className="flex flex-row flex-wrap gap-2 rounded-xl border border-border/50 bg-secondary/20 p-2 mb-2">
+              {attachments.map((file) => (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  key={file.url}
+                  className="flex max-w-full flex-row items-center gap-2 rounded-lg border border-border/50 bg-primary/5 py-1 pl-3 pr-1 text-sm"
+                >
+                  <span className="truncate">{file.name}</span>
+                  <button
+                    type="button"
+                    className="flex h-6 w-6 flex-none items-center justify-center rounded-md"
+                    onClick={() => {
+                      setAttachments((currentFiles) =>
+                        currentFiles.filter(
+                          (currentFile) => currentFile.url !== file.url,
+                        ),
+                      );
+                    }}
+                  >
+                    <CrossIcon size={16} />
+                  </button>
+                </motion.div>
+              ))}
             </div>
-          ))}
-        </motion.div>
-      )}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <form
         onSubmit={(e) => {
-          e.preventDefault();
-          if (uploadQueue.length > 0) {
-            toast.info('Please wait for all files to upload');
-            return;
-          }
-          handleSubmit(e, {
-            experimental_attachments: attachments,
-          });
-          resetHeight();
-          setLocalStorageInput('');
+          wrappedHandleSubmit(e); // Use our wrapped version
         }}
         className="flex w-full flex-row items-end gap-2 p-2"
       >
@@ -351,15 +340,7 @@ function PureMultimodalInput({
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                if (uploadQueue.length > 0) {
-                  toast.info('Please wait for all files to upload');
-                  return;
-                }
-                handleSubmit(undefined, {
-                  experimental_attachments: attachments,
-                });
-                resetHeight();
-                setLocalStorageInput('');
+                wrappedHandleSubmit(); // Use our wrapped version
               }
             }}
             placeholder="Message..."
@@ -369,44 +350,19 @@ function PureMultimodalInput({
             disabled={isLoading || uploadQueue.length > 0}
           />
 
-          {isLoading ? (
-            <StopButton stop={stop} setMessages={setMessages} />
-          ) : (
-            <SendButton
-              submitForm={() => {
-                if (uploadQueue.length > 0) {
-                  toast.info('Please wait for all files to upload');
-                  return;
-                }
-                handleSubmit(undefined, {
-                  experimental_attachments: attachments,
-                });
-                resetHeight();
-                setLocalStorageInput('');
-              }}
-              input={input}
-              uploadQueue={uploadQueue}
-            />
-          )}
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-row items-center">
+            {isLoading ? (
+              <StopButton stop={stop} setMessages={setMessages} />
+            ) : (
+              <SendButton
+                submitForm={wrappedHandleSubmit} // Use our wrapped version
+                input={input}
+                uploadQueue={uploadQueue}
+              />
+            )}
+          </div>
         </div>
       </form>
-
-      <AnimatePresence>
-        {!isLoading && messages.length === 0 && (
-          <motion.div 
-            className="w-full px-2 pb-2"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-          >
-            <SuggestedActions
-              chatId={chatId}
-              append={append}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }

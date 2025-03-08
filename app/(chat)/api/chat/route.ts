@@ -65,35 +65,38 @@ export async function POST(request: Request) {
     await saveChat({ id, userId: session.user.id, title });
   }
 
-  // Save only the user message, not any assistant messages that might have been added
-  // for file content (those are already saved by the client)
+  // Save the user message to the database
   await saveMessages({
     messages: [{ ...userMessage, createdAt: new Date(), chatId: id }],
   });
 
   try {
+    // Find document artifacts in messages and save them if they're new
+    const documentMessages = messages.filter(message => 
+      message.role === 'system' && 'documentId' in message && message.documentId
+    );
+    
+    if (documentMessages.length > 0) {
+      await saveMessages({
+        messages: documentMessages.map(message => ({
+          ...message,
+          chatId: id,
+          createdAt: new Date(),
+        })),
+      });
+    }
+
     // Use the base system prompt without any file content modifications
     const enhancedSystemPrompt = (model: string) => {
       return systemPrompt({ selectedChatModel: model });
     };
 
-    // Filter out assistant messages that were added for file content
-    // But keep system messages that contain document artifacts
+    // Filter messages to remove document artifacts from those sent to the model
+    // This prevents wasting tokens on messages that don't contribute to the conversation
+    // We'll preserve user messages and actual assistant responses
     const filteredMessages = messages.filter(message => {
-      // Keep all user messages
-      if (message.role === 'user') {
-        return true;
-      }
-      
-      // Keep system messages with document artifacts
+      // Filter out system messages with document artifacts
       if (message.role === 'system' && 'documentId' in message) {
-        return true;
-      }
-      
-      // Filter out assistant messages with file content analysis
-      if (message.role === 'assistant' && 
-          typeof message.content === 'string' && 
-          message.content.startsWith("I've analyzed the content of")) {
         return false;
       }
       
