@@ -248,51 +248,21 @@ export function AnimationToggle() {
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 bg-background/80 backdrop-blur-sm p-2 rounded-lg border border-border shadow-lg">
       <Button
-        variant="outline"
+        variant={animationsEnabled ? "default" : "outline"}
         size="sm"
-        onClick={resetAnimations}
+        onClick={toggleAnimations}
         className="w-full"
       >
-        Reset Animations
+        {animationsEnabled ? "Pause" : "Play"}
       </Button>
-      <div className="grid grid-cols-2 gap-2">
-        <Button
-          variant={animationsEnabled ? "default" : "outline"}
-          size="sm"
-          onClick={toggleAnimations}
-        >
-          {animationsEnabled ? "Pause" : "Play"}
-        </Button>
-        <Button
-          variant={nebulaEnabled ? "default" : "outline"}
-          size="sm"
-          onClick={toggleNebula}
-        >
-          Nebula
-        </Button>
-        <Button
-          variant={starsEnabled ? "default" : "outline"}
-          size="sm"
-          onClick={toggleStars}
-        >
-          Stars
-        </Button>
-        <Button
-          variant={shootingStarsEnabled ? "default" : "outline"}
-          size="sm"
-          onClick={toggleShootingStars}
-        >
-          Shooting
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={regenerateStars}
-          className="col-span-2"
-        >
-          New Stars
-        </Button>
-      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={regenerateStars}
+        className="w-full"
+      >
+        New Stars
+      </Button>
     </div>
   );
 } 
