@@ -245,6 +245,15 @@ function PureMultimodalInput({
         }}
         className="flex w-full flex-row items-end gap-2 p-2"
       >
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          className="hidden"
+          multiple
+          accept="image/*,application/pdf"
+        />
+        
         <AttachmentsButton
           fileInputRef={fileInputRef}
           isLoading={isLoading || uploadQueue.length > 0}
