@@ -1,6 +1,5 @@
 import {
   type Message,
-  type Attachment,
   createDataStreamResponse,
   smoothStream,
   streamText,
@@ -20,7 +19,6 @@ import {
   getMostRecentUserMessage,
   sanitizeResponseMessages,
 } from '@/lib/utils';
-import { ExtendedAttachment } from '@/lib/types';
 
 import { generateTitleFromUserMessage } from '../../actions';
 import { createDocument } from '@/lib/ai/tools/create-document';
@@ -29,39 +27,6 @@ import { requestSuggestions } from '@/lib/ai/tools/request-suggestions';
 import { getWeather } from '@/lib/ai/tools/get-weather';
 
 export const maxDuration = 60;
-
-// Extend the Message type to include attachments
-interface MessageWithAttachments extends Message {
-  attachments?: Attachment[];
-}
-
-/**
- * Processes attachments to extract text content for the AI model
- * @param message The user message containing attachments
- * @returns A string containing the extracted text content from attachments
- */
-function processAttachments(message: MessageWithAttachments): string {
-  if (!message.attachments || message.attachments.length === 0) {
-    return '';
-  }
-
-  const fileContents: string[] = [];
-
-  message.attachments.forEach((attachment: Attachment, index: number) => {
-    const extAttachment = attachment as ExtendedAttachment;
-    if (extAttachment.textContent) {
-      fileContents.push(
-        `[File ${index + 1}: ${attachment.name}]\n${extAttachment.textContent}\n[End of File ${index + 1}]`
-      );
-    }
-  });
-
-  if (fileContents.length === 0) {
-    return '';
-  }
-
-  return `\n\nThe user has attached the following files with extracted content:\n\n${fileContents.join('\n\n')}`;
-}
 
 export async function POST(request: Request) {
   const {
@@ -77,7 +42,7 @@ export async function POST(request: Request) {
     return new Response('Unauthorized', { status: 401 });
   }
 
-  const userMessage = getMostRecentUserMessage(messages) as MessageWithAttachments;
+  const userMessage = getMostRecentUserMessage(messages);
 
   if (!userMessage) {
     return new Response('No user message found', { status: 400 });
@@ -94,14 +59,11 @@ export async function POST(request: Request) {
     messages: [{ ...userMessage, createdAt: new Date(), chatId: id }],
   });
 
-  // Process any text content from attachments
-  const attachmentContent = processAttachments(userMessage);
-
   return createDataStreamResponse({
     execute: (dataStream) => {
       const result = streamText({
         model: myProvider.languageModel(selectedChatModel),
-        system: systemPrompt({ selectedChatModel }) + attachmentContent,
+        system: systemPrompt({ selectedChatModel }),
         messages,
         maxSteps: 5,
         experimental_activeTools:

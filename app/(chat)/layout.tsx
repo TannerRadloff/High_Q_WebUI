@@ -38,8 +38,8 @@ const ANIMATION_INIT_SCRIPT = `\
     
     // Generate stars in different regions with varying densities
     
-    // Dense cluster region (50-80 stars)
-    const clusterStarCount = 50 + Math.floor(seededRandom() * 30);
+    // Dense cluster region (80-120 stars) - increased from 50-80
+    const clusterStarCount = 80 + Math.floor(seededRandom() * 40);
     const clusterCenterX = 20 + seededRandom() * 60; // 20-80% of screen width
     const clusterCenterY = 20 + seededRandom() * 60; // 20-80% of screen height
     
@@ -61,7 +61,7 @@ const ANIMATION_INIT_SCRIPT = `\
       
       // Random twinkle animation delay and duration
       const delay = seededRandom() * 10;
-      const duration = 3 + seededRandom() * 4;
+      const duration = 2 + seededRandom() * 3; // Shorter duration for more noticeable twinkling
       
       // Apply styles
       star.style.top = \`\${top}%\`;
@@ -75,8 +75,8 @@ const ANIMATION_INIT_SCRIPT = `\
       randomStars.appendChild(star);
     }
     
-    // Scattered stars throughout (40-60 stars)
-    const scatteredStarCount = 40 + Math.floor(seededRandom() * 20);
+    // Scattered stars throughout (70-100 stars) - increased from 40-60
+    const scatteredStarCount = 70 + Math.floor(seededRandom() * 30);
     
     for (let i = 0; i < scatteredStarCount; i++) {
       const star = document.createElement('div');
@@ -94,7 +94,7 @@ const ANIMATION_INIT_SCRIPT = `\
       
       // Random twinkle animation delay and duration
       const delay = seededRandom() * 10;
-      const duration = 3 + seededRandom() * 4;
+      const duration = 2 + seededRandom() * 3; // Shorter duration for more noticeable twinkling
       
       // Apply styles
       star.style.top = \`\${top}%\`;
@@ -108,8 +108,8 @@ const ANIMATION_INIT_SCRIPT = `\
       randomStars.appendChild(star);
     }
     
-    // Bright highlight stars (10-15 stars)
-    const brightStarCount = 10 + Math.floor(seededRandom() * 5);
+    // Bright highlight stars (15-25 stars) - increased from 10-15
+    const brightStarCount = 15 + Math.floor(seededRandom() * 10);
     
     for (let i = 0; i < brightStarCount; i++) {
       const star = document.createElement('div');
@@ -127,7 +127,7 @@ const ANIMATION_INIT_SCRIPT = `\
       
       // Random twinkle animation delay and duration
       const delay = seededRandom() * 10;
-      const duration = 4 + seededRandom() * 3;
+      const duration = 3 + seededRandom() * 2; // Shorter duration for more noticeable twinkling
       
       // Apply styles
       star.style.top = \`\${top}%\`;

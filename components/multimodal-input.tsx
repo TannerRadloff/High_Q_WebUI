@@ -154,14 +154,12 @@ function PureMultimodalInput({
 
       if (response.ok) {
         const data = await response.json();
-        const { url, pathname, contentType, textContent } = data;
+        const { url, pathname, contentType } = data;
 
         return {
           url,
           name: pathname,
           contentType: contentType,
-          // Include text content for PDF and TXT files
-          ...(textContent && { textContent }),
         };
       }
       const { error } = await response.json();

@@ -202,24 +202,31 @@
         height: 100%;
         pointer-events: none;
         background: 
-            radial-gradient(1px 1px at 25% 30%, rgba(255, 255, 255, 0.9), transparent),
-            radial-gradient(1px 1px at 50% 50%, rgba(255, 255, 255, 0.8), transparent),
-            radial-gradient(2px 2px at 75% 70%, rgba(255, 255, 255, 0.9), transparent),
-            radial-gradient(2px 2px at 20% 20%, rgba(255, 255, 255, 0.7), transparent),
-            radial-gradient(2px 2px at 35% 60%, rgba(255, 255, 255, 0.8), transparent),
-            radial-gradient(2px 2px at 65% 40%, rgba(255, 255, 255, 0.9), transparent),
-            radial-gradient(3px 3px at 15% 75%, rgba(255, 255, 255, 0.6), transparent),
-            radial-gradient(3px 3px at 85% 25%, rgba(255, 255, 255, 0.7), transparent),
-            radial-gradient(1px 1px at 10% 15%, rgba(255, 255, 255, 0.8), transparent),
-            radial-gradient(1px 1px at 40% 10%, rgba(255, 255, 255, 0.7), transparent),
-            radial-gradient(1px 1px at 60% 30%, rgba(255, 255, 255, 0.9), transparent),
-            radial-gradient(1px 1px at 80% 40%, rgba(255, 255, 255, 0.8), transparent),
-            radial-gradient(1px 1px at 90% 60%, rgba(255, 255, 255, 0.7), transparent),
-            radial-gradient(1px 1px at 55% 75%, rgba(255, 255, 255, 0.9), transparent),
-            radial-gradient(1px 1px at 30% 85%, rgba(255, 255, 255, 0.8), transparent),
-            radial-gradient(1px 1px at 70% 95%, rgba(255, 255, 255, 0.7), transparent);
+            radial-gradient(1px 1px at 10% 10%, rgba(255, 255, 255, 0.9), transparent),
+            radial-gradient(1px 1px at 20% 20%, rgba(255, 255, 255, 0.8), transparent),
+            radial-gradient(1px 1px at 30% 30%, rgba(255, 255, 255, 0.9), transparent),
+            radial-gradient(1px 1px at 40% 40%, rgba(255, 255, 255, 0.8), transparent),
+            radial-gradient(1px 1px at 50% 50%, rgba(255, 255, 255, 0.9), transparent),
+            radial-gradient(1px 1px at 60% 60%, rgba(255, 255, 255, 0.8), transparent),
+            radial-gradient(1px 1px at 70% 70%, rgba(255, 255, 255, 0.9), transparent),
+            radial-gradient(1px 1px at 80% 80%, rgba(255, 255, 255, 0.8), transparent),
+            radial-gradient(1px 1px at 90% 90%, rgba(255, 255, 255, 0.9), transparent),
+            radial-gradient(2px 2px at 15% 25%, rgba(255, 255, 255, 0.7), transparent),
+            radial-gradient(2px 2px at 35% 15%, rgba(255, 255, 255, 0.8), transparent),
+            radial-gradient(2px 2px at 45% 35%, rgba(255, 255, 255, 0.9), transparent),
+            radial-gradient(2px 2px at 55% 45%, rgba(255, 255, 255, 0.7), transparent),
+            radial-gradient(2px 2px at 65% 55%, rgba(255, 255, 255, 0.8), transparent),
+            radial-gradient(2px 2px at 75% 65%, rgba(255, 255, 255, 0.9), transparent),
+            radial-gradient(2px 2px at 85% 75%, rgba(255, 255, 255, 0.7), transparent),
+            radial-gradient(2px 2px at 95% 85%, rgba(255, 255, 255, 0.8), transparent),
+            radial-gradient(3px 3px at 5% 95%, rgba(255, 255, 255, 0.6), transparent),
+            radial-gradient(3px 3px at 25% 5%, rgba(255, 255, 255, 0.7), transparent),
+            radial-gradient(3px 3px at 45% 25%, rgba(255, 255, 255, 0.6), transparent),
+            radial-gradient(3px 3px at 65% 45%, rgba(255, 255, 255, 0.7), transparent),
+            radial-gradient(3px 3px at 85% 65%, rgba(255, 255, 255, 0.6), transparent);
         background-size: 550px 550px, 350px 350px, 250px 250px, 150px 150px, 100px 100px, 200px 200px, 300px 300px, 400px 400px, 
-                         250px 250px, 300px 300px, 200px 200px, 350px 350px, 400px 400px, 300px 300px, 250px 250px, 350px 350px;
+                         250px 250px, 300px 300px, 200px 200px, 350px 350px, 400px 400px, 300px 300px, 250px 250px, 350px 350px,
+                         200px 200px, 300px 300px, 250px 250px, 350px 350px, 400px 400px, 300px 300px;
         opacity: calc(var(--stars-opacity) * var(--body-before-opacity));
         z-index: -1;
         animation: twinkling 120s linear infinite;
@@ -268,7 +275,7 @@
         mix-blend-mode: screen;
         opacity: calc(var(--nebula-opacity) * var(--body-after-opacity) * 0.6);
         z-index: -2;
-        animation: nebula-drift 180s ease-in-out infinite alternate;
+        animation: nebula-drift 180s ease-in-out infinite alternate, nebula-rotate 360s linear infinite;
         animation-play-state: var(--animation-play-state);
     }
 
@@ -343,6 +350,16 @@
             background-position: 3% 4%, -3% -4%, 4% -3%, -4% 3%, 2% 3%, -2% -3%, 3% -2%, -3% 2%, 3% 3%;
             opacity: calc(var(--nebula-opacity) * 0.5);
             filter: blur(15px) contrast(1.1) saturate(1.2);
+        }
+    }
+
+    /* New animation for nebula rotation */
+    @keyframes nebula-rotate {
+        0% {
+            transform: rotate(0deg);
+        }
+        100% {
+            transform: rotate(360deg);
         }
     }
 
@@ -1320,7 +1337,7 @@
   animation-play-state: var(--animation-play-state);
 }
 
-/* Random star twinkling animation */
+/* Random star twinkling animation with more noticeable effect */
 @keyframes random-star-twinkle {
   0%, 100% {
     opacity: var(--original-opacity, 1);
@@ -1328,27 +1345,27 @@
     filter: blur(0px);
   }
   50% {
-    opacity: calc(var(--original-opacity, 1) * 0.5);
-    transform: scale(0.8);
-    filter: blur(0.3px);
+    opacity: calc(var(--original-opacity, 1) * 0.3);
+    transform: scale(0.7);
+    filter: blur(0.5px);
   }
 }
 
-/* Bright star twinkling animation */
+/* Bright star twinkling animation with more noticeable effect */
 @keyframes random-star-twinkle-bright {
   0%, 100% {
     opacity: var(--original-opacity, 1);
     transform: scale(1);
     box-shadow: 
-      0 0 3px 1px rgba(255, 255, 255, 0.6),
-      0 0 6px 3px rgba(255, 255, 255, 0.2);
+        0 0 3px 1px rgba(255, 255, 255, 0.6),
+        0 0 6px 3px rgba(255, 255, 255, 0.2);
   }
   50% {
-    opacity: calc(var(--original-opacity, 1) * 0.7);
-    transform: scale(1.05);
+    opacity: calc(var(--original-opacity, 1) * 0.5);
+    transform: scale(1.2);
     box-shadow: 
-      0 0 4px 2px rgba(255, 255, 255, 0.7),
-      0 0 8px 4px rgba(255, 255, 255, 0.3);
+        0 0 5px 2px rgba(255, 255, 255, 0.8),
+        0 0 8px 4px rgba(255, 255, 255, 0.3);
   }
 }
 

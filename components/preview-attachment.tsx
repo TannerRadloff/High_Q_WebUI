@@ -1,8 +1,7 @@
 import type { Attachment } from 'ai';
-import { ExtendedAttachment } from '@/lib/types';
 
 import { LoaderIcon } from './icons';
-import { FileIcon, FileTextIcon, BrainIcon } from 'lucide-react';
+import { FileIcon, FileTextIcon } from 'lucide-react';
 
 export const PreviewAttachment = ({
   attachment,
@@ -12,8 +11,6 @@ export const PreviewAttachment = ({
   isUploading?: boolean;
 }) => {
   const { name, url, contentType } = attachment;
-  const extAttachment = attachment as ExtendedAttachment;
-  const hasTextContent = !!extAttachment.textContent;
 
   return (
     <div className="flex flex-col gap-2">
@@ -56,12 +53,6 @@ export const PreviewAttachment = ({
         {isUploading && (
           <div className="animate-spin absolute text-zinc-500">
             <LoaderIcon />
-          </div>
-        )}
-        
-        {hasTextContent && (
-          <div className="absolute top-0 right-0 bg-primary/80 rounded-bl-md p-0.5">
-            <BrainIcon className="h-3 w-3 text-white" />
           </div>
         )}
       </div>
