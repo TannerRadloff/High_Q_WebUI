@@ -121,45 +121,82 @@ export async function POST(request: Request) {
       });
     }
 
-    // Extract document content from artifact messages
-    let documentContents = '';
-    
-    for (const msg of messages) {
-      if (msg.role === 'system' && 'documentId' in msg && msg.documentId) {
+    // Create a clean array of messages for the API
+    // First, filter out document system messages
+    let apiMessages = messages.filter(message => 
+      !(message.role === 'system' && 'documentId' in message)
+    );
+
+    // Now retrieve and prepend document content as user messages to the conversation
+    // These will be visible to the model but not saved to the database
+    const documentContextMessages: Message[] = [];
+    for (const docMessage of documentMessages) {
+      if (docMessage && 'documentId' in docMessage && docMessage.documentId) {
         try {
-          const document = await getDocumentById({ id: String(msg.documentId) });
-          if (document && document.content) {
-            documentContents += `\n\nDocument: ${document.title}\nContent: ${document.content}\n\n`;
+          const documentId = String(docMessage.documentId);
+          console.log(`Retrieving document with ID: ${documentId}`);
+          const document = await getDocumentById({ id: documentId });
+          
+          if (document) {
+            const contentLength = document.content?.length || 0;
+            console.log(`Found document: ${document.title}, Content length: ${contentLength} chars`);
+            
+            // Check if we have valid content
+            const content = document.content || `[No content available for document: ${document.title}]`;
+            
+            // Ensure content isn't too large (OpenAI has token limits)
+            const trimmedContent = content.length > 10000 ? content.substring(0, 10000) + "... [content truncated due to length]" : content;
+            
+            // Add the document content as a user message at the start of the conversation
+            const contentPreview = trimmedContent.substring(0, 100) + '...';
+            console.log(`Adding document content to conversation: ${contentPreview}`);
+            
+            documentContextMessages.push({
+              id: generateUUID(),
+              role: 'user',
+              content: `Document: ${document.title}\n\n${trimmedContent}`,
+              createdAt: new Date(Date.now() - 60000) // Make it appear earlier
+            });
+            
+            // Add an assistant acknowledgment to create a proper conversation flow
+            documentContextMessages.push({
+              id: generateUUID(),
+              role: 'assistant',
+              content: `I've received the document "${document.title}". I'll use this information to help answer your questions.`,
+              createdAt: new Date(Date.now() - 50000) // Make it appear earlier
+            });
+          } else {
+            console.log(`Document with ID ${documentId} not found`);
           }
         } catch (error) {
-          console.error('Error retrieving document:', error);
+          console.error('Error retrieving document for context:', error);
         }
       }
     }
 
-    // Create enhanced system prompt with document contents if available
-    const enhancedSystemPrompt = (model: string) => {
-      const basePrompt = systemPrompt({ selectedChatModel: model });
-      if (documentContents) {
-        return `${basePrompt}\n\nThe following documents have been uploaded by the user: ${documentContents}`;
-      }
-      return basePrompt;
-    };
+    // Combine document context messages with regular messages
+    if (documentContextMessages.length > 0) {
+      // Place document context at the beginning of the conversation
+      apiMessages = [...documentContextMessages, ...apiMessages];
+      console.log(`Added ${documentContextMessages.length} document context messages to the conversation`);
+      console.log(`Total message count: ${apiMessages.length}`);
+      // Log the roles of all messages to verify structure
+      console.log(`Message roles sequence: ${apiMessages.map(m => m.role).join(', ')}`);
+    }
 
-    // Filter out system messages with document artifacts from the messages sent to the model
-    const filteredMessages = messages.filter(message => {
-      if (message.role === 'system' && 'documentId' in message) {
-        return false;
-      }
-      return true;
-    });
+    // Use the standard system prompt
+    const enhancedSystemPrompt = (model: string) => {
+      const prompt = systemPrompt({ selectedChatModel: model });
+      console.log(`Using system prompt: ${prompt.substring(0, 100)}...`);
+      return prompt;
+    };
 
     return createDataStreamResponse({
       execute: (dataStream) => {
         const result = streamText({
           model: myProvider.languageModel(selectedChatModel),
           system: enhancedSystemPrompt(selectedChatModel),
-          messages: filteredMessages,
+          messages: apiMessages,
           maxSteps: 5,
           experimental_activeTools:
             selectedChatModel === 'chat-model-reasoning'
@@ -259,3 +296,4 @@ export async function DELETE(request: Request) {
     });
   }
 }
+

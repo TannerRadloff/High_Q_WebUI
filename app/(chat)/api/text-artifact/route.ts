@@ -36,10 +36,22 @@ export async function POST(request: Request) {
     const documentId = generateUUID();
     const title = fileName || 'Uploaded Text File';
 
+    // Make sure content is a string and not empty
+    if (!textContent || typeof textContent !== 'string') {
+      console.error('Invalid text content:', typeof textContent);
+      return NextResponse.json(
+        { error: 'Invalid text content' },
+        { status: 400 }
+      );
+    }
+
+    // Log first part of content to verify it's valid
+    const contentPreview = textContent.substring(0, 100) + (textContent.length > 100 ? '...' : '');
     console.log('Creating text artifact:', { 
       id: documentId, 
       title, 
       contentLength: textContent.length,
+      contentPreview,
       userId: session.user.id 
     });
 
@@ -54,6 +66,19 @@ export async function POST(request: Request) {
       });
       
       console.log('Text artifact created successfully');
+      
+      // Verify the document was saved by trying to retrieve it
+      try {
+        const { getDocumentById } = await import('@/lib/db/queries');
+        const savedDoc = await getDocumentById({ id: documentId });
+        if (savedDoc) {
+          console.log(`Verified document saved: ID ${documentId}, Content length: ${savedDoc.content?.length || 0}`);
+        } else {
+          console.error('Document was not found after saving!');
+        }
+      } catch (verifyError) {
+        console.error('Error verifying document save:', verifyError);
+      }
     } catch (saveError) {
       console.error('Error saving document:', saveError);
       throw saveError;
