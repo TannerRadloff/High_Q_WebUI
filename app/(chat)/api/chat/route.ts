@@ -121,53 +121,45 @@ export async function POST(request: Request) {
       });
     }
 
-    // Use the base system prompt without any file content modifications
+    // Extract document content from artifact messages
+    let documentContents = '';
+    
+    for (const msg of messages) {
+      if (msg.role === 'system' && 'documentId' in msg && msg.documentId) {
+        try {
+          const document = await getDocumentById({ id: String(msg.documentId) });
+          if (document && document.content) {
+            documentContents += `\n\nDocument: ${document.title}\nContent: ${document.content}\n\n`;
+          }
+        } catch (error) {
+          console.error('Error retrieving document:', error);
+        }
+      }
+    }
+
+    // Create enhanced system prompt with document contents if available
     const enhancedSystemPrompt = (model: string) => {
-      return systemPrompt({ selectedChatModel: model });
+      const basePrompt = systemPrompt({ selectedChatModel: model });
+      if (documentContents) {
+        return `${basePrompt}\n\nThe following documents have been uploaded by the user: ${documentContents}`;
+      }
+      return basePrompt;
     };
 
-    // Filter messages for the model but also retrieve document content
-    // We need to include document content in a modified system message
-    const filteredMessages = await Promise.all(
-      messages.map(async (message) => {
-        // Keep all user and assistant messages for conversation history
-        if (message.role === 'user' || message.role === 'assistant') {
-          return message;
-        }
-        
-        // For system messages with document artifacts, fetch the document content
-        if (message.role === 'system' && 'documentId' in message && message.documentId) {
-          try {
-            // Cast the documentId to string to ensure proper typing
-            const documentId = message.documentId as string;
-            const document = await getDocumentById({ id: documentId });
-            
-            if (document && document.content) {
-              // Return a modified system message that includes the document content
-              // with proper typing to match Message structure
-              return {
-                id: message.id || generateUUID(),
-                role: 'system' as const,
-                content: `Document "${document.title}" content:\n\n${document.content}`,
-                createdAt: message.createdAt
-              };
-            }
-          } catch (docError) {
-            console.error('Error retrieving document content:', docError);
-          }
-        }
-        
-        // Keep any other system messages
-        return message;
-      })
-    );
+    // Filter out system messages with document artifacts from the messages sent to the model
+    const filteredMessages = messages.filter(message => {
+      if (message.role === 'system' && 'documentId' in message) {
+        return false;
+      }
+      return true;
+    });
 
     return createDataStreamResponse({
       execute: (dataStream) => {
         const result = streamText({
           model: myProvider.languageModel(selectedChatModel),
           system: enhancedSystemPrompt(selectedChatModel),
-          messages: filteredMessages as Message[],
+          messages: filteredMessages,
           maxSteps: 5,
           experimental_activeTools:
             selectedChatModel === 'chat-model-reasoning'
