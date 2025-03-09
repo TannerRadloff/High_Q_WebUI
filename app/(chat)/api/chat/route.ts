@@ -14,6 +14,7 @@ import {
   saveChat,
   saveMessages,
   saveDocument,
+  getDocumentById,
 } from '@/lib/db/queries';
 import {
   generateUUID,
@@ -125,30 +126,48 @@ export async function POST(request: Request) {
       return systemPrompt({ selectedChatModel: model });
     };
 
-    // Filter messages for the model to avoid token waste
-    // We need to filter out system messages with document artifacts
-    // but keep the messages that are needed for conversation history
-    const filteredMessages = messages.filter(message => {
-      // Keep all user and assistant messages for conversation history
-      if (message.role === 'user' || message.role === 'assistant') {
-        return true;
-      }
-      
-      // Filter out system messages with document artifacts
-      if (message.role === 'system' && 'documentId' in message) {
-        return false;
-      }
-      
-      // Keep any other system messages
-      return true;
-    });
+    // Filter messages for the model but also retrieve document content
+    // We need to include document content in a modified system message
+    const filteredMessages = await Promise.all(
+      messages.map(async (message) => {
+        // Keep all user and assistant messages for conversation history
+        if (message.role === 'user' || message.role === 'assistant') {
+          return message;
+        }
+        
+        // For system messages with document artifacts, fetch the document content
+        if (message.role === 'system' && 'documentId' in message && message.documentId) {
+          try {
+            // Cast the documentId to string to ensure proper typing
+            const documentId = message.documentId as string;
+            const document = await getDocumentById({ id: documentId });
+            
+            if (document && document.content) {
+              // Return a modified system message that includes the document content
+              // with proper typing to match Message structure
+              return {
+                id: message.id || generateUUID(),
+                role: 'system' as const,
+                content: `Document "${document.title}" content:\n\n${document.content}`,
+                createdAt: message.createdAt
+              };
+            }
+          } catch (docError) {
+            console.error('Error retrieving document content:', docError);
+          }
+        }
+        
+        // Keep any other system messages
+        return message;
+      })
+    );
 
     return createDataStreamResponse({
       execute: (dataStream) => {
         const result = streamText({
           model: myProvider.languageModel(selectedChatModel),
           system: enhancedSystemPrompt(selectedChatModel),
-          messages: filteredMessages,
+          messages: filteredMessages as Message[],
           maxSteps: 5,
           experimental_activeTools:
             selectedChatModel === 'chat-model-reasoning'
