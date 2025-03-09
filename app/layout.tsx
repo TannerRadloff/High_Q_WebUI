@@ -315,21 +315,23 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: THEME_COLOR_SCRIPT,
-          }}
-        />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: ANIMATION_INIT_SCRIPT,
-          }}
+        <Script id="theme-color-script" strategy="beforeInteractive">
+          {THEME_COLOR_SCRIPT}
+        </Script>
+        <Script id="animation-init-script" strategy="afterInteractive">
+          {ANIMATION_INIT_SCRIPT}
+        </Script>
+        <Script
+          id="nextjs-core"
+          strategy="beforeInteractive"
+          src="/_next/static/chunks/webpack.js"
         />
       </head>
       <body className="antialiased">
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
+          enableSystem
           disableTransitionOnChange
         >
           {/* Animation elements are now created by the script */}
