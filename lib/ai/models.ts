@@ -6,17 +6,15 @@ import {
   wrapLanguageModel,
 } from 'ai';
 
-export const DEFAULT_CHAT_MODEL: string = 'chat-model-small';
+export const DEFAULT_CHAT_MODEL: string = 'gpt-o3-mini';
 
 export const myProvider = customProvider({
   languageModels: {
-    'chat-model-small': openai('gpt-4o-mini'),
-    'chat-model-large': openai('gpt-4o'),
-    'chat-model-reasoning': wrapLanguageModel({
-      model: fireworks('accounts/fireworks/models/deepseek-r1'),
-      middleware: extractReasoningMiddleware({ tagName: 'think' }),
-    }),
-    'title-model': openai('gpt-4-turbo'),
+    'gpt-40': openai('gpt-4o'),
+    'gpt-45': openai('gpt-4.5'),
+    'gpt-o1': openai('gpt-o1'),
+    'gpt-o3-mini': openai('gpt-4o-mini'),
+    'title-model': openai('gpt-4o'),
     'artifact-model': openai('gpt-4o-mini'),
   },
   imageModels: {
@@ -33,18 +31,23 @@ interface ChatModel {
 
 export const chatModels: Array<ChatModel> = [
   {
-    id: 'chat-model-small',
-    name: 'Small model',
-    description: 'Small model for fast, lightweight tasks',
+    id: 'gpt-40',
+    name: 'GPT 4o',
+    description: 'Powerful multimodal model for complex tasks',
   },
   {
-    id: 'chat-model-large',
-    name: 'Large model',
-    description: 'Large model for complex, multi-step tasks',
+    id: 'gpt-45',
+    name: 'GPT 4.5',
+    description: 'Advanced model with improved capabilities',
   },
   {
-    id: 'chat-model-reasoning',
-    name: 'Reasoning model',
-    description: 'Uses advanced reasoning',
+    id: 'gpt-o1',
+    name: 'GPT o1',
+    description: 'High-performance model with advanced reasoning',
+  },
+  {
+    id: 'gpt-o3-mini',
+    name: 'GPT o3 mini',
+    description: 'Fast, efficient model for everyday tasks',
   },
 ];
