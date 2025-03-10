@@ -29,6 +29,46 @@ import { getWeather } from '@/lib/ai/tools/get-weather';
 
 export const maxDuration = 60;
 
+// Add detailed logging function
+const logError = (error: any, context: string) => {
+  console.error(`[API ERROR] ${context}:`, error);
+  
+  if (error instanceof Error) {
+    console.error(`Error name: ${error.name}`);
+    console.error(`Error message: ${error.message}`);
+    console.error(`Error stack: ${error.stack}`);
+    
+    if ('cause' in error) {
+      console.error(`Error cause:`, error.cause);
+    }
+    
+    // Check for specific OpenAI API errors
+    if (error.message && error.message.includes('OpenAI')) {
+      console.error(`OpenAI API error detected`);
+      
+      // Extract status code if available
+      const statusMatch = error.message.match(/status (\d+)/);
+      if (statusMatch) {
+        console.error(`OpenAI API status code: ${statusMatch[1]}`);
+      }
+      
+      // Log if it's a model-specific error
+      if (error.message.includes('model')) {
+        console.error(`Model-specific error detected`);
+      }
+    }
+  } else {
+    console.error(`Non-Error object:`, error);
+  }
+  
+  // Log request context if available
+  if (typeof error === 'object' && error !== null && 'config' in error) {
+    console.error(`Request URL: ${(error as any).config?.url}`);
+    console.error(`Request method: ${(error as any).config?.method}`);
+    console.error(`Request headers:`, (error as any).config?.headers);
+  }
+};
+
 // Maximum size for file content in characters
 const MAX_FILE_CONTENT_SIZE = 10000;
 
@@ -45,6 +85,8 @@ export async function POST(request: Request) {
     experimental_attachments?: ExtendedAttachment[];
   } = await request.json();
 
+  console.log(`[API] Chat request with model: ${selectedChatModel}`);
+
   const session = await auth();
 
   if (!session || !session.user || !session.user.id) {
@@ -52,8 +94,28 @@ export async function POST(request: Request) {
   }
 
   // Validate the selected model
-  const validModel = chatModels.some(model => model.id === selectedChatModel);
-  const modelToUse = validModel ? selectedChatModel : DEFAULT_CHAT_MODEL;
+  let modelToUse = DEFAULT_CHAT_MODEL;
+  try {
+    console.log(`[API] Validating model: ${selectedChatModel}`);
+    const validModel = chatModels.some(model => model.id === selectedChatModel);
+    modelToUse = validModel ? selectedChatModel : DEFAULT_CHAT_MODEL;
+    
+    // Verify that the model can be initialized
+    if (validModel) {
+      try {
+        const model = myProvider.languageModel(selectedChatModel);
+        console.log(`[API] Successfully validated model: ${selectedChatModel}`);
+      } catch (modelError) {
+        console.error(`[API] Error initializing model ${selectedChatModel}:`, modelError);
+        modelToUse = DEFAULT_CHAT_MODEL;
+      }
+    }
+  } catch (validationError) {
+    console.error(`[API] Error during model validation:`, validationError);
+    modelToUse = DEFAULT_CHAT_MODEL;
+  }
+
+  console.log(`[API] Using model: ${modelToUse} (selected: ${selectedChatModel})`);
 
   // Check if there are any document artifact messages
   const hasArtifacts = messages.some(message => 
@@ -152,10 +214,30 @@ export async function POST(request: Request) {
         let retryCount = 0;
         const maxRetries = 2;
         
+        console.log(`[API] Starting stream with model: ${currentModel}`);
+        
         const executeStreamText = async () => {
           try {
+            console.log(`[API] Executing streamText with model: ${currentModel}`);
+            
+            // Add detailed logging for GPT-o1 model
+            if (currentModel === 'gpt-o1') {
+              console.log(`[API] Using GPT-o1 model with maxSteps: 10`);
+              
+              try {
+                const modelString = myProvider.languageModel(currentModel).toString();
+                console.log(`[API] Model mapping: ${currentModel} -> ${modelString}`);
+              } catch (modelError) {
+                console.error(`[API] Error getting model string for ${currentModel}:`, modelError);
+              }
+            }
+            
+            // Initialize the model before using it to catch any initialization errors
+            const model = myProvider.languageModel(currentModel);
+            console.log(`[API] Successfully initialized model: ${currentModel}`);
+            
             const result = streamText({
-              model: myProvider.languageModel(currentModel),
+              model: model,
               system: enhancedSystemPrompt(currentModel),
               messages: filteredMessages,
               maxSteps: currentModel === 'gpt-o1' ? 10 : 5,
@@ -180,6 +262,7 @@ export async function POST(request: Request) {
                 }),
               },
               onFinish: async ({ response, reasoning }) => {
+                console.log(`[API] Stream finished successfully with model: ${currentModel}`);
                 if (session.user?.id) {
                   try {
                     const sanitizedResponseMessages = sanitizeResponseMessages({
@@ -199,7 +282,7 @@ export async function POST(request: Request) {
                       }),
                     });
                   } catch (error) {
-                    console.error('Failed to save chat');
+                    logError(error, 'Failed to save chat messages');
                   }
                 }
               },
@@ -215,13 +298,40 @@ export async function POST(request: Request) {
             
             return result;
           } catch (error) {
+            logError(error, `Error streaming with model ${currentModel}`);
+            
+            // Add more detailed error logging for debugging
+            console.error(`[API] Detailed error for model ${currentModel}:`);
+            
+            // Check for specific OpenAI API errors
+            if (error instanceof Error) {
+              // Check if it's a model-specific error
+              if (error.message.includes('model')) {
+                console.error(`[API] Model error detected: ${error.message}`);
+                
+                if (currentModel === 'gpt-o1') {
+                  console.error(`[API] GPT-o1 model error. Model ID used: ${myProvider.languageModel(currentModel).toString()}`);
+                }
+              }
+              
+              // Check for rate limit errors
+              if (error.message.includes('rate limit')) {
+                console.error(`[API] Rate limit error detected: ${error.message}`);
+              }
+              
+              // Check for context length errors
+              if (error.message.includes('context length')) {
+                console.error(`[API] Context length error detected: ${error.message}`);
+              }
+            }
+            
             if (retryCount < maxRetries && currentModel === 'gpt-o1') {
               retryCount++;
-              console.warn(`Error with model ${currentModel}, retrying (${retryCount}/${maxRetries})...`);
+              console.warn(`[API] Error with model ${currentModel}, retrying (${retryCount}/${maxRetries})...`);
               
               // If we've reached max retries, fall back to the default model
               if (retryCount === maxRetries) {
-                console.warn(`Falling back to ${DEFAULT_CHAT_MODEL} after ${maxRetries} failed attempts with ${currentModel}`);
+                console.warn(`[API] Falling back to ${DEFAULT_CHAT_MODEL} after ${maxRetries} failed attempts with ${currentModel}`);
                 currentModel = DEFAULT_CHAT_MODEL;
               }
               
@@ -235,16 +345,33 @@ export async function POST(request: Request) {
         await executeStreamText();
       },
       onError: (error: unknown) => {
-        console.error('Chat API error:', error);
-        if (error instanceof Error && error.message && error.message.includes('context length')) {
-          return 'The file content is too large for the model to process. Please try with a smaller file or extract the most relevant parts.';
+        logError(error, 'Chat API error in dataStream');
+        
+        // Add more detailed error logging for debugging
+        if (error instanceof Error) {
+          // Check if it's a model-specific error
+          if (error.message.includes('model')) {
+            console.error(`[API] Model error detected in onError handler: ${error.message}`);
+          }
+          
+          // Check for rate limit errors
+          if (error.message.includes('rate limit')) {
+            console.error(`[API] Rate limit error detected in onError handler: ${error.message}`);
+          }
+          
+          // Check for context length errors
+          if (error.message.includes('context length')) {
+            console.error(`[API] Context length error detected in onError handler: ${error.message}`);
+            return 'The file content is too large for the model to process. Please try with a smaller file or extract the most relevant parts.';
+          }
         }
-        return 'Oops, an error occurred while processing your request. Please try again with a smaller file or different content.';
+        
+        return `Oops, an error occurred while processing your request: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again with a smaller file or different content.`;
       },
     });
   } catch (error: unknown) {
-    console.error('Unexpected error in chat API:', error);
-    return new Response('An unexpected error occurred. Please try again.', { status: 500 });
+    logError(error, 'Unexpected error in chat API');
+    return new Response(`An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`, { status: 500 });
   }
 }
 
@@ -278,3 +405,4 @@ export async function DELETE(request: Request) {
     });
   }
 }
+

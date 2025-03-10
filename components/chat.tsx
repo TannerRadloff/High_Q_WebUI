@@ -18,6 +18,23 @@ import type { VisibilityType } from './visibility-selector';
 import { useArtifactSelector } from '@/hooks/use-artifact';
 import { toast } from 'sonner';
 
+// Add detailed logging function
+const logError = (error: any, context: string) => {
+  console.error(`[ERROR] ${context}:`, error);
+  console.error(`Error type: ${typeof error}`);
+  console.error(`Error message: ${error.message}`);
+  console.error(`Error stack: ${error.stack}`);
+  
+  if (error.response) {
+    console.error(`Response status: ${error.response.status}`);
+    console.error(`Response data:`, error.response.data);
+  }
+  
+  if (error.cause) {
+    console.error(`Error cause: ${error.cause}`);
+  }
+};
+
 export function Chat({
   id,
   initialMessages,
@@ -32,6 +49,13 @@ export function Chat({
   isReadonly: boolean;
 }) {
   const { mutate } = useSWRConfig();
+  
+  console.log(`Initializing chat with model: ${selectedChatModel}`);
+
+  // Log when the component mounts or when the selected model changes
+  useEffect(() => {
+    console.log(`[CHAT] Component mounted or model changed: ${selectedChatModel}`);
+  }, [selectedChatModel]);
 
   const {
     messages,
@@ -51,20 +75,40 @@ export function Chat({
     sendExtraMessageFields: true,
     generateId: generateUUID,
     onFinish: () => {
+      console.log(`[CHAT] Chat completed successfully with model: ${selectedChatModel}`);
       mutate('/api/history');
     },
     onError: (error) => {
-      console.error('Chat error:', error);
+      logError(error, `Chat error with model ${selectedChatModel}`);
+      
+      // Log additional details about the error
+      console.error(`[CHAT] Error details for model ${selectedChatModel}:`);
+      
+      // Type assertion for API error objects that might have response/request properties
+      const apiError = error as Error & { 
+        response?: { status: number; data: any }; 
+        request?: any;
+      };
+      
+      if (apiError.response) {
+        console.error(`Response status: ${apiError.response.status}`);
+        console.error(`Response data:`, apiError.response.data);
+      }
+      
+      if (apiError.request) {
+        console.error(`Request details:`, apiError.request);
+      }
       
       // Provide more specific error messages based on the error
       if (error.message && error.message.includes('model')) {
-        toast.error('Model error: The selected model may not be available. Please try a different model.');
+        console.error(`[CHAT] Model-specific error detected: ${error.message}`);
+        toast.error(`Model error: The selected model (${selectedChatModel}) may not be available. Please try a different model.`);
       } else if (error.message && error.message.includes('context length')) {
         toast.error('The conversation is too long for the model. Please start a new chat.');
       } else if (error.message && error.message.includes('rate limit')) {
         toast.error('Rate limit exceeded. Please wait a moment before trying again.');
       } else {
-        toast.error('An error occurred, please try again!');
+        toast.error(`An error occurred: ${error.message || 'Unknown error'}`);
       }
     },
   });
@@ -235,6 +279,15 @@ export function Chat({
     console.log(`Generated ${clusterStarCount + scatteredStarCount + brightStarCount} random stars`);
   };
 
+  // Add a custom submit handler to log the request
+  const handleSubmitWithLogging = (
+    event?: { preventDefault?: () => void } | undefined,
+    chatRequestOptions?: any
+  ) => {
+    console.log(`[CHAT] Submitting chat with model: ${selectedChatModel}`);
+    return handleSubmit(event, chatRequestOptions);
+  };
+
   return (
     <>
       <div className="flex flex-col min-w-0 h-dvh bg-background relative">
@@ -313,7 +366,7 @@ export function Chat({
                 chatId={id}
                 input={input}
                 setInput={setInput}
-                handleSubmit={handleSubmit}
+                handleSubmit={handleSubmitWithLogging}
                 isLoading={isLoading}
                 stop={stop}
                 attachments={attachments}
@@ -331,7 +384,7 @@ export function Chat({
         chatId={id}
         input={input}
         setInput={setInput}
-        handleSubmit={handleSubmit}
+        handleSubmit={handleSubmitWithLogging}
         isLoading={isLoading}
         stop={stop}
         attachments={attachments}

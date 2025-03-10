@@ -61,6 +61,13 @@ export function ModelSelector({
               onSelect={() => {
                 setOpen(false);
 
+                console.log(`[MODEL-SELECTOR] User selected model: ${id}`);
+                
+                // Add extra logging for o1 model
+                if (id === 'gpt-o1') {
+                  console.log(`[MODEL-SELECTOR] User selected GPT-o1 model`);
+                }
+
                 startTransition(() => {
                   setOptimisticModelId(id);
                   saveChatModelAsCookie(id);
