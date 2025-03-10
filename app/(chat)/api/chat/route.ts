@@ -333,6 +333,16 @@ export async function POST(request: Request) {
               if (retryCount === maxRetries) {
                 console.warn(`[API] Falling back to ${DEFAULT_CHAT_MODEL} after ${maxRetries} failed attempts with ${currentModel}`);
                 currentModel = DEFAULT_CHAT_MODEL;
+                
+                // Inform the user about the fallback
+                dataStream.writeData({
+                  type: 'message',
+                  message: {
+                    id: generateUUID(),
+                    role: 'assistant',
+                    content: `I'm currently using a fallback model because the ${selectedChatModel} model is unavailable. I'll do my best to help you with your request.`,
+                  }
+                });
               }
               
               return executeStreamText();

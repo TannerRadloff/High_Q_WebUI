@@ -49,12 +49,16 @@ export function Chat({
   isReadonly: boolean;
 }) {
   const { mutate } = useSWRConfig();
+  const [usesFallbackModel, setUsesFallbackModel] = useState(false);
   
   console.log(`Initializing chat with model: ${selectedChatModel}`);
 
   // Log when the component mounts or when the selected model changes
   useEffect(() => {
     console.log(`[CHAT] Component mounted or model changed: ${selectedChatModel}`);
+    
+    // Reset fallback model state when model changes
+    setUsesFallbackModel(false);
   }, [selectedChatModel]);
 
   const {
@@ -74,8 +78,16 @@ export function Chat({
     experimental_throttle: 100,
     sendExtraMessageFields: true,
     generateId: generateUUID,
-    onFinish: () => {
+    onFinish: (message) => {
       console.log(`[CHAT] Chat completed successfully with model: ${selectedChatModel}`);
+      
+      // Check if the response contains information about a fallback model
+      if (message.content.includes('fallback model')) {
+        console.log('[CHAT] Using fallback model detected');
+        setUsesFallbackModel(true);
+        toast.warning(`The ${selectedChatModel} model is currently unavailable. Using a fallback model instead.`);
+      }
+      
       mutate('/api/history');
     },
     onError: (error) => {

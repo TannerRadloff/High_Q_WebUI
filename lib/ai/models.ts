@@ -5,13 +5,67 @@ import {
 
 export const DEFAULT_CHAT_MODEL: string = 'gpt-o3-mini';
 
+// Custom error logger for model issues
+const logModelError = (modelId: string, error: any) => {
+  console.error(`[MODEL ERROR] Error with model ${modelId}:`, error);
+  console.error(`Model error details:`, {
+    message: error.message,
+    name: error.name,
+    stack: error.stack,
+  });
+};
+
+// Helper function to try multiple model IDs in sequence
+const tryMultipleModels = (modelId: string, openAiIds: string[], fallbackId: string = 'gpt-4o-mini') => {
+  console.log(`[MODEL] Trying multiple IDs for ${modelId}:`, openAiIds);
+  
+  // Try each model ID in sequence
+  for (const openAiId of openAiIds) {
+    try {
+      console.log(`[MODEL] Trying ${modelId} with ID: ${openAiId}`);
+      return openai(openAiId);
+    } catch (error) {
+      logModelError(`${modelId}:${openAiId}`, error);
+      // Continue to the next ID
+      console.log(`[MODEL] Failed with ${openAiId}, trying next option`);
+    }
+  }
+  
+  // If all fail, use fallback
+  console.log(`[MODEL] All IDs failed for ${modelId}, using fallback: ${fallbackId}`);
+  return openai(fallbackId);
+};
+
+// Helper function to safely create a model with error logging and fallback
+const createSafeModel = (modelId: string, openAiId: string, fallbackId: string = 'gpt-4o-mini') => {
+  try {
+    // For gpt-o1, try multiple potential IDs
+    if (modelId === 'gpt-o1') {
+      return tryMultipleModels(modelId, [
+        'o1',                  // Direct o1 name
+        'gpt-o1',              // gpt- prefix
+        'gpt-4o-2024-05',      // May 2024 version
+        'gpt-4-o1',            // Alternative format
+        openAiId               // Passed parameter
+      ], fallbackId);
+    }
+    
+    // For other models, just use the specified ID
+    return openai(openAiId);
+  } catch (error) {
+    logModelError(modelId, error);
+    // Return default model as fallback
+    return openai(fallbackId);
+  }
+};
+
 export const myProvider = customProvider({
   languageModels: {
-    'gpt-40': openai('gpt-4o'),
-    'gpt-o1': openai('o1'),
-    'gpt-o3-mini': openai('gpt-4o-mini'),
-    'title-model': openai('gpt-4o'),
-    'artifact-model': openai('gpt-4o-mini'),
+    'gpt-40': createSafeModel('gpt-40', 'gpt-4o'),
+    'gpt-o1': createSafeModel('gpt-o1', 'gpt-4o-2024-05', 'gpt-4o-mini'), // Try o1 model ID with fallback
+    'gpt-o3-mini': createSafeModel('gpt-o3-mini', 'gpt-4o-mini'),
+    'title-model': createSafeModel('title-model', 'gpt-4o'),
+    'artifact-model': createSafeModel('artifact-model', 'gpt-4o-mini'),
   },
   imageModels: {
     'small-model': openai.image('dall-e-2'),
