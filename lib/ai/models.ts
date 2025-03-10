@@ -42,11 +42,12 @@ const createSafeModel = (modelId: string, openAiId: string, fallbackId: string =
     // For gpt-o1, try multiple potential IDs
     if (modelId === 'gpt-o1') {
       return tryMultipleModels(modelId, [
-        'o1',                  // Direct o1 name
-        'gpt-o1',              // gpt- prefix
-        'gpt-4o-2024-05',      // May 2024 version
-        'gpt-4-o1',            // Alternative format
-        openAiId               // Passed parameter
+        'gpt-4o-2024-05-preview',  // Updated to the correct model ID for o1
+        'o1-preview',              // Alternate name
+        'o1',                      // Direct o1 name
+        'gpt-o1',                  // gpt- prefix
+        'gpt-4-o1',                // Alternative format
+        openAiId                   // Passed parameter
       ], fallbackId);
     }
     

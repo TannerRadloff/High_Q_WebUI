@@ -222,7 +222,7 @@ export async function POST(request: Request) {
             
             // Add detailed logging for GPT-o1 model
             if (currentModel === 'gpt-o1') {
-              console.log(`[API] Using GPT-o1 model with maxSteps: 10`);
+              console.log(`[API] Using GPT-o1 model with maxSteps: 25 for advanced reasoning`);
               
               try {
                 const modelString = myProvider.languageModel(currentModel).toString();
@@ -236,11 +236,23 @@ export async function POST(request: Request) {
             const model = myProvider.languageModel(currentModel);
             console.log(`[API] Successfully initialized model: ${currentModel}`);
             
+            // Enhanced system prompt for o1 model with reasoning framework instructions
+            let systemPromptContent = enhancedSystemPrompt(currentModel);
+            if (currentModel === 'gpt-o1') {
+              // Add advanced reasoning instructions to the system prompt for o1
+              systemPromptContent = systemPromptContent + 
+                "\n\nYou are using the advanced reasoning GPT-o1 model. " +
+                "Use step-by-step reasoning when solving problems. " +
+                "Break down complex problems into simpler parts. " +
+                "Consider multiple approaches before settling on a solution. " +
+                "Explicitly state your assumptions and reasoning process.";
+            }
+            
             const result = streamText({
               model: model,
-              system: enhancedSystemPrompt(currentModel),
+              system: systemPromptContent,
               messages: filteredMessages,
-              maxSteps: currentModel === 'gpt-o1' ? 10 : 5,
+              maxSteps: currentModel === 'gpt-o1' ? 25 : 5, // Increased steps for o1 model
               experimental_activeTools:
                 currentModel === 'chat-model-reasoning'
                   ? []
@@ -310,7 +322,16 @@ export async function POST(request: Request) {
                 console.error(`[API] Model error detected: ${error.message}`);
                 
                 if (currentModel === 'gpt-o1') {
-                  console.error(`[API] GPT-o1 model error. Model ID used: ${myProvider.languageModel(currentModel).toString()}`);
+                  console.error(`[API] GPT-o1 model error detected. Here are additional details:`);
+                  
+                  // Check for common o1 specific errors
+                  if (error.message.includes('not found') || error.message.includes('does not exist')) {
+                    console.error(`[API] The o1 model ID may be incorrect. Tried with: ${myProvider.languageModel(currentModel).toString()}`);
+                  } else if (error.message.includes('permission') || error.message.includes('access')) {
+                    console.error(`[API] Permission or access error for o1 model. Ensure your API key has access to o1.`);
+                  } else if (error.message.includes('capacity') || error.message.includes('overloaded')) {
+                    console.error(`[API] The o1 model appears to be at capacity or overloaded.`);
+                  }
                 }
               }
               
@@ -327,7 +348,10 @@ export async function POST(request: Request) {
             
             if (retryCount < maxRetries && currentModel === 'gpt-o1') {
               retryCount++;
-              console.warn(`[API] Error with model ${currentModel}, retrying (${retryCount}/${maxRetries})...`);
+              console.warn(`[API] Error with model ${currentModel}, retrying (${retryCount}/${maxRetries}) after delay...`);
+              
+              // Add a delay before retrying to allow for potential rate limit recovery
+              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // Progressive backoff
               
               // If we've reached max retries, fall back to the default model
               if (retryCount === maxRetries) {
@@ -340,7 +364,7 @@ export async function POST(request: Request) {
                   message: {
                     id: generateUUID(),
                     role: 'assistant',
-                    content: `I'm currently using a fallback model because the ${selectedChatModel} model is unavailable. I'll do my best to help you with your request.`,
+                    content: `I encountered an issue with the advanced ${selectedChatModel} model and have switched to a more reliable alternative. I'll still do my best to help you with your request.`,
                   }
                 });
               }
