@@ -147,65 +147,92 @@ export async function POST(request: Request) {
     });
 
     return createDataStreamResponse({
-      execute: (dataStream) => {
-        const result = streamText({
-          model: myProvider.languageModel(modelToUse),
-          system: enhancedSystemPrompt(modelToUse),
-          messages: filteredMessages,
-          maxSteps: 5,
-          experimental_activeTools:
-            modelToUse === 'chat-model-reasoning'
-              ? []
-              : [
-                  'getWeather',
-                  'createDocument',
-                  'updateDocument',
-                  'requestSuggestions',
-                ],
-          experimental_transform: smoothStream({ chunking: 'word' }),
-          experimental_generateMessageId: generateUUID,
-          tools: {
-            getWeather,
-            createDocument: createDocument({ session, dataStream }),
-            updateDocument: updateDocument({ session, dataStream }),
-            requestSuggestions: requestSuggestions({
-              session,
-              dataStream,
-            }),
-          },
-          onFinish: async ({ response, reasoning }) => {
-            if (session.user?.id) {
-              try {
-                const sanitizedResponseMessages = sanitizeResponseMessages({
-                  messages: response.messages,
-                  reasoning,
-                });
+      execute: async (dataStream) => {
+        let currentModel = modelToUse;
+        let retryCount = 0;
+        const maxRetries = 2;
+        
+        const executeStreamText = async () => {
+          try {
+            const result = streamText({
+              model: myProvider.languageModel(currentModel),
+              system: enhancedSystemPrompt(currentModel),
+              messages: filteredMessages,
+              maxSteps: currentModel === 'gpt-o1' ? 10 : 5,
+              experimental_activeTools:
+                currentModel === 'chat-model-reasoning'
+                  ? []
+                  : [
+                      'getWeather',
+                      'createDocument',
+                      'updateDocument',
+                      'requestSuggestions',
+                    ],
+              experimental_transform: smoothStream({ chunking: 'word' }),
+              experimental_generateMessageId: generateUUID,
+              tools: {
+                getWeather,
+                createDocument: createDocument({ session, dataStream }),
+                updateDocument: updateDocument({ session, dataStream }),
+                requestSuggestions: requestSuggestions({
+                  session,
+                  dataStream,
+                }),
+              },
+              onFinish: async ({ response, reasoning }) => {
+                if (session.user?.id) {
+                  try {
+                    const sanitizedResponseMessages = sanitizeResponseMessages({
+                      messages: response.messages,
+                      reasoning,
+                    });
 
-                await saveMessages({
-                  messages: sanitizedResponseMessages.map((message) => {
-                    return {
-                      id: message.id,
-                      chatId: id,
-                      role: message.role,
-                      content: message.content,
-                      createdAt: new Date(),
-                    };
-                  }),
-                });
-              } catch (error) {
-                console.error('Failed to save chat');
+                    await saveMessages({
+                      messages: sanitizedResponseMessages.map((message) => {
+                        return {
+                          id: message.id,
+                          chatId: id,
+                          role: message.role,
+                          content: message.content,
+                          createdAt: new Date(),
+                        };
+                      }),
+                    });
+                  } catch (error) {
+                    console.error('Failed to save chat');
+                  }
+                }
+              },
+              experimental_telemetry: {
+                isEnabled: true,
+                functionId: 'stream-text',
+              },
+            });
+
+            result.mergeIntoDataStream(dataStream, {
+              sendReasoning: true,
+            });
+            
+            return result;
+          } catch (error) {
+            if (retryCount < maxRetries && currentModel === 'gpt-o1') {
+              retryCount++;
+              console.warn(`Error with model ${currentModel}, retrying (${retryCount}/${maxRetries})...`);
+              
+              // If we've reached max retries, fall back to the default model
+              if (retryCount === maxRetries) {
+                console.warn(`Falling back to ${DEFAULT_CHAT_MODEL} after ${maxRetries} failed attempts with ${currentModel}`);
+                currentModel = DEFAULT_CHAT_MODEL;
               }
+              
+              return executeStreamText();
             }
-          },
-          experimental_telemetry: {
-            isEnabled: true,
-            functionId: 'stream-text',
-          },
-        });
-
-        result.mergeIntoDataStream(dataStream, {
-          sendReasoning: true,
-        });
+            
+            throw error;
+          }
+        };
+        
+        await executeStreamText();
       },
       onError: (error: unknown) => {
         console.error('Chat API error:', error);

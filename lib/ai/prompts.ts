@@ -34,6 +34,9 @@ Do not update document right after creating it. Wait for user feedback or reques
 export const regularPrompt =
   'You are a friendly assistant! Keep your responses concise and helpful.';
 
+export const o1Prompt =
+  'You are a friendly assistant with advanced reasoning capabilities! Provide thoughtful, well-reasoned responses. Your reasoning will be shown to the user in a collapsible section above your final response.';
+
 export const systemPrompt = ({
   selectedChatModel,
 }: {
@@ -41,6 +44,8 @@ export const systemPrompt = ({
 }) => {
   if (selectedChatModel === 'chat-model-reasoning') {
     return regularPrompt;
+  } else if (selectedChatModel === 'gpt-o1') {
+    return `${o1Prompt}\n\n${artifactsPrompt}`;
   } else {
     return `${regularPrompt}\n\n${artifactsPrompt}`;
   }

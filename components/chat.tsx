@@ -54,7 +54,18 @@ export function Chat({
       mutate('/api/history');
     },
     onError: (error) => {
-      toast.error('An error occured, please try again!');
+      console.error('Chat error:', error);
+      
+      // Provide more specific error messages based on the error
+      if (error.message && error.message.includes('model')) {
+        toast.error('Model error: The selected model may not be available. Please try a different model.');
+      } else if (error.message && error.message.includes('context length')) {
+        toast.error('The conversation is too long for the model. Please start a new chat.');
+      } else if (error.message && error.message.includes('rate limit')) {
+        toast.error('Rate limit exceeded. Please wait a moment before trying again.');
+      } else {
+        toast.error('An error occurred, please try again!');
+      }
     },
   });
 
