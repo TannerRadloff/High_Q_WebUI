@@ -42,11 +42,10 @@ const createSafeModel = (modelId: string, openAiId: string, fallbackId: string =
     // For gpt-o1, try multiple potential IDs
     if (modelId === 'gpt-o1') {
       return tryMultipleModels(modelId, [
-        'gpt-4o-2024-05-preview',  // Updated to the correct model ID for o1
+        'gpt-4o-2024-08-preview',  // Latest model ID for o1 (August 2024)
+        'gpt-4o-2024-05-preview',  // May 2024 preview version
         'o1-preview',              // Alternate name
         'o1',                      // Direct o1 name
-        'gpt-o1',                  // gpt- prefix
-        'gpt-4-o1',                // Alternative format
         openAiId                   // Passed parameter
       ], fallbackId);
     }
@@ -63,7 +62,7 @@ const createSafeModel = (modelId: string, openAiId: string, fallbackId: string =
 export const myProvider = customProvider({
   languageModels: {
     'gpt-40': createSafeModel('gpt-40', 'gpt-4o'),
-    'gpt-o1': createSafeModel('gpt-o1', 'gpt-4o-2024-05', 'gpt-4o-mini'), // Try o1 model ID with fallback
+    'gpt-o1': createSafeModel('gpt-o1', 'gpt-4o-2024-08-preview', 'gpt-4o'), // Updated to latest model ID with better fallback
     'gpt-o3-mini': createSafeModel('gpt-o3-mini', 'gpt-4o-mini'),
     'title-model': createSafeModel('title-model', 'gpt-4o'),
     'artifact-model': createSafeModel('artifact-model', 'gpt-4o-mini'),

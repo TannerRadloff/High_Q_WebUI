@@ -222,7 +222,7 @@ export async function POST(request: Request) {
             
             // Add detailed logging for GPT-o1 model
             if (currentModel === 'gpt-o1') {
-              console.log(`[API] Using GPT-o1 model with maxSteps: 25 for advanced reasoning`);
+              console.log(`[API] Using GPT-o1 model with maxSteps: 30 for advanced reasoning`);
               
               try {
                 const modelString = myProvider.languageModel(currentModel).toString();
@@ -238,21 +238,12 @@ export async function POST(request: Request) {
             
             // Enhanced system prompt for o1 model with reasoning framework instructions
             let systemPromptContent = enhancedSystemPrompt(currentModel);
-            if (currentModel === 'gpt-o1') {
-              // Add advanced reasoning instructions to the system prompt for o1
-              systemPromptContent = systemPromptContent + 
-                "\n\nYou are using the advanced reasoning GPT-o1 model. " +
-                "Use step-by-step reasoning when solving problems. " +
-                "Break down complex problems into simpler parts. " +
-                "Consider multiple approaches before settling on a solution. " +
-                "Explicitly state your assumptions and reasoning process.";
-            }
             
             const result = streamText({
               model: model,
               system: systemPromptContent,
               messages: filteredMessages,
-              maxSteps: currentModel === 'gpt-o1' ? 25 : 5, // Increased steps for o1 model
+              maxSteps: currentModel === 'gpt-o1' ? 30 : 5, // Increased steps for o1 model
               experimental_activeTools:
                 currentModel === 'chat-model-reasoning'
                   ? []
@@ -331,6 +322,8 @@ export async function POST(request: Request) {
                     console.error(`[API] Permission or access error for o1 model. Ensure your API key has access to o1.`);
                   } else if (error.message.includes('capacity') || error.message.includes('overloaded')) {
                     console.error(`[API] The o1 model appears to be at capacity or overloaded.`);
+                  } else if (error.message.includes('version')) {
+                    console.error(`[API] API version error. The o1 model may require a specific API version.`);
                   }
                 }
               }
@@ -343,6 +336,11 @@ export async function POST(request: Request) {
               // Check for context length errors
               if (error.message.includes('context length')) {
                 console.error(`[API] Context length error detected: ${error.message}`);
+              }
+              
+              // Check for API key errors
+              if (error.message.includes('api key') || error.message.includes('authentication')) {
+                console.error(`[API] API key or authentication error: ${error.message}`);
               }
             }
             

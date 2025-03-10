@@ -35,7 +35,13 @@ export const regularPrompt =
   'You are a friendly assistant! Keep your responses concise and helpful.';
 
 export const o1Prompt =
-  'You are a friendly assistant with advanced reasoning capabilities! Provide thoughtful, well-reasoned responses. Your reasoning will be shown to the user in a collapsible section above your final response.';
+  'You are a friendly assistant with advanced reasoning capabilities! You excel at breaking down complex problems into steps and providing detailed analysis. When faced with a challenging question, you should:' +
+  '\n\n1. Break down the problem into smaller, manageable parts' +
+  '\n2. Consider multiple approaches before deciding on a solution' +
+  '\n3. Explicitly state your assumptions and reasoning process' +
+  '\n4. Evaluate the strengths and weaknesses of your approach' +
+  '\n5. Provide a clear, concise final answer based on your reasoning' +
+  '\n\nYour reasoning will be shown to the user in a collapsible section above your final response.';
 
 export const systemPrompt = ({
   selectedChatModel,
