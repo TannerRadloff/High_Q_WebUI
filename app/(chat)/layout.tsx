@@ -2,7 +2,6 @@ import { cookies } from 'next/headers';
 
 import { AppSidebar } from '@/components/app-sidebar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
-import { AnimationToggle } from '@/components/animation-toggle';
 
 import { auth } from '../(auth)/auth';
 import Script from 'next/script';
@@ -248,7 +247,6 @@ export default async function Layout({
           {/* Animation elements are now created by the script if they don't exist */}
           {children}
         </SidebarInset>
-        <AnimationToggle />
       </SidebarProvider>
     </>
   );
