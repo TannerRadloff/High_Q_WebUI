@@ -55,6 +55,15 @@ const logError = (error: any, context: string) => {
       // Log if it's a model-specific error
       if (error.message.includes('model')) {
         console.error(`Model-specific error detected`);
+        
+        // Check for o1 model errors specifically
+        if (error.message.includes('o1') || 
+            error.message.includes('gpt-4o-2024') || 
+            error.message.includes('does not exist') ||
+            error.message.includes('access')) {
+          console.error(`O1 model access error detected. Please check your API key permissions.`);
+          console.error(`Attempted model access error: ${error.message}`);
+        }
       }
     }
   } else {
@@ -107,12 +116,26 @@ export async function POST(request: Request) {
         console.log(`[API] Successfully validated model: ${selectedChatModel}`);
       } catch (modelError) {
         console.error(`[API] Error initializing model ${selectedChatModel}:`, modelError);
-        modelToUse = DEFAULT_CHAT_MODEL;
+        
+        // Special handling for o1 model errors
+        if (selectedChatModel === 'gpt-o1') {
+          console.error(`[API] O1 model initialization failed. Falling back to gpt-40.`);
+          modelToUse = 'gpt-40'; // Fallback to gpt-40 instead of the default mini model
+        } else {
+          modelToUse = DEFAULT_CHAT_MODEL;
+        }
       }
     }
   } catch (validationError) {
     console.error(`[API] Error during model validation:`, validationError);
-    modelToUse = DEFAULT_CHAT_MODEL;
+    
+    // Special handling for o1 model errors
+    if (selectedChatModel === 'gpt-o1') {
+      console.error(`[API] O1 model validation failed. Falling back to gpt-40.`);
+      modelToUse = 'gpt-40'; // Fallback to gpt-40 instead of the default mini model
+    } else {
+      modelToUse = DEFAULT_CHAT_MODEL;
+    }
   }
 
   console.log(`[API] Using model: ${modelToUse} (selected: ${selectedChatModel})`);
