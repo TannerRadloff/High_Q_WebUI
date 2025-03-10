@@ -25,9 +25,16 @@ export function ModelSelector({
   const [optimisticModelId, setOptimisticModelId] =
     useOptimistic(selectedModelId);
 
+  // Validate that the selected model exists in the chatModels array
+  const validModelId = useMemo(() => {
+    return chatModels.some(model => model.id === optimisticModelId) 
+      ? optimisticModelId 
+      : chatModels[0].id;
+  }, [optimisticModelId]);
+
   const selectedChatModel = useMemo(
-    () => chatModels.find((chatModel) => chatModel.id === optimisticModelId),
-    [optimisticModelId],
+    () => chatModels.find((chatModel) => chatModel.id === validModelId) || chatModels[0],
+    [validModelId],
   );
 
   return (
@@ -60,7 +67,7 @@ export function ModelSelector({
                 });
               }}
               className="gap-4 group/item flex flex-row justify-between items-center"
-              data-active={id === optimisticModelId}
+              data-active={id === validModelId}
             >
               <div className="flex flex-col gap-1 items-start">
                 <div>{chatModel.name}</div>

@@ -8,7 +8,6 @@ export const DEFAULT_CHAT_MODEL: string = 'gpt-o3-mini';
 export const myProvider = customProvider({
   languageModels: {
     'gpt-40': openai('gpt-4o'),
-    'gpt-45': openai('gpt-4.5'),
     'gpt-o1': openai('gpt-o1'),
     'gpt-o3-mini': openai('gpt-4o-mini'),
     'title-model': openai('gpt-4o'),
@@ -31,11 +30,6 @@ export const chatModels: Array<ChatModel> = [
     id: 'gpt-40',
     name: 'GPT 4o',
     description: 'Powerful multimodal model for complex tasks',
-  },
-  {
-    id: 'gpt-45',
-    name: 'GPT 4.5',
-    description: 'Advanced model with improved capabilities',
   },
   {
     id: 'gpt-o1',

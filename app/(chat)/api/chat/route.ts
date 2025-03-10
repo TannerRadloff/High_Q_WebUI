@@ -6,7 +6,7 @@ import {
 } from 'ai';
 
 import { auth } from '@/app/(auth)/auth';
-import { myProvider } from '@/lib/ai/models';
+import { myProvider, DEFAULT_CHAT_MODEL, chatModels } from '@/lib/ai/models';
 import { systemPrompt } from '@/lib/ai/prompts';
 import {
   deleteChatById,
@@ -50,6 +50,10 @@ export async function POST(request: Request) {
   if (!session || !session.user || !session.user.id) {
     return new Response('Unauthorized', { status: 401 });
   }
+
+  // Validate the selected model
+  const validModel = chatModels.some(model => model.id === selectedChatModel);
+  const modelToUse = validModel ? selectedChatModel : DEFAULT_CHAT_MODEL;
 
   // Check if there are any document artifact messages
   const hasArtifacts = messages.some(message => 
@@ -145,12 +149,12 @@ export async function POST(request: Request) {
     return createDataStreamResponse({
       execute: (dataStream) => {
         const result = streamText({
-          model: myProvider.languageModel(selectedChatModel),
-          system: enhancedSystemPrompt(selectedChatModel),
+          model: myProvider.languageModel(modelToUse),
+          system: enhancedSystemPrompt(modelToUse),
           messages: filteredMessages,
           maxSteps: 5,
           experimental_activeTools:
-            selectedChatModel === 'chat-model-reasoning'
+            modelToUse === 'chat-model-reasoning'
               ? []
               : [
                   'getWeather',

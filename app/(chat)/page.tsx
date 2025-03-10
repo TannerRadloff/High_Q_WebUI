@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 
 import { Chat } from '@/components/chat';
-import { DEFAULT_CHAT_MODEL } from '@/lib/ai/models';
+import { DEFAULT_CHAT_MODEL, chatModels } from '@/lib/ai/models';
 import { generateUUID } from '@/lib/utils';
 import { DataStreamHandler } from '@/components/data-stream-handler';
 
@@ -11,7 +11,8 @@ export default async function Page() {
   const cookieStore = await cookies();
   const modelIdFromCookie = cookieStore.get('chat-model');
 
-  if (!modelIdFromCookie) {
+  // If no cookie or the model doesn't exist in chatModels, use default
+  if (!modelIdFromCookie || !chatModels.some(model => model.id === modelIdFromCookie.value)) {
     return (
       <>
         <Chat
