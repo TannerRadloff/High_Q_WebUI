@@ -1,10 +1,6 @@
 import type { Metadata } from 'next';
 import { Toaster } from 'sonner';
 import Script from 'next/script';
-import { Inter as FontSans } from 'next/font/google';
-import { GeistMono } from 'geist/font';
-import { Analytics } from '@vercel/analytics/react';
-import { SpeedInsights } from '@vercel/speed-insights/next';
 
 import { ThemeProvider } from '@/components/theme-provider';
 

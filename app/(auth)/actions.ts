@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { genSaltSync, hashSync } from 'bcrypt-ts';
-import { randomBytes } from 'crypto';
+import { randomBytes } from 'node:crypto';
 
 import { 
   createUser, 
@@ -11,7 +11,6 @@ import {
   getPasswordResetByToken, 
   markPasswordResetTokenAsUsed, 
   updateUserPassword, 
-  getUserById 
 } from '@/lib/db/queries';
 import { sendPasswordResetEmail } from '@/lib/email';
 

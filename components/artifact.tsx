@@ -1,5 +1,4 @@
 import type {
-  Attachment,
   ChatRequestOptions,
   CreateMessage,
   Message,
@@ -31,7 +30,7 @@ import { codeArtifact } from '@/artifacts/code/client';
 import { sheetArtifact } from '@/artifacts/sheet/client';
 import { textArtifact } from '@/artifacts/text/client';
 import equal from 'fast-deep-equal';
-import { ExtendedAttachment } from '@/types';
+import type { ExtendedAttachment } from '@/types';
 
 export const artifactDefinitions = [
   textArtifact,

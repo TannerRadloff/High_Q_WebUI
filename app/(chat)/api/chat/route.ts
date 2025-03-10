@@ -13,14 +13,13 @@ import {
   getChatById,
   saveChat,
   saveMessages,
-  saveDocument,
 } from '@/lib/db/queries';
 import {
   generateUUID,
   getMostRecentUserMessage,
   sanitizeResponseMessages,
 } from '@/lib/utils';
-import { ExtendedAttachment } from '@/types';
+import type { ExtendedAttachment } from '@/types';
 
 import { generateTitleFromUserMessage } from '../../actions';
 import { createDocument } from '@/lib/ai/tools/create-document';

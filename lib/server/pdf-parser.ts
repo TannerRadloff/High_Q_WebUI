@@ -1,5 +1,5 @@
 // This file should only be imported from server components or API routes
-import { createRequire } from 'module';
+import { createRequire } from 'node:module';
 
 // Dynamically import pdf-parse to ensure it's only loaded on the server
 export async function parsePdf(fileBuffer: ArrayBuffer): Promise<string> {

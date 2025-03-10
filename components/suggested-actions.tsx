@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { Button } from './ui/button';
-import { ChatRequestOptions, CreateMessage, Message } from 'ai';
+import type { ChatRequestOptions, CreateMessage, Message } from 'ai';
 import { memo, useRef, useState, useEffect } from 'react';
 import { ArrowUpIcon } from './icons';
 
@@ -122,6 +122,8 @@ function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
       {/* Carousel container */}
       <div 
         ref={carouselRef}
+        role="region"
+        aria-label="Suggested actions carousel"
         className="flex overflow-x-auto scrollbar-hide snap-x snap-mandatory gap-2 p-1"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         onMouseDown={handleMouseDown}

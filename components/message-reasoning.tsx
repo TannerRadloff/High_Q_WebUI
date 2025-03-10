@@ -45,8 +45,15 @@ export function MessageReasoning({
           <div className="font-medium">Reasoned for a few seconds</div>
           <div
             className="cursor-pointer"
+            role="button"
+            tabIndex={0}
             onClick={() => {
               setIsExpanded(!isExpanded);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                setIsExpanded(!isExpanded);
+              }
             }}
           >
             <ChevronDownIcon />

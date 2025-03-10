@@ -5,8 +5,7 @@ import type {
   CreateMessage,
   Message,
 } from 'ai';
-import { ExtendedAttachment } from '@/types';
-import cx from 'classnames';
+import type { ExtendedAttachment } from '@/types';
 import type React from 'react';
 import {
   useRef,
@@ -20,18 +19,13 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 import { useLocalStorage, useWindowSize } from 'usehooks-ts';
-
-import { sanitizeUIMessages, generateUUID } from '@/lib/utils';
-
-import { ArrowUpIcon, PaperclipIcon, StopIcon } from './icons';
-import { PreviewAttachment } from './preview-attachment';
-import { Button } from './ui/button';
-import { Textarea } from './ui/textarea';
-import { SuggestedActions } from './suggested-actions';
 import equal from 'fast-deep-equal';
 import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
-import { CrossIcon } from './icons';
+
+import { sanitizeUIMessages, generateUUID, cn } from '@/lib/utils';
+import { ArrowUpIcon, PaperclipIcon, StopIcon, CrossIcon } from './icons';
+import { Button } from './ui/button';
+import { Textarea } from './ui/textarea';
 
 // Add an interface at the top of the file
 interface MessageWithDocument extends Message {
@@ -92,12 +86,12 @@ function PureMultimodalInput({
     }
   };
 
-  const resetHeight = () => {
+  const resetHeight = useCallback(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = '98px';
     }
-  };
+  }, [textareaRef]);
 
   const [localStorageInput, setLocalStorageInput] = useLocalStorage(
     'input',
@@ -185,7 +179,7 @@ function PureMultimodalInput({
   );
   
   // New function to process text files as artifacts
-  const processTextFiles = async (attachmentsToProcess: ExtendedAttachment[]) => {
+  const processTextFiles = useCallback(async (attachmentsToProcess: ExtendedAttachment[]) => {
     const textFileAttachments = attachmentsToProcess.filter(
       attachment => attachment.contentType === 'text/plain' && attachment.textContent
     );
@@ -287,7 +281,7 @@ function PureMultimodalInput({
     }
     
     return otherAttachments;
-  };
+  }, [setMessages, chatId]);
   
   // Wrap the original handleSubmit to process text files first
   const wrappedHandleSubmit = useCallback(
@@ -336,7 +330,7 @@ function PureMultimodalInput({
         textareaRef.current?.focus();
       }
     },
-    [handleSubmit, attachments, setAttachments, uploadQueue, chatId, processTextFiles, input, setLocalStorageInput, resetHeight, width]
+    [handleSubmit, attachments, setAttachments, uploadQueue, processTextFiles, input, setLocalStorageInput, resetHeight, width]
   );
 
   return (
@@ -368,7 +362,7 @@ function PureMultimodalInput({
                   <span className="truncate">{file.name}</span>
                   <button
                     type="button"
-                    className="flex h-6 w-6 flex-none items-center justify-center rounded-md"
+                    className="flex size-6 flex-none items-center justify-center rounded-md"
                     onClick={() => {
                       setAttachments((currentFiles) =>
                         currentFiles.filter(

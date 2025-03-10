@@ -2,9 +2,7 @@ import type {
   CoreAssistantMessage,
   CoreToolMessage,
   Message,
-  TextStreamPart,
   ToolInvocation,
-  ToolSet,
 } from 'ai';
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -265,7 +263,18 @@ export async function identifyFileType(
       const text = decoder.decode(sample);
       
       // If we can decode it and it doesn't have too many non-printable characters, it's likely text
-      const nonPrintableCount = (text.match(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g) || []).length;
+      let nonPrintableCount = 0;
+      for (let i = 0; i < text.length; i++) {
+        const charCode = text.charCodeAt(i);
+        // Check for non-printable ASCII characters
+        if ((charCode >= 0 && charCode <= 8) || 
+            charCode === 11 || 
+            charCode === 12 || 
+            (charCode >= 14 && charCode <= 31) || 
+            charCode === 127) {
+          nonPrintableCount++;
+        }
+      }
       if (nonPrintableCount / text.length < 0.1) {
         return 'text/plain';
       }

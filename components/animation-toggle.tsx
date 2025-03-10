@@ -15,8 +15,8 @@ export function AnimationToggle() {
     const computedStyle = getComputedStyle(root);
     
     setAnimationsEnabled(computedStyle.getPropertyValue('--animation-play-state') !== 'paused');
-    setNebulaEnabled(parseFloat(computedStyle.getPropertyValue('--nebula-opacity') || '0') > 0);
-    setStarsEnabled(parseFloat(computedStyle.getPropertyValue('--stars-opacity') || '0') > 0);
+    setNebulaEnabled(Number.parseFloat(computedStyle.getPropertyValue('--nebula-opacity') || '0') > 0);
+    setStarsEnabled(Number.parseFloat(computedStyle.getPropertyValue('--stars-opacity') || '0') > 0);
     setShootingStarsEnabled(computedStyle.getPropertyValue('--shooting-stars-display') !== 'none');
   }, []);
 
