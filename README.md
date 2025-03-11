@@ -3,35 +3,59 @@
   <h1 align="center">Next.js AI Chatbot</h1>
 </a>
 
-<p align="center">
-  An Open-Source AI Chatbot Template Built With Next.js and the AI SDK by Vercel.
-</p>
+## OpenAI Responses API Update
 
-<p align="center">
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#model-providers"><strong>Model Providers</strong></a> ·
-  <a href="#deploy-your-own"><strong>Deploy Your Own</strong></a> ·
-  <a href="#running-locally"><strong>Running locally</strong></a>
-</p>
-<br/>
+This project has been updated to use OpenAI's new Responses API instead of the Chat Completions API. The Responses API is OpenAI's newest core API and an agentic API primitive, combining the simplicity of Chat Completions with the ability to do more agentic tasks.
+
+### Key Changes:
+
+1. Updated `@ai-sdk/openai` to version 2.0.0 and `ai` to version 5.0.0
+2. Changed model initialization from `openai(modelId)` to `openai.responses(modelId)`
+3. Updated API parameters:
+   - Changed `prompt` to `input` in generateText calls
+   - Changed `messages` to `inputs` in streamText calls
+4. Updated response handling to work with the new Responses API format
+   - The Responses API returns `output_text` instead of `message.content`
+
+### Benefits of the Responses API:
+
+- Simpler event-driven architecture
+- Better support for agentic tasks
+- Built-in tools for web search, file search, and computer use
+- Clearer semantic events for better integration
+
+---
+
+A full-featured Next.js 14 and App Router-ready AI chatbot built with:
+
+- Next.js 14 App Router
+- Vercel AI SDK
+- OpenAI (GPT-4o, GPT-o1, GPT-o3 mini)
+- Vercel Postgres
+- Drizzle ORM
+- Auth.js
+- Tailwind CSS
+- Artifacts (documents, code, spreadsheets)
+- File attachments
 
 ## Features
 
-- [Next.js](https://nextjs.org) App Router
-  - Advanced routing for seamless navigation and performance
-  - React Server Components (RSCs) and Server Actions for server-side rendering and increased performance
-- [AI SDK](https://sdk.vercel.ai/docs)
-  - Unified API for generating text, structured objects, and tool calls with LLMs
-  - Hooks for building dynamic chat and generative user interfaces
-  - Supports OpenAI (default), Anthropic, Cohere, and other model providers
-- [shadcn/ui](https://ui.shadcn.com)
-  - Styling with [Tailwind CSS](https://tailwindcss.com)
-  - Component primitives from [Radix UI](https://radix-ui.com) for accessibility and flexibility
-- Data Persistence
-  - [Vercel Postgres powered by Neon](https://vercel.com/storage/postgres) for saving chat history and user data
-  - [Vercel Blob](https://vercel.com/storage/blob) for efficient file storage
-- [NextAuth.js](https://github.com/nextauthjs/next-auth)
-  - Simple and secure authentication
+- [x] Full-featured chat interface
+- [x] Multiple model support (GPT-4o, GPT-o1, GPT-o3 mini)
+- [x] Markdown support
+- [x] Code highlighting with copy button
+- [x] Drag-and-drop file uploads
+- [x] Document creation and editing
+- [x] Code generation with syntax highlighting
+- [x] Spreadsheet creation and editing
+- [x] Chat history
+- [x] Chat sharing
+- [x] Mobile support
+- [x] Light/Dark mode
+- [x] AI-generated titles
+- [x] Vercel Postgres database
+- [x] Auth.js authentication
+- [x] Fully typed (TypeScript)
 
 ## Model Providers
 
@@ -53,19 +77,62 @@ You can deploy your own version of the Next.js AI Chatbot to Vercel with one cli
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fai-chatbot&env=AUTH_SECRET,OPENAI_API_KEY&envDescription=Learn%20more%20about%20how%20to%20get%20the%20API%20Keys%20for%20the%20application&envLink=https%3A%2F%2Fgithub.com%2Fvercel%2Fai-chatbot%2Fblob%2Fmain%2F.env.example&demo-title=AI%20Chatbot&demo-description=An%20Open-Source%20AI%20Chatbot%20Template%20Built%20With%20Next.js%20and%20the%20AI%20SDK%20by%20Vercel.&demo-url=https%3A%2F%2Fchat.vercel.ai&stores=[{%22type%22:%22postgres%22},{%22type%22:%22blob%22}])
 
-## Running locally
+## Running Locally
 
-You will need to use the environment variables [defined in `.env.example`](.env.example) to run Next.js AI Chatbot. It's recommended you use [Vercel Environment Variables](https://vercel.com/docs/projects/environment-variables) for this, but a `.env` file is all that is necessary.
-
-> Note: You should not commit your `.env` file or it will expose secrets that will allow others to control access to your various OpenAI and authentication provider accounts.
-
-1. Install Vercel CLI: `npm i -g vercel`
-2. Link local instance with Vercel and GitHub accounts (creates `.vercel` directory): `vercel link`
-3. Download your environment variables: `vercel env pull`
+### Cloning the repository
 
 ```bash
-pnpm install
-pnpm dev
+git clone https://github.com/vercel/ai-chatbot.git
 ```
 
-Your app template should now be running on [localhost:3000](http://localhost:3000/).
+### Installing dependencies
+
+```bash
+npm install
+```
+
+### Configuration
+
+1. Copy the `.env.example` file to `.env.local`:
+
+```bash
+cp .env.example .env.local
+```
+
+2. Update the environment variables in the `.env.local` file:
+
+```
+# OpenAI API Key - https://platform.openai.com/account/api-keys
+OPENAI_API_KEY=
+
+# Authentication
+# Generate a random secret: https://generate-secret.vercel.app/32 or `openssl rand -base64 32`
+AUTH_SECRET=
+
+# Database
+DATABASE_URL=
+
+# Email (optional)
+EMAIL_SERVER=
+EMAIL_FROM=
+```
+
+### Database Setup
+
+1. Create a database in Vercel Postgres or any other PostgreSQL provider.
+2. Update the `DATABASE_URL` in the `.env.local` file.
+3. Run the database migrations:
+
+```bash
+npm run db:migrate
+```
+
+### Starting the app
+
+```bash
+npm run dev
+```
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

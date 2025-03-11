@@ -13,7 +13,7 @@ export const textDocumentHandler = createDocumentHandler<'text'>({
       system:
         'Write about the given topic. Markdown is supported. Use headings wherever appropriate.',
       experimental_transform: smoothStream({ chunking: 'word' }),
-      prompt: title,
+      input: title,
     });
 
     for await (const delta of fullStream) {
@@ -40,7 +40,7 @@ export const textDocumentHandler = createDocumentHandler<'text'>({
       model: myProvider.languageModel('artifact-model'),
       system: updateDocumentPrompt(document.content, 'text'),
       experimental_transform: smoothStream({ chunking: 'word' }),
-      prompt: description,
+      input: description,
       experimental_providerMetadata: {
         openai: {
           prediction: {

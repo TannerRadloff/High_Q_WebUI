@@ -143,9 +143,11 @@ export function sanitizeResponseMessages({
 
   for (const message of messages) {
     if (message.role === 'tool') {
-      for (const content of message.content) {
-        if (content.type === 'tool-result') {
-          toolResultIds.push(content.toolCallId);
+      if (Array.isArray(message.content)) {
+        for (const content of message.content) {
+          if (content.type === 'tool-result') {
+            toolResultIds.push(content.toolCallId);
+          }
         }
       }
     }
@@ -156,27 +158,36 @@ export function sanitizeResponseMessages({
 
     if (typeof message.content === 'string') return message;
 
-    const sanitizedContent = message.content.filter((content) =>
-      content.type === 'tool-call'
-        ? toolResultIds.includes(content.toolCallId)
-        : content.type === 'text'
-          ? content.text.length > 0
-          : true,
-    );
+    if (Array.isArray(message.content)) {
+      const sanitizedContent = message.content.filter((content) => {
+        if (content.type === 'tool-call') {
+          return toolResultIds.includes(content.toolCallId);
+        }
+        else if (content.type === 'text') {
+          return content.text.length > 0;
+        }
+        else if (content.type === 'output_text') {
+          return content.text.length > 0;
+        }
+        return true;
+      });
 
-    if (reasoning) {
-      // @ts-expect-error: reasoning message parts in sdk is wip
-      sanitizedContent.push({ type: 'reasoning', reasoning });
+      if (reasoning) {
+        // @ts-expect-error: reasoning message parts in sdk is wip
+        sanitizedContent.push({ type: 'reasoning', reasoning });
+      }
+
+      return {
+        ...message,
+        content: sanitizedContent,
+      };
     }
 
-    return {
-      ...message,
-      content: sanitizedContent,
-    };
+    return message;
   });
 
   return messagesBySanitizedContent.filter(
-    (message) => message.content.length > 0,
+    (message) => Array.isArray(message.content) ? message.content.length > 0 : true,
   );
 }
 

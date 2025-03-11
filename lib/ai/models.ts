@@ -23,7 +23,8 @@ const tryMultipleModels = (modelId: string, openAiIds: string[], fallbackId: str
   for (const openAiId of openAiIds) {
     try {
       console.log(`[MODEL] Trying ${modelId} with ID: ${openAiId}`);
-      return openai(openAiId);
+      // Use responses API instead of chat completions
+      return openai.responses(openAiId);
     } catch (error) {
       logModelError(`${modelId}:${openAiId}`, error);
       // Continue to the next ID
@@ -33,7 +34,8 @@ const tryMultipleModels = (modelId: string, openAiIds: string[], fallbackId: str
   
   // If all fail, use fallback
   console.log(`[MODEL] All IDs failed for ${modelId}, using fallback: ${fallbackId}`);
-  return openai(fallbackId);
+  // Use responses API instead of chat completions
+  return openai.responses(fallbackId);
 };
 
 // Helper function to safely create a model with error logging and fallback
@@ -51,11 +53,13 @@ const createSafeModel = (modelId: string, openAiId: string, fallbackId: string =
     }
     
     // For other models, just use the specified ID
-    return openai(openAiId);
+    // Use responses API instead of chat completions
+    return openai.responses(openAiId);
   } catch (error) {
     logModelError(modelId, error);
     // Return default model as fallback
-    return openai(fallbackId);
+    // Use responses API instead of chat completions
+    return openai.responses(fallbackId);
   }
 };
 
