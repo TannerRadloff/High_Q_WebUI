@@ -10,6 +10,7 @@ import { useSidebar } from './ui/sidebar';
 import { memo } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { type VisibilityType, VisibilitySelector } from './visibility-selector';
+import { UserAuthStatus } from './user-auth-status';
 
 function PureChatHeader({
   chatId,
@@ -63,6 +64,10 @@ function PureChatHeader({
           className="order-1 md:order-3"
         />
       )}
+
+      <div className="ml-auto order-3 md:order-4">
+        <UserAuthStatus />
+      </div>
     </header>
   );
 }

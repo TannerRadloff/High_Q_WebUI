@@ -3,6 +3,7 @@ import { Toaster } from 'sonner';
 import Script from 'next/script';
 
 import { ThemeProvider } from '@/components/theme-provider';
+import { Providers } from './providers';
 
 import './globals.css';
 
@@ -336,7 +337,7 @@ export default async function RootLayout({
           {/* Animation elements are now created by the script */}
           <Script src="/animation-diagnostic.js" strategy="afterInteractive" />
           <Toaster position="top-center" />
-          {children}
+          <Providers>{children}</Providers>
         </ThemeProvider>
       </body>
     </html>

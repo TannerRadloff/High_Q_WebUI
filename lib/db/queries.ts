@@ -37,6 +37,36 @@ export async function getUser(email: string): Promise<Array<User>> {
   }
 }
 
+export async function getUserByEmail(email: string): Promise<User | undefined> {
+  try {
+    const [selectedUser] = await db.select().from(user).where(eq(user.email, email));
+    return selectedUser;
+  } catch (error) {
+    console.error('Failed to get user by email from database');
+    throw error;
+  }
+}
+
+export async function createOAuthUser(
+  email: string, 
+  name: string | null | undefined, 
+  image: string | null | undefined,
+  provider: string
+) {
+  try {
+    return await db.insert(user).values({ 
+      email, 
+      name: name || null,
+      image: image || null,
+      provider,
+      emailVerified: new Date()
+    });
+  } catch (error) {
+    console.error('Failed to create OAuth user in database');
+    throw error;
+  }
+}
+
 export async function createUser(email: string, password: string) {
   const salt = genSaltSync(10);
   const hash = hashSync(password, salt);

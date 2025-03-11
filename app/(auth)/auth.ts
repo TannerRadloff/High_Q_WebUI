@@ -1,8 +1,9 @@
 import { compare } from 'bcrypt-ts';
 import NextAuth, { type User, type Session } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
+import Google from 'next-auth/providers/google';
 
-import { getUser } from '@/lib/db/queries';
+import { createOAuthUser, getUser, getUserByEmail } from '@/lib/db/queries';
 
 import { authConfig } from './auth.config';
 
@@ -19,6 +20,10 @@ export const {
   ...authConfig,
   secret: process.env.AUTH_SECRET,
   providers: [
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    }),
     Credentials({
       credentials: {},
       async authorize({ email, password }: any) {
@@ -56,6 +61,27 @@ export const {
     }),
   ],
   callbacks: {
+    async signIn({ user, account, profile }) {
+      if (account?.provider === 'google') {
+        try {
+          const existingUser = await getUserByEmail(user.email!);
+          
+          // If user doesn't exist, create them
+          if (!existingUser) {
+            await createOAuthUser(
+              user.email!,
+              user.name,
+              user.image,
+              'google'
+            );
+          }
+        } catch (error) {
+          console.error('Error during OAuth sign in:', error);
+          // Still allow sign in even if DB operation fails
+        }
+      }
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
@@ -63,13 +89,7 @@ export const {
 
       return token;
     },
-    async session({
-      session,
-      token,
-    }: {
-      session: ExtendedSession;
-      token: any;
-    }) {
+    async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
       }
