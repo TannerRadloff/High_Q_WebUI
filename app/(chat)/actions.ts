@@ -1,5 +1,6 @@
 'use server';
 
+// Updated for @ai-sdk/openai v1.2.2: changed input to prompt
 import { generateText, type Message } from 'ai';
 import { cookies } from 'next/headers';
 
