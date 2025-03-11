@@ -65,9 +65,9 @@ const logError = (error: any, context: string) => {
           console.error(`Attempted model access error: ${error.message}`);
         }
       }
+    } else {
+      console.error(`Non-Error object:`, error);
     }
-  } else {
-    console.error(`Non-Error object:`, error);
   }
   
   // Log request context if available
@@ -349,8 +349,10 @@ export async function POST(request: Request) {
                   console.error(`[API] GPT-o1 model error detected. Here are additional details:`);
                   
                   // Check for common o1 specific errors
-                  if (error.message.includes('not found') || error.message.includes('does not exist')) {
-                    console.error(`[API] The o1 model ID may be incorrect. Tried with: ${myProvider.languageModel(currentModel).toString()}`);
+                  if (error.message.includes('not found') || 
+                      error.message.includes('does not exist') || 
+                      error.message.includes('do not have access')) {
+                    console.error(`[API] The o1 model ID may be incorrect or not accessible. Error: ${error.message}`);
                     
                     // Inform the user about the specific error
                     dataStream.writeData({
@@ -358,9 +360,16 @@ export async function POST(request: Request) {
                       message: {
                         id: generateUUID(),
                         role: 'system',
-                        content: 'The GPT-o1 model is not available with the current API configuration. Falling back to an alternative model.',
+                        content: 'The GPT-o1 model is not available with your current API key. Falling back to an alternative model.',
                       }
                     });
+                    
+                    // Immediately switch to gpt-4o for a better fallback experience
+                    currentModel = 'gpt-40';
+                    console.log(`[API] Immediately falling back to ${currentModel} due to access error`);
+                    
+                    // Skip retry attempts for access errors
+                    return executeStreamText();
                     
                   } else if (error.message.includes('permission') || error.message.includes('access')) {
                     console.error(`[API] Permission or access error for o1 model. Ensure your API key has access to o1.`);
