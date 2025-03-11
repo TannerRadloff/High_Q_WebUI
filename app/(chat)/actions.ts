@@ -28,10 +28,10 @@ export async function generateTitleFromUserMessage({
     - ensure it is not more than 80 characters long
     - the title should be a summary of the user's message
     - do not use quotes or colons`,
-    input: JSON.stringify(message),
+    prompt: JSON.stringify(message),
   });
 
-  return response.output_text || response.text || '';
+  return response.text || '';
 }
 
 export async function deleteTrailingMessages({ id }: { id: string }) {
