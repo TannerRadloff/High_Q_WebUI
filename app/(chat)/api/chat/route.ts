@@ -253,6 +253,16 @@ export async function POST(request: Request) {
               } catch (modelError) {
                 console.error(`[API] Error getting model string for ${currentModel}:`, modelError);
               }
+              
+              // Add specific warning for o1 model
+              dataStream.writeData({
+                type: 'message',
+                message: {
+                  id: generateUUID(),
+                  role: 'system',
+                  content: 'Using the advanced GPT-o1 model. This model may take longer to respond but provides enhanced reasoning capabilities.',
+                }
+              });
             }
             
             // Initialize the model before using it to catch any initialization errors
@@ -341,10 +351,42 @@ export async function POST(request: Request) {
                   // Check for common o1 specific errors
                   if (error.message.includes('not found') || error.message.includes('does not exist')) {
                     console.error(`[API] The o1 model ID may be incorrect. Tried with: ${myProvider.languageModel(currentModel).toString()}`);
+                    
+                    // Inform the user about the specific error
+                    dataStream.writeData({
+                      type: 'message',
+                      message: {
+                        id: generateUUID(),
+                        role: 'system',
+                        content: 'The GPT-o1 model is not available with the current API configuration. Falling back to an alternative model.',
+                      }
+                    });
+                    
                   } else if (error.message.includes('permission') || error.message.includes('access')) {
                     console.error(`[API] Permission or access error for o1 model. Ensure your API key has access to o1.`);
+                    
+                    // Inform the user about the specific error
+                    dataStream.writeData({
+                      type: 'message',
+                      message: {
+                        id: generateUUID(),
+                        role: 'system',
+                        content: 'Your account does not have access to the GPT-o1 model. Falling back to an alternative model.',
+                      }
+                    });
+                    
                   } else if (error.message.includes('capacity') || error.message.includes('overloaded')) {
                     console.error(`[API] The o1 model appears to be at capacity or overloaded.`);
+                    
+                    // Inform the user about the specific error
+                    dataStream.writeData({
+                      type: 'message',
+                      message: {
+                        id: generateUUID(),
+                        role: 'system',
+                        content: 'The GPT-o1 model is currently at capacity. Falling back to an alternative model.',
+                      }
+                    });
                   } else if (error.message.includes('version')) {
                     console.error(`[API] API version error. The o1 model may require a specific API version.`);
                   }

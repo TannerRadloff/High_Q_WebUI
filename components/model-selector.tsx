@@ -10,10 +10,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { chatModels } from '@/lib/ai/models';
 import { cn } from '@/lib/utils';
 
-import { CheckCircleFillIcon, ChevronDownIcon } from './icons';
+import { CheckCircleFillIcon, ChevronDownIcon, InfoIcon } from './icons';
 
 export function ModelSelector({
   selectedModelId,
@@ -54,6 +60,7 @@ export function ModelSelector({
       <DropdownMenuContent align="start" className="min-w-[300px]">
         {chatModels.map((chatModel) => {
           const { id } = chatModel;
+          const isO1Model = id === 'gpt-o1';
 
           return (
             <DropdownMenuItem
@@ -64,7 +71,7 @@ export function ModelSelector({
                 console.log(`[MODEL-SELECTOR] User selected model: ${id}`);
                 
                 // Add extra logging for o1 model
-                if (id === 'gpt-o1') {
+                if (isO1Model) {
                   console.log(`[MODEL-SELECTOR] User selected GPT-o1 model`);
                 }
 
@@ -77,7 +84,23 @@ export function ModelSelector({
               data-active={id === validModelId}
             >
               <div className="flex flex-col gap-1 items-start">
-                <div>{chatModel.name}</div>
+                <div className="flex items-center gap-1">
+                  {chatModel.name}
+                  {isO1Model && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-help">
+                            <InfoIcon />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[300px]">
+                          <p>GPT-o1 is an advanced model that may require special API access. If unavailable, the system will automatically fall back to another model.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                </div>
                 <div className="text-xs text-muted-foreground">
                   {chatModel.description}
                 </div>

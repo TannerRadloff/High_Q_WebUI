@@ -37,6 +37,16 @@
 
 This template ships with OpenAI `gpt-4o` as the default. However, with the [AI SDK](https://sdk.vercel.ai/docs), you can switch LLM providers to [OpenAI](https://openai.com), [Anthropic](https://anthropic.com), [Cohere](https://cohere.com/), and [many more](https://sdk.vercel.ai/providers/ai-sdk-providers) with just a few lines of code.
 
+### Using the GPT-o1 Model
+
+This template also supports OpenAI's advanced `GPT-o1` model. To use this model:
+
+1. Ensure your OpenAI API key has access to the o1 model. You can check your model access at: https://platform.openai.com/account/models
+2. If you encounter errors when using the o1 model, the application will automatically fall back to using gpt-4o.
+3. Note that the o1 model may require a paid OpenAI account with sufficient usage credits.
+
+The application implements multiple fallback mechanisms to ensure a smooth user experience even if the o1 model is not available or encounters errors.
+
 ## Deploy Your Own
 
 You can deploy your own version of the Next.js AI Chatbot to Vercel with one click:
