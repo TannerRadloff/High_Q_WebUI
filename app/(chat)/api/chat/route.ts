@@ -275,7 +275,7 @@ export async function POST(request: Request) {
             const result = streamText({
               model: model,
               system: systemPromptContent,
-              inputs: filteredMessages,
+              messages: filteredMessages,
               maxSteps: currentModel === 'gpt-o1' ? 30 : 5, // Increased steps for o1 model
               experimental_activeTools:
                 currentModel === 'chat-model-reasoning'
@@ -315,7 +315,7 @@ export async function POST(request: Request) {
                           content: message.content && typeof message.content === 'string' 
                             ? message.content 
                             : Array.isArray(message.content) 
-                              ? message.content.find(item => item.type === 'output_text')?.text || '' 
+                              ? JSON.stringify(message.content) 
                               : '',
                           createdAt: new Date(),
                         };

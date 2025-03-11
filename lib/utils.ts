@@ -166,9 +166,6 @@ export function sanitizeResponseMessages({
         else if (content.type === 'text') {
           return content.text.length > 0;
         }
-        else if (content.type === 'output_text') {
-          return content.text.length > 0;
-        }
         return true;
       });
 
