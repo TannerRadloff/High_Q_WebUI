@@ -95,7 +95,7 @@ export function ModelSelector({
                           </span>
                         </TooltipTrigger>
                         <TooltipContent className="max-w-[300px]">
-                          <p>GPT-o1 is an advanced model that is currently only available to specific OpenAI customers. If you don't have access, the system will automatically fall back to GPT-4o.</p>
+                          <p>GPT-o1 is an advanced model that is currently only available to specific OpenAI customers. If you don&apos;t have access, the system will automatically fall back to GPT-4o.</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>

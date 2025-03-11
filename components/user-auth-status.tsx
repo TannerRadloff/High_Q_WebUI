@@ -16,7 +16,7 @@ export function UserAuthStatus() {
     return (
       <div className="flex items-center gap-2">
         {session.user.image && (
-          <div className="relative h-8 w-8 overflow-hidden rounded-full">
+          <div className="relative size-8 overflow-hidden rounded-full">
             <Image
               src={session.user.image}
               alt={session.user.name || 'User'}
