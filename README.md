@@ -220,3 +220,49 @@ The Runner class manages the workflow but does not directly control the flow bet
 ## Tracing and Monitoring
 
 The system includes a tracing module that records spans for different operations, including handoffs. This allows for monitoring the flow of a conversation and understanding how agents collaborate to complete a task.
+
+## Using the Runner (OpenAI Agent SDK Compatible)
+
+The `AgentRunner` class provides OpenAI Agent SDK-compatible patterns for running agents:
+
+```typescript
+import { AgentRunner, BaseAgent } from './path/to/agents';
+
+// Create an agent
+const agent = new BaseAgent({
+  name: "Assistant",
+  instructions: "You are a helpful assistant."
+});
+
+// Option 1: Static run method (async)
+const result = await AgentRunner.run(agent, "Write a haiku about recursion in programming.");
+console.log(result.final_output);
+// Code within the code,
+// Functions calling themselves,
+// Infinite loop's dance.
+
+// Option 2: Create a runner instance
+const runner = new AgentRunner(agent);
+
+// Use the runner for multiple queries
+const result1 = await runner.run("What is machine learning?");
+console.log(result1.output);
+
+// Maintain conversation history with to_input_list()
+const newInput = result1.to_input_list().concat([{ role: "user", content: "Give an example of it" }]);
+const result2 = await runner.run(newInput);
+console.log(result2.output);
+
+// Option 3: Streaming responses
+const callbacks = {
+  onToken: (token) => process.stdout.write(token),
+  onComplete: (result) => console.log("\nDone!"),
+  onError: (error) => console.error(error)
+};
+
+await runner.run_streamed("Explain quantum computing", callbacks);
+```
+
+## Installation
+
+...existing content...

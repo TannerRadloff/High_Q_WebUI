@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
-import { Agent, AgentConfig, AgentContext, AgentResponse, StreamCallbacks } from './agent';
+import { Agent, AgentConfig, AgentContext, AgentResponse, StreamCallbacks, HandoffInputFilter } from './agent';
 import { Tool, agentAsTool } from './tools';
-import { generation_span, handoff_span, agent_span, SpanType, TraceMetadata } from './tracing';
+import { generation_span, handoff_span, agent_span, SpanType, TraceMetadata, RunConfig } from './tracing';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { MemoryManager, InMemoryStorage, MemoryType } from './memory';
@@ -14,6 +14,7 @@ import {
   callOpenAI,
   streamOpenAI
 } from './api-utils';
+import { MaxTurnsExceededError } from '../runner';
 
 // Type for OpenAI API response
 type OpenAIResponse = {
@@ -44,6 +45,7 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
   handoffs: Agent[];
   outputType?: OutputType;
   protected memory?: MemoryManager;
+  handoffInputFilters: Map<string, HandoffInputFilter>;
 
   constructor(config: AgentConfig<OutputType>) {
     this.name = config.name;
@@ -53,6 +55,7 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
     this.tools = config.tools || [];
     this.handoffs = config.handoffs || [];
     this.outputType = config.outputType;
+    this.handoffInputFilters = new Map<string, HandoffInputFilter>();
     
     // Initialize memory if not provided
     if (!this.memory && config.name) {
@@ -84,7 +87,12 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
   /**
    * Handle tool calls from the model response, including executing tools and handling handoffs
    */
-  async handleToolCalls(toolCalls: any[], context?: AgentContext, conversationHistory?: any[]): Promise<{ toolResults: any[], handoffResult?: AgentResponse }> {
+  async handleToolCalls(
+    toolCalls: any[], 
+    context?: AgentContext, 
+    conversationHistory?: any[], 
+    runConfig?: RunConfig
+  ): Promise<{ toolResults: any[], handoffResult?: AgentResponse }> {
     const toolResults = [];
     let handoffResult: AgentResponse | undefined = undefined;
 
@@ -131,12 +139,27 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
               // Add the reason for handoff to context
               handoffContext.handoffReason = reason;
               
+              // Prepare input for the target agent
+              let handoffInput = conversationHistory 
+                ? `I need your help with: ${conversationHistory[conversationHistory.length - 1].content}` 
+                : context?.originalQuery || 'Please help with this task';
+              
+              // Apply input filter if available for this specific handoff
+              const targetAgentKey = targetAgent.name.toLowerCase().replace(/\s+/g, '_');
+              if (this.handoffInputFilters.has(targetAgentKey)) {
+                const inputFilter = this.handoffInputFilters.get(targetAgentKey);
+                if (inputFilter && typeof inputFilter === 'function') {
+                  handoffInput = inputFilter(handoffInput);
+                }
+              } 
+              // Or apply global handoff input filter if available
+              else if (runConfig?.handoff_input_filter && typeof runConfig.handoff_input_filter === 'function') {
+                handoffInput = runConfig.handoff_input_filter(handoffInput);
+              }
+              
               // Execute the handoff by calling the target agent's handleTask method
               const response = await targetAgent.handleTask(
-                // If we have conversation history, we can be smarter about what we pass
-                conversationHistory ? `I need your help with: ${conversationHistory[conversationHistory.length - 1].content}` : 
-                // Otherwise just pass the original query from context if available
-                context?.originalQuery || 'Please help with this task',
+                handoffInput,
                 handoffContext
               );
               
@@ -280,199 +303,128 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
   }
 
   /**
-   * Process a task through this agent
+   * Handles a task with the agent
    */
   async handleTask(userQuery: string, context?: AgentContext): Promise<AgentResponse> {
-    const agentContext = context || {};
+    // Extract the original query and run configuration if provided
+    const originalQuery = typeof userQuery === 'string' ? userQuery : '';
+    const runConfig = context?.runConfig as RunConfig | undefined;
     
-    // Store the original query in context for potential handoffs
-    if (!agentContext.originalQuery) {
-      agentContext.originalQuery = userQuery;
-    }
-    
-    // Create a trace span for this agent
-    const agentSpanWrapper = agent_span(this.name, {
-      agent_name: this.name,
-      agent_instructions: typeof this.instructions === 'string' ? this.instructions : '[dynamic instructions]',
-      input: includeSensitiveData ? userQuery : '[redacted]'
+    // Set up context with original query
+    const enhancedContext = await this.getMemoryEnhancedContext(userQuery, {
+      ...(context || {}),
+      originalQuery
     });
-
+    
+    // Track turns to prevent infinite loops
+    const maxTurns = enhancedContext.maxTurns || 25;
+    let currentTurn = 0;
+    let conversationHistory: any[] = [{ role: 'user', content: userQuery }];
+    
+    // Create a trace span for this agent's execution
+    const agentSpanWrapper = agent_span(`${this.name} execution`, {
+      agent_name: this.name,
+      agent_instructions: this.resolveInstructions(enhancedContext),
+      input: userQuery
+    });
+    
     try {
       agentSpanWrapper.enter();
+      let finalResponse: AgentResponse | undefined = undefined;
       
-      // Initialize conversation history with the user's query
-      const conversationHistory: any[] = [
-        { role: 'system', content: this.resolveInstructions(agentContext) },
-        { role: 'user', content: userQuery }
-      ];
-      
-      // Enhance context with relevant memories
-      const enhancedContext = await this.getMemoryEnhancedContext(userQuery, context);
-      
-      // Prepare for the response
-      let finalResponse: string = '';
-      let metadata: Record<string, any> = {};
-      let executionComplete = false;
-      let maxTurns = 10; // Prevent infinite loops
-      
-      // Track tool calls for metadata
-      const allToolCalls: any[] = [];
-      
-      while (!executionComplete && maxTurns > 0) {
-        maxTurns--;
+      while (currentTurn < maxTurns) {
+        currentTurn++;
         
-        try {
-          // Create a span for the LLM call
-          const generationSpanWrapper = generation_span('LLM Generation', {
-            model: this.model,
-            input: includeSensitiveData ? JSON.stringify(conversationHistory) : '[redacted]'
-          });
-          
-          try {
-            generationSpanWrapper.enter();
-            
-            // Get prepared tools
-            const formattedTools = prepareToolsForAPI(this.tools, this.handoffs);
-            
-            // Prepare API parameters
-            const requestParams = prepareCompletionParams({
-              model: this.model,
-              messages: conversationHistory,
-              temperature: this.modelSettings?.temperature,
-              top_p: this.modelSettings?.topP,
-              max_tokens: this.modelSettings?.maxTokens,
-            }, formattedTools);
-            
-            // Call the OpenAI API
-            const response = await callOpenAI(requestParams);
-            
-            // Update the generation span with token usage if available
-            if (response.usage) {
-              generationSpanWrapper.addData({
-                tokens: {
-                  prompt_tokens: response.usage.prompt_tokens,
-                  completion_tokens: response.usage.completion_tokens,
-                  total_tokens: response.usage.total_tokens
-                }
-              });
-            }
-            
-            // Get the response message
-            const responseMessage = response.choices[0].message;
-            
-            // Add the assistant's message to conversation history
-            conversationHistory.push({
-              role: 'assistant',
-              content: responseMessage.content || '',
-              tool_calls: responseMessage.tool_calls
-            });
-            
-            // Check if there are tool calls to process
-            if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
-              // Add to tracking
-              allToolCalls.push(...responseMessage.tool_calls);
-              
-              // Handle the tool calls
-              const { toolResults, handoffResult } = await this.handleToolCalls(
-                responseMessage.tool_calls,
-                enhancedContext,
-                conversationHistory
-              );
-              
-              // If there was a handoff, we're done
-              if (handoffResult) {
-                // Add handoff result to metadata
-                metadata = {
-                  ...metadata,
-                  handoffOccurred: true,
-                  handoffTarget: handoffResult.metadata?.agentName || 'Unknown Agent',
-                  handoffResult: handoffResult.metadata
-                };
-                
-                // Return the result from the handoff target
-                finalResponse = handoffResult.content;
-                executionComplete = true;
-                break;
-              }
-              
-              // Add tool results to conversation history
-              conversationHistory.push(...toolResults);
-            } else {
-              // No tool calls, so we're done
-              finalResponse = responseMessage.content || '';
-              executionComplete = true;
-            }
-            
-            generationSpanWrapper.exit();
-          } catch (error) {
-            generationSpanWrapper.exit();
-            throw error;
-          }
-        } catch (error) {
-          console.error(`Error in agent execution:`, error);
-          
-          return {
-            success: false,
-            content: '',
-            error: error instanceof Error ? error.message : 'Unknown error during agent execution'
-          };
-        }
-      }
-      
-      // Check if we exited due to max turns
-      if (!executionComplete) {
-        return {
-          success: false,
-          content: '',
-          error: 'Exceeded maximum number of interaction turns'
+        // Prepare the LLM call with the conversation history
+        const formattedTools = prepareToolsForAPI(this.tools, this.handoffs);
+        
+        // Prepare API parameters for LLM call
+        const requestParams = prepareCompletionParams({
+          model: this.model,
+          messages: conversationHistory,
+          temperature: this.modelSettings?.temperature,
+          top_p: this.modelSettings?.topP,
+          max_tokens: this.modelSettings?.maxTokens,
+        }, formattedTools);
+        
+        // Call the OpenAI API
+        const response = await callOpenAI(requestParams);
+        
+        // Extract the response message
+        const aiOutput = {
+          output_text: response.choices[0].message.content || '',
+          tool_calls: response.choices[0].message.tool_calls
         };
+        
+        // Check if there are tool calls to process
+        if (aiOutput.tool_calls && aiOutput.tool_calls.length > 0) {
+          const { toolResults, handoffResult } = await this.handleToolCalls(
+            aiOutput.tool_calls, 
+            enhancedContext, 
+            conversationHistory,
+            runConfig
+          );
+          
+          // If we got a handoff result, use that as the final output
+          if (handoffResult) {
+            finalResponse = handoffResult;
+            break;
+          }
+          
+          // Add the tool results to the conversation history
+          conversationHistory = [...conversationHistory, ...toolResults];
+        } else if (aiOutput.output_text) {
+          // No tool calls - we have a final response
+          finalResponse = {
+            content: aiOutput.output_text,
+            success: true
+          };
+          break;
+        } else {
+          // Unexpected response format
+          finalResponse = {
+            content: 'Error: Unable to parse AI response',
+            success: false,
+            error: 'Invalid response format from OpenAI API'
+          };
+          break;
+        }
       }
       
-      // Add tool calls to metadata
-      metadata = {
-        ...metadata,
-        toolCalls: allToolCalls
-      };
+      // Check if we hit the max turns limit
+      if (currentTurn >= maxTurns && !finalResponse) {
+        throw new MaxTurnsExceededError(`Maximum number of turns (${maxTurns}) exceeded in agent execution`);
+      }
       
-      // Update the agent span with the output
-      agentSpanWrapper.addData({
-        output: includeSensitiveData ? finalResponse : '[redacted]'
-      });
-      
-      agentSpanWrapper.exit();
-      
-      // After getting the response, store it in memory
-      await this.storeMemory(userQuery, {
-        success: true,
-        content: finalResponse,
-        metadata: {
-          ...metadata,
-          agentName: this.name,
-          model: this.model,
-          temperature: this.modelSettings?.temperature
-        }
-      });
-      
-      // Return the successful result
-      return {
-        success: true,
-        content: finalResponse,
-        metadata: {
-          ...metadata,
-          agentName: this.name,
-          model: this.model,
-          temperature: this.modelSettings?.temperature
-        }
-      };
-    } catch (error) {
-      agentSpanWrapper.exit();
-      
-      console.error(`Error in agent execution:`, error);
-      
-      return {
+      // Return the final response
+      const result: AgentResponse = finalResponse || {
+        content: 'Error: No response generated',
         success: false,
+        error: 'No response generated after multiple turns'
+      };
+      
+      agentSpanWrapper.addData({
+        output: result.content,
+        success: result.success
+      });
+      
+      agentSpanWrapper.exit();
+      
+      return result;
+    } catch (error) {
+      console.error(`Error in ${this.name} agent:`, error);
+      
+      agentSpanWrapper.addData({
+        error: error instanceof Error ? error.message : 'Unknown error',
+        success: false
+      });
+      
+      agentSpanWrapper.exit();
+      
+      return {
         content: '',
-        error: error instanceof Error ? error.message : 'Unknown error during agent execution'
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
   }
@@ -520,10 +472,19 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
       let toolCalls: any[] = [];
       let isCollectingToolCall = false;
       let currentToolCall: string = '';
+      let maxTurns = context?.maxTurns || 25; // Use context value or default
+      let executionComplete = false;
       
-      // Process the stream
+      // Stream processing loop
       try {
-        for await (const chunk of stream as any) {
+        for await (const chunk of stream) {
+          // Check for max turns exceeded
+          if (maxTurns <= 0 && !executionComplete) {
+            const error = new MaxTurnsExceededError(`Maximum number of turns (${context?.maxTurns || 25}) exceeded for agent ${this.name}`);
+            callbacks.onError?.(error);
+            return;
+          }
+          
           // Handle different types of chunks in the stream
           if ('delta' in chunk && chunk.delta && typeof chunk.delta === 'object') {
             if ('text' in chunk.delta && chunk.delta.text) {
@@ -605,6 +566,59 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
             callbacks.onToken?.(followUpResponse.output_text);
             content += followUpResponse.output_text;
           }
+        }
+        
+        // Process tool calls if any were collected
+        if (toolCalls.length > 0) {
+          maxTurns--; // Decrement turn counter for tool processing
+          
+          // Process tool calls, which may include handoffs
+          const { toolResults, handoffResult } = await this.handleToolCalls(
+            toolCalls, 
+            context,
+            [...conversationHistory, { role: 'user', content: userQuery }]
+          );
+          
+          // If a handoff occurred, we need to stream with the target agent
+          if (handoffResult) {
+            // Find which tool call was a handoff
+            const handoffCall = toolCalls.find(call => 
+              call.function.name.startsWith('transfer_to_')
+            );
+            
+            if (handoffCall) {
+              const targetAgentName = handoffCall.function.name
+                .replace('transfer_to_', '')
+                .replace(/_/g, ' ');
+              
+              // Notify about the handoff
+              callbacks.onHandoff?.(this.name, targetAgentName);
+              
+              // Assume handoffResult contains success/content/etc 
+              callbacks.onComplete?.(handoffResult);
+              return;
+            }
+          }
+          
+          // If we have tool results but no handoff, continue with the next part of the conversation
+          // This would be handled by calling the API again with tool results in a real implementation
+          callbacks.onToken?.("\n\nProcessing tool results...\n\n");
+          
+          // Prepare streaming parameters with tool results
+          const followUpParams = prepareStreamingParams({
+            model: this.model,
+            instructions: instructions,
+            input: userQuery, 
+            tool_results: toolResults,
+            stream: false
+          });
+          
+          // Here we would stream the follow-up response with tool results
+          // This is a simplified implementation
+          const followUpResponse = await streamOpenAI(followUpParams) as unknown as OpenAIResponse;
+          
+          callbacks.onToken?.(followUpResponse.output_text);
+          content += followUpResponse.output_text;
         }
       } catch (streamError) {
         console.error('Stream processing error:', streamError);
@@ -711,5 +725,15 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
         }
       }
     };
+  }
+
+  /**
+   * Set an input filter for a specific handoff target
+   * @param targetAgentName Name of the target agent
+   * @param filter Function to transform the input for the handoff
+   */
+  setHandoffInputFilter(targetAgentName: string, filter: HandoffInputFilter): void {
+    const key = targetAgentName.toLowerCase().replace(/\s+/g, '_');
+    this.handoffInputFilters.set(key, filter);
   }
 } 

@@ -75,13 +75,40 @@ export interface HandoffSpanData extends SpanData {
   reason?: string;
 }
 
+/**
+ * Configuration options for an agent run, fully aligned with OpenAI Agent SDK
+ */
 export interface RunConfig {
+  // Workflow and tracing identifiers
   workflow_name?: string;
   trace_id?: string;
   group_id?: string;
+  session_id?: string; // Added for SDK alignment - lets you link traces across multiple runs
+  
+  // Model and execution configuration
+  model?: string; // Global model to use, irrespective of agent-specific models
+  model_provider?: string; // Provider for looking up model names
+  model_settings?: { // Override agent-specific settings
+    temperature?: number;
+    top_p?: number;
+    max_tokens?: number;
+    [key: string]: any;
+  };
+  
+  // Guardrails configuration
+  input_guardrails?: any[]; // List of input guardrails to include on all runs
+  output_guardrails?: any[]; // List of output guardrails to include on all runs
+  
+  // Handoff configuration
+  handoff_input_filter?: (inputs: any) => any; // Global input filter for handoffs
+  
+  // Tracing configuration
   tracing_disabled?: boolean;
   trace_include_sensitive_data?: boolean;
-  metadata?: TraceMetadata;
+  trace_metadata?: Record<string, any>;
+  
+  // Execution limits
+  max_turns?: number; // Maximum turns before raising MaxTurnsExceededError
 }
 
 // Current trace and span context (using contextual variables)
@@ -144,7 +171,7 @@ export function trace(workflow_name: string, config?: RunConfig): {
     trace_id: config?.trace_id ?? `trace_${uuidv4().replace(/-/g, '')}`,
     group_id: config?.group_id,
     disabled: isDisabled,
-    metadata: config?.metadata,
+    metadata: config?.trace_metadata,
     spans: [],
     started_at: new Date()
   };

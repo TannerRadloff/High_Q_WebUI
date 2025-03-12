@@ -29,6 +29,11 @@ export interface AgentRequest {
     executionTimeMs?: number;
     [key: string]: any;
   };
+  streamResult?: {
+    inputList: any[];
+    metadata?: any;
+  };
+  userId?: string; // User identifier (usually IP)
 }
 
 // In-memory storage (in a real app, this would be a database)
@@ -130,10 +135,14 @@ export const AgentStateService = {
   
   // Record a new agent request
   recordRequest: (request: AgentRequest): AgentRequest => {
-    // Add to request history
+    // Set request userId if not provided
+    if (!request.userId && request.metadata?.ip) {
+      request.userId = request.metadata.ip;
+    }
+    
     agentRequests.push(request);
     
-    // Update agent stats for the request
+    // Update agent stats
     const agentIndex = activeAgents.findIndex(agent => agent.type === request.agentType);
     if (agentIndex !== -1) {
       const agent = activeAgents[agentIndex];
@@ -264,6 +273,15 @@ export const AgentStateService = {
   // Get a specific request
   getRequest: (requestId: string): AgentRequest | undefined => {
     return agentRequests.find(req => req.id === requestId);
+  },
+
+  /**
+   * Get all requests by a specific user (identified by IP or user ID)
+   */
+  getRequestsByUser: (userId: string): AgentRequest[] => {
+    return agentRequests
+      .filter(req => req.userId === userId)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }
 };
 

@@ -11,6 +11,12 @@ import { AgentType } from '../../../agents/AgentFactory';
 import { BaseAgent } from '../../../agents/BaseAgent';
 import { includeSensitiveData } from '../../../agents/api-utils';
 
+// Update the AgentRequest type to match our service
+type AgentStreamResult = {
+  inputList: any[];
+  metadata?: any;
+};
+
 // Define the AgentRequest type with properly typed properties
 type AgentRequest = {
   id: string;
@@ -20,6 +26,8 @@ type AgentRequest = {
   status: 'pending' | 'in-progress' | 'completed' | 'failed';
   response?: string; // Using response instead of result for consistency
   error?: string;
+  streamResult?: AgentStreamResult;
+  userId?: string;
 };
 
 // Simple in-memory rate limiting (would be replaced with Redis or similar in production)
@@ -91,7 +99,7 @@ export async function POST(req: NextRequest) {
       group_id,
       tracing_disabled,
       trace_include_sensitive_data,
-      metadata: {
+      trace_metadata: {
         ...metadata,
         requestId,
         ip
@@ -112,7 +120,8 @@ export async function POST(req: NextRequest) {
       timestamp: new Date().toISOString(),
       query,
       agentType: getAgentTypeEnum(agentType),
-      status: 'pending'
+      status: 'pending',
+      userId: ip // Add the user ID to track conversation history
     });
     
     // Update agent state to working
@@ -139,8 +148,33 @@ export async function POST(req: NextRequest) {
       // Create a runner with the appropriate agent based on the requested type
       const runner = createRunnerForAgentType(agentType);
       
-      // Run the agent using the runner
-      const runResult = await runner.run(query, runConfig);
+      // Get previous context if this is a follow-up message
+      const prevRequest = AgentStateService.getRequestsByUser(ip)[0];
+      
+      // Check for context to make conversation
+      let inputData: string | any[] = query;
+      
+      if (prevRequest?.streamResult?.inputList && prevRequest.id !== requestId) {
+        // Use previous conversation context for follow-up
+        inputData = [
+          ...prevRequest.streamResult.inputList,
+          { role: 'user', content: query }
+        ];
+      }
+      
+      // Run the agent using the runner with max_turns parameter
+      const runResult = await runner.run(inputData, {
+        ...runConfig, 
+        max_turns: 25 // Default max turns for API requests
+      });
+      
+      // Store input list for future conversations
+      AgentStateService.updateRequest(requestId, {
+        streamResult: {
+          inputList: runResult.to_input_list(),
+          metadata: runResult.metadata
+        } as AgentStreamResult
+      });
       
       // Format the result for API response
       result = {
@@ -521,7 +555,19 @@ async function handleStreamingResponse(
       };
       
       // Run the agent with streaming
-      await runner.streamRun(query, callbacks, runConfig);
+      const streamResult = await runner.run_streamed(query, callbacks, {
+        ...runConfig,
+        max_turns: 25 // Default max turns for API requests
+      });
+      
+      // Store the result in the context for potential follow-up messages
+      AgentStateService.updateRequest(requestId, {
+        streamResult: {
+          // Only store what's needed for future to_input_list calls
+          inputList: streamResult.to_input_list(),
+          metadata: streamResult.metadata
+        } as AgentStreamResult
+      });
       
     } catch (error) {
       console.error(`Error in agent stream for ${requestId}:`, error);
