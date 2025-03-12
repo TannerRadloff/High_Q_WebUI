@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { type Message } from 'ai';
-import { Send } from 'lucide-react';
+import { Send, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { generateUUID } from '@/lib/utils';
+import { useAgentMode } from '@/hooks/use-agent-mode';
 
 // Simple message component for agent mode
 function AgentMessage({ message }: { message: Message }) {
@@ -28,6 +29,7 @@ export function AgentInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { toggleAgentMode } = useAgentMode();
   
   // Load any previous agent messages from localStorage
   useEffect(() => {
@@ -113,6 +115,17 @@ export function AgentInterface() {
 
   return (
     <div className="flex flex-col w-full h-[calc(100vh-4rem)] overflow-hidden">
+      <div className="p-2 border-b">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={toggleAgentMode}
+          className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back to Chat</span>
+        </Button>
+      </div>
       <div className="flex-1 overflow-y-auto px-4 pt-4">
         {messages.length === 0 ? (
           <div className="flex-1 flex items-center justify-center h-full">
