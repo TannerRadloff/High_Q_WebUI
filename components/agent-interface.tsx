@@ -16,6 +16,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import { AgentActionLog, type AgentAction } from '@/components/agent-action-log';
 
 // Enhanced message interface with streaming metadata
 interface EnhancedMessage extends Message {
@@ -127,6 +128,7 @@ export function AgentInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<AgentType>('auto');
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [agentActions, setAgentActions] = useState<AgentAction[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -225,7 +227,20 @@ export function AgentInterface() {
     }, RECONNECT_DELAY);
   };
 
-  // Update handleStreamingSubmit to accept optional parameters for reconnection
+  // Helper function to add a new agent action
+  const addAgentAction = (type: AgentAction['type'], message: string, metadata?: Record<string, any>) => {
+    const newAction: AgentAction = {
+      id: generateUUID(),
+      timestamp: Date.now(),
+      type,
+      message,
+      metadata
+    };
+    
+    setAgentActions(prev => [...prev, newAction]);
+  };
+
+  // Update handleStreamingSubmit to track actions
   const handleStreamingSubmit = async (
     e?: React.FormEvent | null,
     existingMessageId?: string,
@@ -240,6 +255,13 @@ export function AgentInterface() {
     if (!queryText.trim()) return;
     
     setIsLoading(true);
+    
+    // Track action: starting a new query
+    if (!existingMessageId) {
+      addAgentAction('start', 'Started processing query', { query: queryText });
+    } else {
+      addAgentAction('start', 'Reconnecting to query', { query: queryText });
+    }
     
     // Create a unique ID for the assistant message or use existing one for reconnection
     const assistantMessageId = existingMessageId || generateUUID();
@@ -400,7 +422,13 @@ export function AgentInterface() {
                   });
                   break;
                   
+                case 'triage':
                 case 'triage_complete':
+                  addAgentAction('triage', 'Query analysis complete', {
+                    taskType: data.taskType,
+                    confidence: data.confidence
+                  });
+                  
                   setMessages(prev => {
                     const msgIndex = prev.findIndex(m => m.id === assistantMessageId);
                     if (msgIndex === -1) return prev;
@@ -451,6 +479,8 @@ export function AgentInterface() {
                   break;
                   
                 case 'error':
+                  addAgentAction('error', 'Error occurred', { message: data.message });
+                  
                   setMessages(prev => {
                     const newMessages = [...prev];
                     const index = newMessages.findIndex(m => m.id === assistantMessageId);
@@ -463,6 +493,8 @@ export function AgentInterface() {
                   break;
                   
                 case 'research_start':
+                  addAgentAction('research_start', 'Started web research');
+                  
                   setMessages(prev => {
                     const newMessages = [...prev];
                     const index = newMessages.findIndex(m => m.id === assistantMessageId);
@@ -477,6 +509,10 @@ export function AgentInterface() {
                   break;
                   
                 case 'research_complete':
+                  addAgentAction('research_complete', 'Research completed', {
+                    sources: data.citations
+                  });
+                  
                   setMessages(prev => {
                     const newMessages = [...prev];
                     const index = newMessages.findIndex(m => m.id === assistantMessageId);
@@ -486,7 +522,7 @@ export function AgentInterface() {
                         researchInProgress: false,
                         researchComplete: true,
                         researchStats: {
-                          sources: data.sources,
+                          sources: data.citations,
                           researchDataLength: data.researchDataLength
                         }
                       };
@@ -496,6 +532,8 @@ export function AgentInterface() {
                   break;
                   
                 case 'report_start':
+                  addAgentAction('report_start', 'Generating report');
+                  
                   setMessages(prev => {
                     const newMessages = [...prev];
                     const index = newMessages.findIndex(m => m.id === assistantMessageId);
@@ -510,6 +548,8 @@ export function AgentInterface() {
                   break;
                   
                 case 'complete':
+                  addAgentAction('complete', 'Task completed');
+                  
                   setMessages(prev => {
                     const newMessages = [...prev];
                     const index = newMessages.findIndex(m => m.id === assistantMessageId);
@@ -525,6 +565,64 @@ export function AgentInterface() {
                     return newMessages;
                   });
                   setIsLoading(false);
+                  break;
+                  
+                case 'trace':
+                  if (data && data.spans) {
+                    // Process trace spans and convert to agent actions
+                    data.spans.forEach((span: any) => {
+                      let actionType: AgentAction['type'] = 'custom';
+                      let message = span.name || 'Unknown operation';
+                      let metadata: Record<string, any> = {
+                        startTime: new Date(span.started_at).getTime(),
+                        endTime: span.ended_at ? new Date(span.ended_at).getTime() : undefined
+                      };
+                      
+                      switch (span.span_type) {
+                        case 'agent':
+                          actionType = 'agent';
+                          message = `Agent: ${span.span_data.agent_name || 'Unknown'}`;
+                          metadata = {
+                            ...metadata,
+                            agentName: span.span_data.agent_name,
+                            input: span.span_data.input?.substring(0, 50) + (span.span_data.input?.length > 50 ? '...' : '')
+                          };
+                          break;
+                          
+                        case 'generation':
+                          actionType = 'generation';
+                          message = `Model: ${span.span_data.model || 'Unknown'}`;
+                          if (span.name.toLowerCase().includes('triage')) {
+                            actionType = 'triage';
+                            message = `Analyzing query with ${span.span_data.model}`;
+                          } else if (span.name.toLowerCase().includes('research')) {
+                            actionType = 'research_start';
+                            message = `Researching with ${span.span_data.model}`;
+                          } else if (span.name.toLowerCase().includes('report')) {
+                            actionType = 'report_start';
+                            message = `Generating report with ${span.span_data.model}`;
+                          }
+                          break;
+                          
+                        case 'function':
+                          actionType = 'function';
+                          message = `Function: ${span.span_data.function_name || 'Unknown'}`;
+                          if (span.name.toLowerCase().includes('citation')) {
+                            actionType = 'research_complete';
+                            message = `Processed ${span.span_data.result || 0} citations`;
+                            metadata.sources = span.span_data.result;
+                          }
+                          break;
+                          
+                        default:
+                          actionType = 'custom';
+                          message = `${span.span_type}: ${span.name}`;
+                          break;
+                      }
+                      
+                      addAgentAction(actionType, message, metadata);
+                    });
+                  }
                   break;
               }
             }
@@ -556,6 +654,9 @@ export function AgentInterface() {
           setIsLoading(false);
           // Reset reconnect counter on non-connection errors
           setReconnectAttempts(0);
+          addAgentAction('error', 'Error in streaming process', { 
+            message: error instanceof Error ? error.message : 'Unknown error' 
+          });
         }
       };
       
@@ -587,6 +688,9 @@ export function AgentInterface() {
       setIsLoading(false);
       // Reset reconnect counter on non-connection errors
       setReconnectAttempts(0);
+      addAgentAction('error', 'Error in streaming process', { 
+        message: error instanceof Error ? error.message : 'Unknown error' 
+      });
     }
   };
 
@@ -616,6 +720,7 @@ export function AgentInterface() {
   
   const clearConversation = () => {
     setMessages([]);
+    setAgentActions([]);
     try {
       localStorage.removeItem('agent-messages');
     } catch (error) {
@@ -728,6 +833,13 @@ export function AgentInterface() {
           </div>
         )}
       </div>
+      
+      {/* Agent action log */}
+      {agentActions.length > 0 && (
+        <div className="px-4 pb-2">
+          <AgentActionLog actions={agentActions} />
+        </div>
+      )}
       
       <div className="p-4 border-t">
         <form onSubmit={handleStreamingSubmit} className="flex items-end gap-2">

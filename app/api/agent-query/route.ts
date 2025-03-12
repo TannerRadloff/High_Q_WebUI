@@ -258,6 +258,19 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
           if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
           if (timeoutId) clearTimeout(timeoutId);
           
+          // Send a trace event with the spans
+          if (response.metadata?.trace_id) {
+            // Get trace information from the metadata
+            sendEventMessage(controller, {
+              event: 'trace',
+              data: {
+                trace_id: response.metadata.trace_id,
+                // In a real implementation, this would include the actual spans from the trace
+                spans: response.metadata.spans || []
+              }
+            });
+          }
+          
           sendEventMessage(controller, {
             event: 'complete',
             data: {
