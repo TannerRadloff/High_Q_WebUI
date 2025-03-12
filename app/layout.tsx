@@ -1,9 +1,14 @@
 import type { Metadata } from 'next';
 import { Toaster } from 'sonner';
 import Script from 'next/script';
+import { useEffect } from 'react';
+import { cn } from '@/lib/utils';
 
 import { ThemeProvider } from '@/components/theme-provider';
 import { Providers } from './providers';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 import './globals.css';
 
@@ -297,13 +302,30 @@ const ANIMATION_INIT_SCRIPT = `\
   });
 })();`;
 
-export default async function RootLayout({
+// Add global error handler for message channel errors
+const initGlobalErrorHandlers = () => {
+  if (typeof window !== 'undefined') {
+    // Capture and log unhandled promise rejections
+    window.addEventListener('unhandledrejection', (event) => {
+      if (event.reason && 
+          event.reason.message && 
+          event.reason.message.includes('message channel closed')) {
+        console.error('Global handler: Message channel closed error:', event.reason);
+        // We don't prevent default here to allow error boundaries to catch it
+      }
+    });
+  }
+};
+
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // We can't use usePathname in a Server Component, so we'll use a client component wrapper
-  // to conditionally render the AnimationToggle
+  // Initialize global error handlers
+  useEffect(() => {
+    initGlobalErrorHandlers();
+  }, []);
 
   return (
     <html
@@ -337,8 +359,14 @@ export default async function RootLayout({
           {/* Animation elements are now created by the script */}
           <Script src="/animation-diagnostic.js" strategy="afterInteractive" />
           <Toaster position="top-center" />
-          <Providers>{children}</Providers>
+          <Providers>
+            <ErrorBoundary>
+              {children}
+            </ErrorBoundary>
+          </Providers>
         </ThemeProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

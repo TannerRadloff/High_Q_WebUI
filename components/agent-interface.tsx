@@ -86,11 +86,21 @@ function AgentMessage({ message }: { message: EnhancedMessage }) {
 
 type AgentType = 'research' | 'report' | 'orchestrator';
 
+// Add reconnection mechanism
+const MAX_RECONNECT_ATTEMPTS = 3;
+const RECONNECT_DELAY = 2000; // 2 seconds
+
+// Add heartbeat monitoring
+const HEARTBEAT_TIMEOUT = 30000; // 30 seconds
+let lastHeartbeatTime = Date.now();
+let heartbeatTimeoutId: NodeJS.Timeout | null = null;
+
 export function AgentInterface() {
   const [messages, setMessages] = useState<EnhancedMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<AgentType>('orchestrator');
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -135,179 +145,341 @@ export function AgentInterface() {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
       }
+      
+      // Also clean up any heartbeat timeouts
+      if (heartbeatTimeoutId) {
+        clearTimeout(heartbeatTimeoutId);
+        heartbeatTimeoutId = null;
+      }
     };
   }, []);
 
-  const handleStreamingSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!input.trim()) return;
-    
-    // Close any existing EventSource connection
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+  // Add a function to handle reconnection
+  const handleReconnect = (lastMessageId: string, userQuery: string) => {
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      console.error(`Maximum reconnection attempts (${MAX_RECONNECT_ATTEMPTS}) reached`);
+      
+      // Update the message with an error
+      setMessages(prev => {
+        const newMessages = [...prev];
+        const index = newMessages.findIndex(m => m.id === lastMessageId);
+        if (index !== -1) {
+          newMessages[index].content = 'Connection lost. Maximum reconnection attempts reached.';
+          newMessages[index].error = 'Unable to reconnect to server';
+          newMessages[index].isStreaming = false;
+        }
+        return newMessages;
+      });
+      
+      // Reset reconnect counter
+      setReconnectAttempts(0);
+      setIsLoading(false);
+      return;
     }
     
-    // Add user message to state
-    const userMessage: EnhancedMessage = {
-      id: generateUUID(),
-      role: 'user',
-      content: input,
-    };
+    console.log(`Attempting to reconnect (${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})...`);
     
-    setMessages(prev => [...prev, userMessage]);
+    // Update message to show reconnecting
+    setMessages(prev => {
+      const newMessages = [...prev];
+      const index = newMessages.findIndex(m => m.id === lastMessageId);
+      if (index !== -1) {
+        newMessages[index].content += '\n\nConnection lost. Attempting to reconnect...';
+      }
+      return newMessages;
+    });
     
-    // Create a placeholder for the assistant's response
-    const assistantMessageId = generateUUID();
-    const placeholderMessage: EnhancedMessage = {
-      id: assistantMessageId,
-      role: 'assistant',
-      content: '',
-      isStreaming: true,
-    };
+    // Increment reconnect counter
+    setReconnectAttempts(prev => prev + 1);
     
-    setMessages(prev => [...prev, placeholderMessage]);
-    setInput('');
+    // Try to reconnect after a delay
+    setTimeout(() => {
+      // Call the streaming submit again with the same query
+      handleStreamingSubmit(null, lastMessageId, userQuery);
+    }, RECONNECT_DELAY);
+  };
+
+  // Update handleStreamingSubmit to accept optional parameters for reconnection
+  const handleStreamingSubmit = async (
+    e?: React.FormEvent | null,
+    existingMessageId?: string,
+    reconnectQuery?: string
+  ) => {
+    if (e) e.preventDefault();
+    
+    // Use either the input value or the reconnectQuery if provided
+    const queryText = reconnectQuery || input;
+    
+    // Don't allow empty submissions
+    if (!queryText.trim()) return;
+    
     setIsLoading(true);
     
+    // Create a unique ID for the assistant message or use existing one for reconnection
+    const assistantMessageId = existingMessageId || generateUUID();
+    
+    // If this is not a reconnection attempt, create and add a new user message
+    if (!existingMessageId) {
+      // Add the user message
+      const userMessage: EnhancedMessage = {
+        id: generateUUID(),
+        role: 'user',
+        content: queryText,
+      };
+      
+      // Add an empty assistant message (will be populated as the stream arrives)
+      const assistantMessage: EnhancedMessage = {
+        id: assistantMessageId,
+        role: 'assistant',
+        content: '',
+        isStreaming: true
+      };
+      
+      // Update messages with user message and empty assistant message
+      setMessages(prevMessages => [...prevMessages, userMessage, assistantMessage]);
+      
+      // Clear input if this is not a reconnection
+      setInput('');
+    } else {
+      // For reconnection, just update the assistant message
+      setMessages(prev => {
+        const newMessages = [...prev];
+        const index = newMessages.findIndex(m => m.id === assistantMessageId);
+        if (index !== -1) {
+          newMessages[index].isStreaming = true;
+          // Append reconnecting message
+          if (!newMessages[index].content.includes('Reconnected')) {
+            newMessages[index].content += '\n\nReconnected. Resuming...';
+          }
+        }
+        return newMessages;
+      });
+    }
+    
+    // Prepare the API endpoint
+    const apiUrl = '/api/agent-query';
+    
     try {
-      // Make the API request with streaming enabled
-      const response = await fetch('/api/agent-query', {
+      // Set up request with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 1 minute timeout
+      
+      // Make the API request with proper error handling
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          query: input,
+        body: JSON.stringify({
+          query: queryText,
           agentType: selectedAgent,
           stream: true
         }),
+        signal: controller.signal
+      }).catch(error => {
+        console.error('Fetch error:', error);
+        throw new Error(error.message || 'Failed to connect to the server');
       });
       
+      // Clear the timeout since we got a response
+      clearTimeout(timeoutId);
+      
+      // Check if response is ok
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get a response');
+        const errorText = await response.text();
+        throw new Error(`Server error: ${response.status} - ${errorText}`);
       }
       
-      // Create a new reader to handle the SSE stream
+      // Check if we have the expected content type
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('text/event-stream')) {
+        throw new Error(`Unexpected content type: ${contentType}`);
+      }
+      
+      // Get the reader for the response body's stream
       const reader = response.body?.getReader();
       if (!reader) {
-        throw new Error('Response body is not readable');
+        throw new Error('Failed to get stream reader from response');
       }
       
       const decoder = new TextDecoder();
       let fullContent = '';
       
       const processStreamEvents = async () => {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          
-          const chunk = decoder.decode(value, { stream: true });
-          const events = chunk.split('\n\n').filter(e => e.trim());
-          
-          for (const eventText of events) {
-            if (!eventText.includes('event:')) continue;
+        try {
+          while (true) {
+            // Add a timeout to the read operation to prevent hanging
+            const readPromise = reader.read();
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Read timeout')), 30000)); // 30 second timeout
             
-            const eventTypeMatch = eventText.match(/event: ([^\n]+)/);
-            const dataMatch = eventText.match(/data: (.+)/);
+            // Use Promise.race to implement timeout
+            const { done, value } = await Promise.race([
+              readPromise,
+              timeoutPromise
+            ]).catch(error => {
+              console.error('Error reading from stream:', error);
+              throw error; // Rethrow to be caught by outer try-catch
+            }) as ReadableStreamReadResult<Uint8Array>;
             
-            if (!eventTypeMatch || !dataMatch) continue;
+            if (done) break;
             
-            const eventType = eventTypeMatch[1];
-            const data = JSON.parse(dataMatch[1]);
+            const chunk = decoder.decode(value, { stream: true });
+            const events = chunk.split('\n\n').filter(e => e.trim());
             
-            // Handle different event types
-            switch (eventType) {
-              case 'token':
-                fullContent += data.token;
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  const index = newMessages.findIndex(m => m.id === assistantMessageId);
-                  if (index !== -1) {
-                    newMessages[index].content = fullContent;
+            for (const eventText of events) {
+              if (!eventText.includes('event:')) continue;
+              
+              const eventTypeMatch = eventText.match(/event: ([^\n]+)/);
+              const dataMatch = eventText.match(/data: (.+)/);
+              
+              if (!eventTypeMatch || !dataMatch) continue;
+              
+              const eventType = eventTypeMatch[1];
+              let data;
+              
+              try {
+                data = JSON.parse(dataMatch[1]);
+              } catch (parseError) {
+                console.error('Error parsing event data:', parseError, dataMatch[1]);
+                continue; // Skip this malformed event
+              }
+              
+              // Handle different event types
+              switch (eventType) {
+                case 'heartbeat':
+                  // Update last heartbeat time
+                  lastHeartbeatTime = Date.now();
+                  // Reset any existing timeout
+                  if (heartbeatTimeoutId) {
+                    clearTimeout(heartbeatTimeoutId);
                   }
-                  return newMessages;
-                });
-                break;
-                
-              case 'error':
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  const index = newMessages.findIndex(m => m.id === assistantMessageId);
-                  if (index !== -1) {
-                    newMessages[index].error = data.message;
-                    newMessages[index].isStreaming = false;
-                  }
-                  return newMessages;
-                });
-                break;
-                
-              case 'research_start':
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  const index = newMessages.findIndex(m => m.id === assistantMessageId);
-                  if (index !== -1) {
-                    newMessages[index].metadata = {
-                      ...newMessages[index].metadata,
-                      researchInProgress: true
-                    };
-                  }
-                  return newMessages;
-                });
-                break;
-                
-              case 'research_complete':
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  const index = newMessages.findIndex(m => m.id === assistantMessageId);
-                  if (index !== -1) {
-                    newMessages[index].metadata = {
-                      ...newMessages[index].metadata,
-                      researchInProgress: false,
-                      researchComplete: true,
-                      researchStats: {
-                        sources: data.sources,
-                        researchDataLength: data.researchDataLength
-                      }
-                    };
-                  }
-                  return newMessages;
-                });
-                break;
-                
-              case 'report_start':
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  const index = newMessages.findIndex(m => m.id === assistantMessageId);
-                  if (index !== -1) {
-                    newMessages[index].metadata = {
-                      ...newMessages[index].metadata,
-                      reportInProgress: true
-                    };
-                  }
-                  return newMessages;
-                });
-                break;
-                
-              case 'complete':
-                setMessages(prev => {
-                  const newMessages = [...prev];
-                  const index = newMessages.findIndex(m => m.id === assistantMessageId);
-                  if (index !== -1) {
-                    newMessages[index].content = data.content || fullContent;
-                    newMessages[index].isStreaming = false;
-                    newMessages[index].metadata = {
-                      ...newMessages[index].metadata,
-                      ...data.metadata,
-                      reportInProgress: false
-                    };
-                  }
-                  return newMessages;
-                });
-                setIsLoading(false);
-                break;
+                  // Set a new timeout to detect if heartbeats stop
+                  heartbeatTimeoutId = setTimeout(() => {
+                    console.error('Heartbeat timeout - connection may be lost');
+                    // Throw an error to trigger the reconnection logic
+                    throw new Error('message channel closed - heartbeat timeout');
+                  }, HEARTBEAT_TIMEOUT);
+                  break;
+                  
+                case 'token':
+                  // Reset the heartbeat timeout whenever we receive a token
+                  lastHeartbeatTime = Date.now();
+                  fullContent += data.token;
+                  setMessages(prev => {
+                    const newMessages = [...prev];
+                    const index = newMessages.findIndex(m => m.id === assistantMessageId);
+                    if (index !== -1) {
+                      newMessages[index].content = fullContent;
+                    }
+                    return newMessages;
+                  });
+                  break;
+                  
+                case 'error':
+                  setMessages(prev => {
+                    const newMessages = [...prev];
+                    const index = newMessages.findIndex(m => m.id === assistantMessageId);
+                    if (index !== -1) {
+                      newMessages[index].error = data.message;
+                      newMessages[index].isStreaming = false;
+                    }
+                    return newMessages;
+                  });
+                  break;
+                  
+                case 'research_start':
+                  setMessages(prev => {
+                    const newMessages = [...prev];
+                    const index = newMessages.findIndex(m => m.id === assistantMessageId);
+                    if (index !== -1) {
+                      newMessages[index].metadata = {
+                        ...newMessages[index].metadata,
+                        researchInProgress: true
+                      };
+                    }
+                    return newMessages;
+                  });
+                  break;
+                  
+                case 'research_complete':
+                  setMessages(prev => {
+                    const newMessages = [...prev];
+                    const index = newMessages.findIndex(m => m.id === assistantMessageId);
+                    if (index !== -1) {
+                      newMessages[index].metadata = {
+                        ...newMessages[index].metadata,
+                        researchInProgress: false,
+                        researchComplete: true,
+                        researchStats: {
+                          sources: data.sources,
+                          researchDataLength: data.researchDataLength
+                        }
+                      };
+                    }
+                    return newMessages;
+                  });
+                  break;
+                  
+                case 'report_start':
+                  setMessages(prev => {
+                    const newMessages = [...prev];
+                    const index = newMessages.findIndex(m => m.id === assistantMessageId);
+                    if (index !== -1) {
+                      newMessages[index].metadata = {
+                        ...newMessages[index].metadata,
+                        reportInProgress: true
+                      };
+                    }
+                    return newMessages;
+                  });
+                  break;
+                  
+                case 'complete':
+                  setMessages(prev => {
+                    const newMessages = [...prev];
+                    const index = newMessages.findIndex(m => m.id === assistantMessageId);
+                    if (index !== -1) {
+                      newMessages[index].content = data.content || fullContent;
+                      newMessages[index].isStreaming = false;
+                      newMessages[index].metadata = {
+                        ...newMessages[index].metadata,
+                        ...data.metadata,
+                        reportInProgress: false
+                      };
+                    }
+                    return newMessages;
+                  });
+                  setIsLoading(false);
+                  break;
+              }
             }
           }
+        } catch (error) {
+          console.error('Error in streaming process:', error);
+          
+          // Check if the error is related to message channel closed
+          if (error instanceof Error && 
+              error.message.includes('message channel closed')) {
+            
+            console.error('Message channel closed. Attempting to reconnect...');
+            handleReconnect(assistantMessageId, queryText);
+            return;
+          }
+          
+          // Other errors handling
+          setMessages(prev => {
+            const newMessages = [...prev];
+            const index = newMessages.findIndex(m => m.id === assistantMessageId);
+            if (index !== -1) {
+              newMessages[index].content = 'Sorry, an error occurred while processing your request.';
+              newMessages[index].error = error instanceof Error ? error.message : 'Unknown error';
+              newMessages[index].isStreaming = false;
+            }
+            return newMessages;
+          });
+          
+          setIsLoading(false);
+          // Reset reconnect counter on non-connection errors
+          setReconnectAttempts(0);
         }
       };
       
@@ -315,7 +487,16 @@ export function AgentInterface() {
     } catch (error) {
       console.error('Error in streaming process:', error);
       
-      // Update the message with the error
+      // Check if the error is related to message channel closed
+      if (error instanceof Error && 
+          error.message.includes('message channel closed')) {
+        
+        console.error('Message channel closed. Attempting to reconnect...');
+        handleReconnect(assistantMessageId, queryText);
+        return;
+      }
+      
+      // Other errors handling
       setMessages(prev => {
         const newMessages = [...prev];
         const index = newMessages.findIndex(m => m.id === assistantMessageId);
@@ -326,8 +507,10 @@ export function AgentInterface() {
         }
         return newMessages;
       });
-    } finally {
+      
       setIsLoading(false);
+      // Reset reconnect counter on non-connection errors
+      setReconnectAttempts(0);
     }
   };
 

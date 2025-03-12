@@ -33,6 +33,14 @@ const logError = (error: any, context: string) => {
   if (error.cause) {
     console.error(`Error cause: ${error.cause}`);
   }
+  
+  // Handle message channel errors
+  if (error.message && error.message.includes('message channel closed')) {
+    console.error('Message channel closed prematurely. This could be due to:');
+    console.error('1. Network instability');
+    console.error('2. Server timeout');
+    console.error('3. Client navigation away from page');
+  }
 };
 
 export function Chat({
@@ -59,6 +67,21 @@ export function Chat({
     
     // Reset fallback model state when model changes
     setUsesFallbackModel(false);
+    
+    // Add specific error handling for message channel errors
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (event.reason && event.reason.message && 
+          event.reason.message.includes('message channel closed')) {
+        console.error('[CHAT] Message channel closed prematurely:', event.reason);
+        event.preventDefault(); // Prevent the default error handling
+      }
+    };
+    
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    
+    return () => {
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
   }, [selectedChatModel]);
 
   const {

@@ -9,6 +9,10 @@ const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 10;
 const ipRequests = new Map<string, { count: number, resetTime: number }>();
 
+// Add heartbeat interval and timeout constants
+const HEARTBEAT_INTERVAL = 15000; // 15 seconds
+const REQUEST_TIMEOUT = 60000; // 1 minute
+
 function rateLimitCheck(ip: string): { allowed: boolean, message?: string } {
   const now = Date.now();
   const record = ipRequests.get(ip);
@@ -156,8 +160,29 @@ function handleStreamingResponse(query: string, agentType: string): Response {
           data: { message: 'Stream started' }
         });
         
+        // Set up heartbeat to prevent connection timeouts
+        const heartbeatInterval = setInterval(() => {
+          sendEventMessage(controller, {
+            event: 'heartbeat',
+            data: { timestamp: Date.now() }
+          });
+        }, HEARTBEAT_INTERVAL);
+        
+        // Set request timeout
+        const timeoutId = setTimeout(() => {
+          clearInterval(heartbeatInterval);
+          sendEventMessage(controller, {
+            event: 'error',
+            data: { message: 'Request timed out' }
+          });
+          controller.close();
+        }, REQUEST_TIMEOUT);
+        
         // Shared error handler
         const handleError = (error: Error) => {
+          clearInterval(heartbeatInterval);
+          clearTimeout(timeoutId);
+          
           console.error(`Stream error in ${agentType}:`, error);
           sendEventMessage(controller, { 
             event: 'error', 
@@ -176,6 +201,9 @@ function handleStreamingResponse(query: string, agentType: string): Response {
         
         // Shared completion handler
         const handleComplete = (response: AgentResponse) => {
+          clearInterval(heartbeatInterval);
+          clearTimeout(timeoutId);
+          
           sendEventMessage(controller, {
             event: 'complete',
             data: {

@@ -136,3 +136,30 @@ npm run dev
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## TypeScript Setup
+
+This project uses TypeScript for type safety. We've added custom type declarations to resolve issues with external modules.
+
+### Setting Up TypeScript Types
+
+Run the following command to install required TypeScript type packages:
+
+```bash
+npm run setup:types
+# or
+yarn setup:types
+# or
+pnpm setup:types
+```
+
+### Type Declarations
+
+Custom type declarations are located in the `types/` directory:
+
+- `lucide-react.d.ts` - Type definitions for Lucide React icons
+- `ui-components.d.ts` - Type definitions for UI components
+- `next-types.d.ts` - Type definitions for Next.js
+- `vercel-modules.d.ts` - Type definitions for Vercel modules
+
+If you encounter TypeScript errors, check if you need to add or update these type declarations.
