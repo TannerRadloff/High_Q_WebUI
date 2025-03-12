@@ -86,6 +86,8 @@ function addToolMessageToChat({
 export function convertToUIMessages(
   messages: Array<DBMessage>,
 ): Array<Message> {
+  console.log(`[DEBUG] Converting ${messages.length} messages from DB to UI format`);
+  
   return messages.reduce((chatMessages: Array<Message>, message) => {
     if (message.role === 'tool') {
       return addToolMessageToChat({
@@ -98,10 +100,29 @@ export function convertToUIMessages(
     let reasoning: string | undefined = undefined;
     const toolInvocations: Array<ToolInvocation> = [];
 
+    // Parse content if it's a JSON string
+    let parsedContent = message.content;
     if (typeof message.content === 'string') {
-      textContent = message.content;
-    } else if (Array.isArray(message.content)) {
-      for (const content of message.content) {
+      try {
+        // Check if the string is actually a stringified JSON array
+        if (message.content.startsWith('[') && message.content.endsWith(']')) {
+          console.log(`[DEBUG] Parsing JSON string content for message ${message.id}`);
+          parsedContent = JSON.parse(message.content);
+        } else {
+          // If it's not a JSON array, just use the string as is
+          textContent = message.content;
+        }
+      } catch (e) {
+        // If parsing fails, just use the string as is
+        console.error(`[DEBUG] Failed to parse JSON content for message ${message.id}:`, e);
+        textContent = message.content;
+      }
+    }
+
+    // Process array content (either original array or parsed from JSON)
+    if (Array.isArray(parsedContent)) {
+      console.log(`[DEBUG] Processing array content for message ${message.id} with ${parsedContent.length} items`);
+      for (const content of parsedContent) {
         if (content.type === 'text') {
           textContent += content.text;
         } else if (content.type === 'tool-call') {
@@ -112,6 +133,7 @@ export function convertToUIMessages(
             args: content.args,
           });
         } else if (content.type === 'reasoning') {
+          console.log(`[DEBUG] Found reasoning in message ${message.id}`);
           reasoning = content.reasoning;
         }
       }
@@ -156,7 +178,20 @@ export function sanitizeResponseMessages({
   const messagesBySanitizedContent = messages.map((message) => {
     if (message.role !== 'assistant') return message;
 
-    if (typeof message.content === 'string') return message;
+    // For assistant messages, ensure we handle the reasoning properly
+    if (typeof message.content === 'string') {
+      // If the content is a string and we have reasoning, convert to array format
+      if (reasoning) {
+        return {
+          ...message,
+          content: [
+            { type: 'text', text: message.content },
+            { type: 'reasoning', reasoning },
+          ],
+        };
+      }
+      return message;
+    }
 
     if (Array.isArray(message.content)) {
       const sanitizedContent = message.content.filter((content) => {
@@ -170,8 +205,15 @@ export function sanitizeResponseMessages({
       });
 
       if (reasoning) {
-        // @ts-expect-error: reasoning message parts in sdk is wip
-        sanitizedContent.push({ type: 'reasoning', reasoning });
+        // Check if reasoning is already included
+        const hasReasoning = sanitizedContent.some(
+          (content) => content.type === 'reasoning'
+        );
+        
+        if (!hasReasoning) {
+          // @ts-expect-error: reasoning message parts in sdk is wip
+          sanitizedContent.push({ type: 'reasoning', reasoning });
+        }
       }
 
       return {

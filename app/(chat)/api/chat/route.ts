@@ -272,6 +272,11 @@ export async function POST(request: Request) {
             // Enhanced system prompt for o1 model with reasoning framework instructions
             let systemPromptContent = enhancedSystemPrompt(currentModel);
             
+            // For o1 model, add specific instructions about formatting
+            if (currentModel === 'gpt-o1') {
+              systemPromptContent += '\n\nIMPORTANT: When responding, clearly separate your reasoning from your final answer. Start your reasoning with "[Detailed Reasoning]" and your final answer with "[Final Answer]". This helps our system properly display your thought process separately from your conclusion.';
+            }
+            
             const result = streamText({
               model: model,
               system: systemPromptContent,
@@ -299,15 +304,69 @@ export async function POST(request: Request) {
               },
               onFinish: async ({ response, reasoning }) => {
                 console.log(`[API] Stream finished successfully with model: ${currentModel}`);
+                
+                // For o1 model, check if we need to extract reasoning from the formatted response
+                let extractedReasoning = reasoning;
+                
+                if (currentModel === 'gpt-o1' && !reasoning) {
+                  // Try to extract reasoning from the formatted response
+                  for (const msg of response.messages) {
+                    if (msg.role === 'assistant' && typeof msg.content === 'string') {
+                      const content = msg.content;
+                      
+                      // Check for the formatted pattern
+                      const reasoningMatch = content.match(/\[Detailed Reasoning\]([\s\S]*?)\[Final Answer\]/);
+                      const answerMatch = content.match(/\[Final Answer\]([\s\S]*?)$/);
+                      
+                      if (reasoningMatch && answerMatch) {
+                        console.log(`[API] Extracted reasoning and answer from formatted response`);
+                        
+                        // Extract the reasoning and answer
+                        extractedReasoning = reasoningMatch[1].trim();
+                        
+                        // Replace the original content with just the answer
+                        const answer = answerMatch[1].trim();
+                        
+                        // Update the message content
+                        msg.content = answer;
+                      }
+                    }
+                  }
+                }
+                
                 if (session.user?.id) {
                   try {
                     const sanitizedResponseMessages = sanitizeResponseMessages({
                       messages: response.messages,
-                      reasoning,
+                      reasoning: extractedReasoning,
                     });
 
+                    // Log the structure of the messages for debugging
+                    console.log(`[API] Saving ${sanitizedResponseMessages.length} messages with reasoning: ${reasoning ? 'yes' : 'no'}`);
+                    
                     await saveMessages({
                       messages: sanitizedResponseMessages.map((message) => {
+                        // For assistant messages with reasoning, ensure we preserve the array structure
+                        if (message.role === 'assistant' && Array.isArray(message.content)) {
+                          // Check if the content array includes reasoning
+                          const hasReasoning = message.content.some(
+                            (content) => content.type === 'reasoning'
+                          );
+                          
+                          if (hasReasoning) {
+                            console.log(`[API] Preserving array structure for message with reasoning`);
+                            // Preserve the array structure by using JSON.stringify
+                            return {
+                              id: message.id,
+                              chatId: id,
+                              role: message.role,
+                              content: JSON.stringify(message.content),
+                              createdAt: new Date(),
+                            };
+                          }
+                        }
+                        
+                        // For other messages, use the existing logic
                         return {
                           id: message.id,
                           chatId: id,
@@ -335,6 +394,11 @@ export async function POST(request: Request) {
             result.mergeIntoDataStream(dataStream, {
               sendReasoning: true,
             });
+            
+            // Log that we're sending reasoning
+            if (currentModel === 'gpt-o1') {
+              console.log(`[API] Sending reasoning with o1 model response`);
+            }
             
             return result;
           } catch (error) {

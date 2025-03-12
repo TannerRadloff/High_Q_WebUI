@@ -3,7 +3,8 @@
 import type { ChatRequestOptions, Message } from 'ai';
 import cx from 'classnames';
 import { AnimatePresence, motion } from 'framer-motion';
-import { memo, useState } from 'react';
+import { memo, useState, useEffect } from 'react';
+import React from 'react';
 
 import type { Vote } from '@/lib/db/schema';
 
@@ -46,6 +47,12 @@ const PurePreviewMessage = ({
   isReadonly: boolean;
 }) => {
   const [mode, setMode] = useState<'view' | 'edit'>('view');
+
+  useEffect(() => {
+    if (message.reasoning) {
+      console.log(`[DEBUG] Message ${message.id} has reasoning`);
+    }
+  }, [message.id, message.reasoning]);
 
   return (
     <AnimatePresence>
