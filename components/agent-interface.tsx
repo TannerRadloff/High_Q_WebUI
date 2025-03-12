@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { type Message } from 'ai';
-import { Send, ArrowLeft, Search, FileText, Loader2 } from 'lucide-react';
+import { Send, ArrowLeft, Search, FileText, Loader2, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { generateUUID } from '@/lib/utils';
@@ -43,7 +43,7 @@ function AgentMessage({ message }: { message: EnhancedMessage }) {
       }`}>
         {message.role === 'assistant' && message.metadata?.researchInProgress && (
           <div className="text-sm text-amber-500 mb-1 flex items-center gap-1">
-            <Loader2 className="h-3 w-3 animate-spin" /> 
+            <Loader2 className="size-3 animate-spin" /> 
             <span>Researching the web...</span>
           </div>
         )}
@@ -56,7 +56,7 @@ function AgentMessage({ message }: { message: EnhancedMessage }) {
         
         {message.role === 'assistant' && message.metadata?.reportInProgress && (
           <div className="text-sm text-blue-500 mb-1 flex items-center gap-1">
-            <Loader2 className="h-3 w-3 animate-spin" />
+            <Loader2 className="size-3 animate-spin" />
             <span>Generating report...</span>
           </div>
         )}
@@ -141,9 +141,11 @@ export function AgentInterface() {
   
   // Cleanup any active EventSource on unmount
   useEffect(() => {
+    const currentEventSource = eventSourceRef.current;
+    
     return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
+      if (currentEventSource) {
+        currentEventSource.close();
       }
       
       // Also clean up any heartbeat timeouts
@@ -639,7 +641,7 @@ export function AgentInterface() {
             disabled={isLoading}
           />
           <Button type="submit" disabled={isLoading || !input.trim()}>
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            {isLoading ? <Loader2 className="size-3 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </form>
       </div>

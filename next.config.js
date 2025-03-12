@@ -32,9 +32,18 @@ const nextConfig = {
   // Add the images configuration to allow avatar.vercel.sh domain
   images: {
     domains: ['avatar.vercel.sh'],
+    remotePatterns: [
+      {
+        hostname: 'avatar.vercel.sh',
+      },
+    ],
   },
   // Fix development asset loading
   assetPrefix: process.env.NODE_ENV === 'development' ? '' : undefined,
+  // Experimental features
+  experimental: {
+    ppr: true,
+  },
 };
 
 module.exports = nextConfig; 
