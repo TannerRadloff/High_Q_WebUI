@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Orchestrator, OrchestrationResult, StreamOrchestrationCallbacks } from '../../../orchestrator';
+import { Orchestrator, OrchestrationResult, StreamOrchestrationCallbacks, DelegationAgent } from '../../../orchestrator';
 import { ResearchAgent } from '../../../agents/ResearchAgent';
 import { ReportAgent } from '../../../agents/ReportAgent';
 import { TriageAgent, TaskType, TriageResult } from '../../../agents/TriageAgent';
@@ -159,6 +159,23 @@ export async function POST(req: NextRequest) {
           error: reportResponse.error,
           metadata: {
             ...reportResponse.metadata,
+            processingTime: Date.now() - startTime
+          }
+        };
+        break;
+        
+      case 'delegation':
+        // Use the DelegationAgent directly
+        const delegationAgent = new DelegationAgent();
+        const delegationResponse = await delegationAgent.handleTask(query, {
+          originalQuery: query
+        });
+        result = {
+          success: delegationResponse.success,
+          content: delegationResponse.content,
+          error: delegationResponse.error,
+          metadata: {
+            ...delegationResponse.metadata,
             processingTime: Date.now() - startTime
           }
         };
@@ -386,6 +403,37 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
             break;
           }
             
+          case 'delegation': {
+            const delegationAgent = new DelegationAgent();
+            if (!delegationAgent.streamTask) {
+              handleError(new Error('Delegation agent does not support streaming'));
+              return;
+            }
+            
+            await delegationAgent.streamTask(
+              query,
+              {
+                onStart: () => {
+                  sendEventMessage(controller, {
+                    event: 'agent_start',
+                    data: { agent: 'delegation' }
+                  });
+                },
+                onToken: handleToken,
+                onError: handleError,
+                onComplete: handleComplete,
+                onHandoff: (from, to) => {
+                  sendEventMessage(controller, {
+                    event: 'handoff',
+                    data: { from, to, timestamp: Date.now() }
+                  });
+                }
+              },
+              { originalQuery: query }
+            );
+            break;
+          }
+            
           case 'auto':
           default:
             // Use the full orchestration process with streaming
@@ -441,6 +489,16 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
                 sendEventMessage(controller, {
                   event: 'report_start',
                   data: { timestamp: Date.now() }
+                });
+              },
+              onHandoff: (from, to) => {
+                sendEventMessage(controller, {
+                  event: 'handoff',
+                  data: {
+                    from,
+                    to,
+                    timestamp: Date.now()
+                  }
                 });
               }
             }, runConfig);

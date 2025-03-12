@@ -1,8 +1,62 @@
-# Agent Tracing System
+# Agent System Architecture
 
-The agents in this application now include built-in tracing functionality to help debug, visualize, and monitor workflows during development and in production.
+This system implements a multi-agent architecture that allows for delegation and specialization. The architecture is inspired by the OpenAI Agents SDK patterns but implemented in TypeScript.
 
-## Overview
+## Core Architecture
+
+The system uses a delegation-based approach:
+
+1. **DelegationAgent**: The main entry point that users interact with first. It analyzes user requests and delegates to specialized agents.
+
+2. **Specialized Agents**:
+   - **TriageAgent**: Analyzes and categorizes tasks
+   - **ResearchAgent**: Performs research and gathers information
+   - **ReportAgent**: Formats information into structured reports
+
+## Agent Delegation Flow
+
+1. A user submits a query to the `Orchestrator`
+2. The `Orchestrator` passes the query to the `DelegationAgent`
+3. The `DelegationAgent` analyzes the query and delegates to the appropriate specialized agent using handoffs
+4. The specialized agent processes the request and returns a result
+5. The result is returned to the user through the `Orchestrator`
+
+## Using the Agent System
+
+```typescript
+// Create an orchestrator instance
+const orchestrator = new Orchestrator();
+
+// Process a user query
+const result = await orchestrator.handleQuery("What are the latest advancements in renewable energy?");
+
+// Access the result
+console.log(result.report); // The final content returned by the agent chain
+console.log(result.metadata.handoffPath); // The path of handoffs between agents
+```
+
+## Streaming Responses
+
+The system supports streaming responses for real-time updates:
+
+```typescript
+await orchestrator.streamQuery(
+  "What are the environmental impacts of electric vehicles?",
+  {
+    onStart: () => console.log("Processing started"),
+    onToken: (token) => console.log("New token:", token),
+    onHandoff: (from, to) => console.log(`Handoff from ${from} to ${to}`),
+    onComplete: (response) => console.log("Final response:", response),
+    onError: (error) => console.error("Error:", error)
+  }
+);
+```
+
+## Agent Tracing System
+
+The agents include built-in tracing functionality to help debug, visualize, and monitor workflows during development and in production.
+
+### Overview
 
 Tracing collects a comprehensive record of events during an agent run:
 - LLM generations
@@ -10,13 +64,13 @@ Tracing collects a comprehensive record of events during an agent run:
 - Handoffs between agents
 - Custom events
 
-## Using Tracing
+### Using Tracing
 
-### Default Behavior
+#### Default Behavior
 
 Tracing is enabled by default and will log basic information to the console.
 
-### Disabling Tracing
+#### Disabling Tracing
 
 You can disable tracing in two ways:
 
@@ -30,7 +84,7 @@ const result = await orchestrator.handleQuery(query, {
 });
 ```
 
-### Configuring Traces
+#### Configuring Traces
 
 When making an API call to the agent-query endpoint, you can include tracing configuration in the request body:
 
@@ -144,7 +198,7 @@ async function processUserQuery(userQuery) {
 
 Currently, traces are logged to the console. You can implement custom trace processors to send traces to your preferred observability tools or create a custom dashboard to visualize them.
 
-## Sensitive Data
+### Sensitive Data
 
 Some spans might include sensitive data such as the inputs or outputs of LLM generations or function calls. You can control whether this data is included in traces:
 
@@ -153,4 +207,53 @@ Some spans might include sensitive data such as the inputs or outputs of LLM gen
 await orchestrator.handleQuery(query, {
   trace_include_sensitive_data: false
 });
+```
+
+## Extending the System
+
+### Adding a New Specialized Agent
+
+To add a new specialized agent:
+
+1. Create a new agent class that extends `BaseAgent`
+2. Add it to the `DelegationAgent`'s handoffs array
+3. Update the `DelegationAgent`'s instructions to include information about the new agent
+
+Example:
+
+```typescript
+// 1. Create a new specialized agent
+export class SummaryAgent extends BaseAgent {
+  constructor() {
+    super({
+      name: 'SummaryAgent',
+      instructions: `You are a summarization specialist that creates concise summaries.`,
+      model: 'gpt-4o',
+      // Additional configuration...
+    });
+  }
+  
+  // Implement any specialized methods...
+}
+
+// 2 & 3. Update the DelegationAgent to include the new agent
+constructor() {
+  // Create agents including the new one
+  const summaryAgent = new SummaryAgent();
+  
+  super({
+    // ...
+    handoffs: [triageAgent, researchAgent, reportAgent, summaryAgent],
+    instructions: `You are an intelligent assistant that helps users by delegating tasks to specialized agents.
+    
+    Available specialized agents:
+    - TriageAgent: For analyzing and categorizing tasks
+    - ResearchAgent: For finding current information
+    - ReportAgent: For formatting information
+    - SummaryAgent: For creating concise summaries
+    
+    // ...
+    `
+  });
+}
 ``` 

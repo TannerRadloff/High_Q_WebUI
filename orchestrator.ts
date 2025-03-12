@@ -4,6 +4,9 @@ import { ReportAgent } from './agents/ReportAgent';
 import { TriageAgent, TaskType, TriageResult } from './agents/TriageAgent';
 import { AgentResponse, StreamCallbacks } from './agents/agent';
 import { trace, configureTracing, RunConfig } from './agents/tracing';
+import { BaseAgent } from './agents/BaseAgent';
+import { functionTool } from './agents/tools';
+import { z } from 'zod';
 
 export interface OrchestrationResult {
   success: boolean;
@@ -26,18 +29,73 @@ export interface StreamOrchestrationCallbacks extends StreamCallbacks {
 }
 
 /**
+ * DelegationAgent is the main model that users first interact with.
+ * It analyzes the query and delegates to specialized agents.
+ */
+export class DelegationAgent extends BaseAgent {
+  constructor() {
+    // Create the specialized agents
+    const triageAgent = new TriageAgent();
+    const researchAgent = new ResearchAgent();
+    const reportAgent = new ReportAgent();
+
+    super({
+      name: 'DelegationAgent',
+      instructions: `You are an intelligent assistant that helps users by delegating tasks to specialized agents.
+      
+      Your job is to:
+      1. Understand the user's request 
+      2. Determine which specialized agent can best handle this request
+      3. Delegate the task to the appropriate agent using the available handoff tools
+      4. You should NOT attempt to answer the user's question directly - your job is to delegate
+      
+      Available specialized agents:
+      - TriageAgent: For analyzing and categorizing tasks, determining the right workflow
+      - ResearchAgent: For finding current information and answering factual questions
+      - ReportAgent: For formatting information and creating structured reports
+      
+      Always delegate to the most appropriate agent. If unsure, delegate to the TriageAgent which can further analyze the request.`,
+      model: 'gpt-4o',
+      modelSettings: {
+        temperature: 0.3, // Lower temperature for more predictable delegation
+      },
+      // Add handoffs to specialized agents
+      handoffs: [triageAgent, researchAgent, reportAgent],
+      // Add a fallback tool to handle delegation failures
+      tools: [
+        functionTool(
+          'analyze_request',
+          'Analyze the user request to determine appropriate delegation',
+          z.object({
+            request: z.string().describe('The user request to analyze'),
+            recommendation: z.string().describe('The recommended agent to handle this'),
+            reason: z.string().describe('Why this agent is the best choice')
+          }),
+          async (args) => {
+            // Just return the analysis results
+            return JSON.stringify(args);
+          }
+        )
+      ]
+    });
+  }
+}
+
+/**
  * Orchestrator class that manages the workflow between agents
  * Similar to the Runner class in the OpenAI Agent SDK
  * Uses agent handoffs to allow agents to decide how to delegate work
  */
 export class Orchestrator {
+  private delegationAgent: DelegationAgent;
   private triageAgent: TriageAgent;
   private researchAgent: ResearchAgent;
 
   constructor() {
-    // We need TriageAgent for the main entry point
+    // We now use DelegationAgent as the primary entry point
+    this.delegationAgent = new DelegationAgent();
+    // We still keep direct agent references for utility methods
     this.triageAgent = new TriageAgent();
-    // We create ResearchAgent directly for access to its methods like countCitations
     this.researchAgent = new ResearchAgent();
   }
 
@@ -50,7 +108,7 @@ export class Orchestrator {
 
   /**
    * Handles a user query using agent handoffs
-   * The TriageAgent will determine which agents should handle the query
+   * The DelegationAgent will determine which agents should handle the query
    * and initiate the appropriate handoffs
    */
   async handleQuery(userQuery: string, config?: RunConfig): Promise<OrchestrationResult> {
@@ -62,7 +120,7 @@ export class Orchestrator {
     const traceInstance = queryTrace.start();
     
     const startTime = Date.now();
-    const handoffPath: string[] = ['TriageAgent']; // Track the path of handoffs
+    const handoffPath: string[] = ['DelegationAgent']; // Track the path of handoffs
     
     try {
       // 1. Validate input
@@ -81,8 +139,8 @@ export class Orchestrator {
         return result;
       }
       
-      // 2. Send the query to the TriageAgent which will handle handoffs
-      const response = await this.triageAgent.handleTask(userQuery, {
+      // 2. Send the query to the DelegationAgent which will handle handoffs
+      const response = await this.delegationAgent.handleTask(userQuery, {
         handoffTracker: handoffPath // Pass handoff path to track the flow
       });
       
@@ -93,7 +151,7 @@ export class Orchestrator {
           success: true,
           report: response.content,
           metadata: {
-            handoffPath: response.metadata?.handoffPath || handoffPath,
+            handoffPath: response.metadata?.handoffTracker || handoffPath,
             executionTimeMs: Date.now() - startTime,
             ...response.metadata
           }
@@ -107,7 +165,7 @@ export class Orchestrator {
           report: '',
           error: response.error || 'Unknown error occurred during processing',
           metadata: {
-            handoffPath: response.metadata?.handoffPath || handoffPath,
+            handoffPath: response.metadata?.handoffTracker || handoffPath,
             executionTimeMs: Date.now() - startTime
           }
         };
@@ -149,7 +207,7 @@ export class Orchestrator {
     const queryTrace = trace(config?.workflow_name || "Agent query (streaming)", config);
     const traceInstance = queryTrace.start();
     
-    const handoffPath: string[] = ['TriageAgent']; // Track the path of handoffs
+    const handoffPath: string[] = ['DelegationAgent']; // Track the path of handoffs
     
     try {
       // Notify that streaming has started
@@ -180,6 +238,12 @@ export class Orchestrator {
             callbacks.onResearchStart?.();
           } else if (targetAgentName.toLowerCase().includes('report')) {
             callbacks.onReportStart?.();
+          } else if (targetAgentName.toLowerCase().includes('triage')) {
+            callbacks.onTriageComplete?.({ 
+              taskType: TaskType.UNKNOWN, 
+              confidence: 1.0,
+              reasoning: 'Delegated to TriageAgent for analysis'
+            });
           }
           
           // Call generic handoff callback if provided
@@ -187,8 +251,8 @@ export class Orchestrator {
         }
       };
       
-      // 3. Stream with the TriageAgent, which will handle handoffs to other agents
-      await this.triageAgent.streamTask(userQuery, wrappedCallbacks, {
+      // 3. Stream with the DelegationAgent, which will handle handoffs to other agents
+      await this.delegationAgent.streamTask(userQuery, wrappedCallbacks, {
         handoffTracker: handoffPath
       });
       

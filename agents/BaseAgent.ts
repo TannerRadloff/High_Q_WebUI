@@ -1,12 +1,16 @@
 import OpenAI from 'openai';
 import { Agent, AgentConfig, AgentContext, AgentResponse, StreamCallbacks } from './agent';
 import { Tool, agentAsTool } from './tools';
-import { generation_span, handoff_span } from './tracing';
+import { generation_span, handoff_span, agent_span, SpanType, TraceMetadata } from './tracing';
+import { v4 as uuidv4 } from 'uuid';
 
 // Initialize OpenAI client
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// Whether to include sensitive data in traces, defaults to true unless configured otherwise
+const includeSensitiveData = process.env.OPENAI_AGENTS_DONT_LOG_TOOL_DATA !== '1';
 
 // Type for OpenAI API response
 type OpenAIResponse = {
@@ -138,90 +142,149 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
   }
 
   /**
-   * Handle tool calls from the OpenAI API response
+   * Handle tool calls from the model response, including executing tools and handling handoffs
    */
   async handleToolCalls(toolCalls: any[], context?: AgentContext, conversationHistory?: any[]): Promise<{ toolResults: any[], handoffResult?: AgentResponse }> {
     const toolResults = [];
-    let handoffResult: AgentResponse | undefined;
+    let handoffResult: AgentResponse | undefined = undefined;
 
     for (const toolCall of toolCalls) {
-      const { function: func } = toolCall;
-      const { name, arguments: argsJson } = func;
-
-      // Check if it's a handoff tool
-      if (name.startsWith('transfer_to_')) {
-        const handoffName = name.replace('transfer_to_', '').replace(/_/g, ' ');
-        const targetAgent = this.handoffs.find(
-          agent => agent.name.toLowerCase().replace(/\s+/g, '_') === handoffName.toLowerCase()
-        );
-
-        if (targetAgent) {
-          // Create a handoff span for tracing
-          const handoffSpan = handoff_span(this.name, targetAgent.name, {
-            source_agent: this.name,
-            target_agent: targetAgent.name,
-            reason: JSON.parse(argsJson || '{}').reason || 'No reason provided'
-          });
+      const { id, function: { name, arguments: argsStr } } = toolCall;
+      
+      try {
+        // Check if this is a handoff tool call
+        if (name.startsWith('transfer_to_')) {
+          const targetAgentName = name.replace('transfer_to_', '').toLowerCase();
           
-          handoffSpan.enter();
+          // Find the target agent in handoffs
+          const targetAgent = this.handoffs.find(agent => 
+            agent.name.toLowerCase().replace(/\s+/g, '_') === targetAgentName
+          );
           
-          // Execute the actual handoff
-          let handoffInput = '';
-          
-          // If we have conversation history, pass it to the new agent
-          if (conversationHistory && conversationHistory.length > 0) {
-            // The new agent receives the full conversation context
-            handoffResult = await targetAgent.handleTask(
-              // The last message in the conversation history is considered the current query
-              conversationHistory[conversationHistory.length - 1].content, 
-              { ...context, conversationHistory }
-            );
+          if (targetAgent) {
+            // Parse arguments
+            const handoffArgs = JSON.parse(argsStr);
+            const reason = handoffArgs.reason || 'No reason provided';
+            
+            // Create a span for the handoff
+            const handoffSpanWrapper = handoff_span(this.name, targetAgent.name, {
+              source_agent: this.name,
+              target_agent: targetAgent.name,
+              reason
+            });
+            
+            try {
+              handoffSpanWrapper.enter();
+              
+              // If we have conversation history, pass it to the target agent to maintain context
+              let handoffContext = context ? { ...context } : {};
+              
+              // Track the handoff in the context
+              if (!handoffContext.handoffTracker) {
+                handoffContext.handoffTracker = [];
+              }
+              
+              if (Array.isArray(handoffContext.handoffTracker)) {
+                handoffContext.handoffTracker.push(targetAgent.name);
+              }
+              
+              // Add the reason for handoff to context
+              handoffContext.handoffReason = reason;
+              
+              // Execute the handoff by calling the target agent's handleTask method
+              const response = await targetAgent.handleTask(
+                // If we have conversation history, we can be smarter about what we pass
+                conversationHistory ? `I need your help with: ${conversationHistory[conversationHistory.length - 1].content}` : 
+                // Otherwise just pass the original query from context if available
+                context?.originalQuery || 'Please help with this task',
+                handoffContext
+              );
+              
+              // Return the result from the target agent
+              handoffResult = response;
+              
+              // Add a tool result for the handoff
+              toolResults.push({
+                tool_call_id: id,
+                role: 'tool',
+                name,
+                content: JSON.stringify({
+                  status: 'success',
+                  message: `Handoff to ${targetAgent.name} completed successfully`,
+                  handoffId: uuidv4().substring(0, 8)
+                })
+              });
+              
+              // Exit the handoff span
+              handoffSpanWrapper.exit();
+              
+              // In case of a handoff, we stop processing other tool calls
+              break;
+            } catch (error) {
+              console.error(`Handoff to ${targetAgent.name} failed:`, error);
+              handoffSpanWrapper.exit();
+              
+              toolResults.push({
+                tool_call_id: id,
+                role: 'tool',
+                name,
+                content: JSON.stringify({
+                  status: 'error',
+                  message: `Handoff to ${targetAgent.name} failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+                })
+              });
+            }
           } else {
-            // Fallback if no conversation history is provided
-            const args = JSON.parse(argsJson || '{}');
-            handoffInput = args.input || 'Handoff received with no specific input';
-            handoffResult = await targetAgent.handleTask(handoffInput, context);
-          }
-          
-          handoffSpan.exit();
-          
-          // Return a tool result for the handoff
-          toolResults.push({
-            tool_call_id: toolCall.id,
-            output: `Handoff to ${targetAgent.name} completed. The agent has responded directly.`
-          });
-          
-          // Since we've performed a handoff, we'll break here as control passes to the new agent
-          break;
-        } else {
-          toolResults.push({
-            tool_call_id: toolCall.id,
-            output: `Error: Agent ${handoffName} not found for handoff`
-          });
-        }
-      } else {
-        // Handle regular tool calls
-        const tool = this.tools.find(t => t.name === name);
-        if (tool) {
-          try {
-            const args = JSON.parse(argsJson);
-            const result = await tool.execute(args);
+            // Target agent not found
             toolResults.push({
-              tool_call_id: toolCall.id,
-              output: result
-            });
-          } catch (error) {
-            toolResults.push({
-              tool_call_id: toolCall.id,
-              output: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+              tool_call_id: id,
+              role: 'tool',
+              name,
+              content: JSON.stringify({
+                status: 'error',
+                message: `Target agent '${targetAgentName}' not found in available handoffs`
+              })
             });
           }
         } else {
-          toolResults.push({
-            tool_call_id: toolCall.id,
-            output: `Error: Tool ${name} not found`
-          });
+          // Regular tool execution
+          const tool = this.tools.find(t => t.name === name);
+          if (tool) {
+            try {
+              const args = JSON.parse(argsStr);
+              const result = await tool.execute(args);
+              toolResults.push({
+                tool_call_id: id,
+                role: 'tool',
+                name,
+                content: result
+              });
+            } catch (error) {
+              toolResults.push({
+                tool_call_id: id,
+                role: 'tool',
+                name,
+                content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+              });
+            }
+          } else {
+            toolResults.push({
+              tool_call_id: id,
+              role: 'tool',
+              name,
+              content: `Error: Tool ${name} not found`
+            });
+          }
         }
+      } catch (error) {
+        console.error(`Error processing tool call:`, error);
+        
+        toolResults.push({
+          tool_call_id: id,
+          role: 'tool',
+          name,
+          content: `Error: ${error instanceof Error ? error.message : 'Unknown error during tool execution'}`
+        });
       }
     }
 
@@ -229,158 +292,180 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
   }
 
   /**
-   * Handle a task with this agent
+   * Process a task through this agent
    */
   async handleTask(userQuery: string, context?: AgentContext): Promise<AgentResponse> {
+    const agentContext = context || {};
+    
+    // Store the original query in context for potential handoffs
+    if (!agentContext.originalQuery) {
+      agentContext.originalQuery = userQuery;
+    }
+    
+    // Create a trace span for this agent
+    const agentSpanWrapper = agent_span(this.name, {
+      agent_name: this.name,
+      agent_instructions: typeof this.instructions === 'string' ? this.instructions : '[dynamic instructions]',
+      input: includeSensitiveData ? userQuery : '[redacted]'
+    });
+
     try {
-      if (!userQuery || userQuery.trim() === '') {
+      agentSpanWrapper.enter();
+      
+      // Initialize conversation history with the user's query
+      const conversationHistory: any[] = [
+        { role: 'system', content: this.resolveInstructions(agentContext) },
+        { role: 'user', content: userQuery }
+      ];
+      
+      // Prepare for the response
+      let finalResponse: string = '';
+      let metadata: Record<string, any> = {};
+      let executionComplete = false;
+      let maxTurns = 10; // Prevent infinite loops
+      
+      // Track tool calls for metadata
+      const allToolCalls: any[] = [];
+      
+      while (!executionComplete && maxTurns > 0) {
+        maxTurns--;
+        
+        try {
+          // Create a span for the LLM call
+          const generationSpanWrapper = generation_span('LLM Generation', {
+            model: this.model,
+            input: includeSensitiveData ? JSON.stringify(conversationHistory) : '[redacted]'
+          });
+          
+          try {
+            generationSpanWrapper.enter();
+            
+            // Call the OpenAI API
+            const response = await client.chat.completions.create({
+              model: this.model,
+              messages: conversationHistory as any,
+              temperature: this.modelSettings?.temperature || 0.7,
+              top_p: this.modelSettings?.topP || 1,
+              max_tokens: this.modelSettings?.maxTokens,
+              tools: this.prepareToolsForAPI(),
+              tool_choice: this.tools.length > 0 || this.handoffs.length > 0 ? 'auto' : 'none'
+            });
+            
+            // Update the generation span with token usage if available
+            if (response.usage) {
+              generationSpanWrapper.addData({
+                tokens: {
+                  prompt_tokens: response.usage.prompt_tokens,
+                  completion_tokens: response.usage.completion_tokens,
+                  total_tokens: response.usage.total_tokens
+                }
+              });
+            }
+            
+            // Get the response message
+            const responseMessage = response.choices[0].message;
+            
+            // Add the assistant's message to conversation history
+            conversationHistory.push({
+              role: 'assistant',
+              content: responseMessage.content || '',
+              tool_calls: responseMessage.tool_calls
+            });
+            
+            // Check if there are tool calls to process
+            if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+              // Add to tracking
+              allToolCalls.push(...responseMessage.tool_calls);
+              
+              // Handle the tool calls
+              const { toolResults, handoffResult } = await this.handleToolCalls(
+                responseMessage.tool_calls,
+                agentContext,
+                conversationHistory
+              );
+              
+              // If there was a handoff, we're done
+              if (handoffResult) {
+                // Add handoff result to metadata
+                metadata = {
+                  ...metadata,
+                  handoffOccurred: true,
+                  handoffTarget: handoffResult.metadata?.agentName || 'Unknown Agent',
+                  handoffResult: handoffResult.metadata
+                };
+                
+                // Return the result from the handoff target
+                finalResponse = handoffResult.content;
+                executionComplete = true;
+                break;
+              }
+              
+              // Add tool results to conversation history
+              conversationHistory.push(...toolResults);
+            } else {
+              // No tool calls, so we're done
+              finalResponse = responseMessage.content || '';
+              executionComplete = true;
+            }
+            
+            generationSpanWrapper.exit();
+          } catch (error) {
+            generationSpanWrapper.exit();
+            throw error;
+          }
+        } catch (error) {
+          console.error(`Error in agent execution:`, error);
+          
+          return {
+            success: false,
+            content: '',
+            error: error instanceof Error ? error.message : 'Unknown error during agent execution'
+          };
+        }
+      }
+      
+      // Check if we exited due to max turns
+      if (!executionComplete) {
         return {
           success: false,
           content: '',
-          error: `Empty query provided. Please provide a valid query for ${this.name}.`
+          error: 'Exceeded maximum number of interaction turns'
         };
       }
-
-      const startTime = Date.now();
-      const instructions = this.resolveInstructions(context);
       
-      // Create a generation span for tracing
-      const genSpan = generation_span(`${this.name} Generation`, {
-        model: this.model,
-        input: userQuery
-      });
-      
-      genSpan.enter();
-      
-      // Prepare the API request
-      const apiTools = this.prepareToolsForAPI();
-      const hasTools = apiTools.length > 0;
-      
-      // Call OpenAI with appropriate parameters based on modelSettings
-      const createParams: any = {
-        model: this.model,
-        instructions,
-        input: userQuery,
+      // Add tool calls to metadata
+      metadata = {
+        ...metadata,
+        toolCalls: allToolCalls
       };
       
-      // Add temperature if defined
-      if (this.modelSettings?.temperature !== undefined) {
-        createParams.temperature = this.modelSettings.temperature;
-      }
+      // Update the agent span with the output
+      agentSpanWrapper.addData({
+        output: includeSensitiveData ? finalResponse : '[redacted]'
+      });
       
-      // Add top_p if defined
-      if (this.modelSettings?.topP !== undefined) {
-        createParams.top_p = this.modelSettings.topP;
-      }
+      agentSpanWrapper.exit();
       
-      // Add max tokens if defined - note that OpenAI API uses max_tokens
-      if (this.modelSettings?.maxTokens !== undefined) {
-        createParams.max_tokens = this.modelSettings.maxTokens;
-      }
-      
-      // Add tools if we have any
-      if (hasTools) {
-        createParams.tools = apiTools;
-        
-        // Add debug logging
-        console.log('Sending tools to OpenAI API:', JSON.stringify(apiTools, null, 2));
-      }
-      
-      // Extract conversation history from context if available
-      const conversationHistory = context?.conversationHistory || [];
-      
-      // Log full params for debugging
-      console.log('Creating response with params:', JSON.stringify(createParams, null, 2));
-      
-      // Ensure tools format is correct for OpenAI API
-      if (createParams.tools && createParams.tools.length > 0) {
-        // Double check that all tools have the required format
-        createParams.tools = createParams.tools.map((tool: any) => {
-          // Make sure each tool has a 'type' field and a 'name' field
-          if (!tool.type) {
-            tool.type = 'function';
-          }
-          
-          if (!tool.name) {
-            console.error('Tool missing name field:', tool);
-            // Try to get name from function.name if available
-            if (tool.function && tool.function.name) {
-              tool.name = tool.function.name;
-            } else {
-              tool.name = 'unnamed_tool';
-            }
-          }
-          
-          // Make sure the function property has the right structure
-          if (tool.type === 'function' && (!tool.function || !tool.function.name)) {
-            console.error('Tool missing required function fields:', tool);
-            // Try to fix it
-            if (!tool.function) {
-              tool.function = {
-                name: tool.name || 'unnamed_function',
-                description: 'No description provided',
-                parameters: { type: 'object', properties: {} }
-              };
-            } else if (!tool.function.name) {
-              tool.function.name = tool.name || 'unnamed_function';
-            }
-          }
-          return tool;
-        });
-      }
-      
-      // Call OpenAI
-      const response = await client.responses.create(createParams) as unknown as OpenAIResponse;
-      
-      let finalOutput = '';
-      
-      // Check for tool calls in the response
-      if (response.tool_calls && response.tool_calls.length > 0) {
-        const { toolResults, handoffResult } = await this.handleToolCalls(
-          response.tool_calls, 
-          context,
-          [...conversationHistory, { role: 'user', content: userQuery }]
-        );
-        
-        // If a handoff occurred, return its result instead
-        if (handoffResult) {
-          return handoffResult;
-        }
-        
-        // Prepare follow-up params
-        const followUpParams = { ...createParams, tool_results: toolResults };
-        
-        // Call the API again with the tool results
-        const followUpResponse = await client.responses.create(followUpParams) as unknown as OpenAIResponse;
-        
-        finalOutput = followUpResponse.output_text;
-      } else {
-        finalOutput = response.output_text;
-      }
-      
-      genSpan.exit();
-      
-      // Record completion time
-      const endTime = Date.now();
-      const responseTime = endTime - startTime;
-      
+      // Return the successful result
       return {
         success: true,
-        content: finalOutput,
+        content: finalResponse,
         metadata: {
+          ...metadata,
+          agentName: this.name,
           model: this.model,
-          responseTime,
-          query: userQuery,
-          context,
-          agent: this.name
+          temperature: this.modelSettings?.temperature
         }
       };
     } catch (error) {
-      console.error(`${this.name} error:`, error);
+      agentSpanWrapper.exit();
+      
+      console.error(`Error in agent execution:`, error);
+      
       return {
         success: false,
         content: '',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error during agent execution'
       };
     }
   }
