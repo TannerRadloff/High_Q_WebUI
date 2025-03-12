@@ -11,9 +11,6 @@ import { memo } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 import { type VisibilityType, VisibilitySelector } from './visibility-selector';
 import { UserAuthStatus } from './user-auth-status';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { useAgentMode } from '@/hooks/use-agent-mode';
 
 function PureChatHeader({
   chatId,
@@ -29,71 +26,44 @@ function PureChatHeader({
   const router = useRouter();
   const { open } = useSidebar();
   const { width: windowWidth } = useWindowSize();
-  const { agentMode, toggleAgentMode } = useAgentMode();
 
   return (
-    <header className="flex sticky top-0 z-10 bg-background py-1.5 items-center px-2 md:px-2 gap-2 chat-header">
-      <SidebarToggle />
-
-      {(!open || windowWidth < 768) && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              className="order-2 md:order-1 md:px-2 px-2 md:h-fit ml-auto md:ml-0 hover:bg-primary/10 hover:text-primary"
-              onClick={() => {
-                router.push('/');
-                router.refresh();
-              }}
-            >
-              <PlusIcon />
-              <span className="md:sr-only">New Chat</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>New Chat</TooltipContent>
-        </Tooltip>
-      )}
-
-      {!isReadonly && (
+    <header className="sticky top-0 z-10 flex items-center justify-between gap-2 bg-background p-2 sm:px-4">
+      <div className="flex-1 order-2 md:order-1 flex flex-wrap gap-2 items-center">
+        {windowWidth < 768 && (
+          <div className="md:hidden">
+            <SidebarToggle />
+          </div>
+        )}
+        
         <ModelSelector
           selectedModelId={selectedModelId}
           className="order-1 md:order-2"
         />
-      )}
-
-      {!isReadonly && (
+        
         <VisibilitySelector
           chatId={chatId}
           selectedVisibilityType={selectedVisibilityType}
           className="order-1 md:order-3"
         />
-      )}
+      </div>
 
-      {/* Agent Mode Toggle */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className={`order-1 md:order-4 flex items-center gap-2 px-2 py-1 rounded transition-colors ${
-            agentMode ? 'bg-primary/10' : ''
-          }`}>
-            <Switch
-              id="agent-mode"
-              checked={agentMode}
-              onCheckedChange={toggleAgentMode}
-              className="data-[state=checked]:bg-primary"
-            />
-            <Label htmlFor="agent-mode" className={`text-sm cursor-pointer ${
-              agentMode ? 'font-semibold text-primary' : ''
-            }`}>
-              Agent Mode
-            </Label>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent>
-          {agentMode 
-            ? 'Currently in Agent Mode - Switch back to chat mode' 
-            : 'Switch to Agent Mode - Use AI agents with tool access'}
-        </TooltipContent>
-      </Tooltip>
+      {/* Button to create a new chat */}
+      {!isReadonly && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              className="order-2 md:order-3"
+              onClick={() => router.push('/')}
+            >
+              <PlusIcon />
+              <span className="sr-only md:not-sr-only md:ml-2">New Chat</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Start a new chat</TooltipContent>
+        </Tooltip>
+      )}
 
       <div className="ml-auto order-3 md:order-5">
         <UserAuthStatus />

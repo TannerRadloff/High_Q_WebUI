@@ -1,7 +1,7 @@
 'use client';
 
 import type { User } from 'next-auth';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 import { PlusIcon } from '@/components/icons';
 import { SidebarHistory } from '@/components/sidebar-history';
@@ -13,14 +13,18 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
   useSidebar,
 } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { Server } from 'lucide-react';
 
 export function AppSidebar({ user }: { user: User | undefined }) {
   const router = useRouter();
   const { setOpenMobile } = useSidebar();
+  const pathname = usePathname();
 
   return (
     <Sidebar className="group-data-[side=left]:border-r-0">
@@ -56,6 +60,24 @@ export function AppSidebar({ user }: { user: User | undefined }) {
               <TooltipContent align="end">New Chat</TooltipContent>
             </Tooltip>
           </div>
+          
+          {/* Link to Agent Mode */}
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={pathname === '/agent-mode'}
+              tooltip="Agent Mode"
+            >
+              <Link 
+                href="/agent-mode"
+                onClick={() => setOpenMobile(false)}
+                className="flex items-center gap-2"
+              >
+                <Server className="h-4 w-4" />
+                <span>Agent Mode</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
