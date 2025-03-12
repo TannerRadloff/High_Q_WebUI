@@ -3,6 +3,7 @@ import { ResearchAgent } from './agents/ResearchAgent';
 import { ReportAgent } from './agents/ReportAgent';
 import { TriageAgent, TaskType, TriageResult } from './agents/TriageAgent';
 import { AgentResponse, StreamCallbacks } from './agents/agent';
+import { trace, agent_span, generation_span, function_span, RunConfig, configureTracing } from './agents/tracing';
 
 export interface OrchestrationResult {
   success: boolean;
@@ -41,13 +42,20 @@ export class Orchestrator {
    * 2. Routing to the appropriate workflow based on triage results
    * Returns an OrchestrationResult with the report and metadata.
    */
-  async handleQuery(userQuery: string): Promise<OrchestrationResult> {
+  async handleQuery(userQuery: string, config?: RunConfig): Promise<OrchestrationResult> {
+    // Configure tracing based on provided config
+    configureTracing(config);
+    
+    // Create a trace for this query
+    const queryTrace = trace(config?.workflow_name || "Agent query", config);
+    const traceInstance = queryTrace.start();
+    
     const startTime = Date.now();
     
     try {
       // 1. Validate input
       if (!userQuery || userQuery.trim() === '') {
-        return {
+        const result = {
           success: false,
           report: '',
           error: 'Empty query provided. Please provide a valid research query.',
@@ -55,13 +63,23 @@ export class Orchestrator {
             executionTimeMs: Date.now() - startTime
           }
         };
+        
+        await queryTrace.finish();
+        return result;
       }
       
       // 2. Triage the query to determine which agents to use
+      const triageSpan = agent_span("Triage Agent", {
+        agent_name: this.triageAgent.name,
+        input: userQuery
+      });
+      
+      triageSpan.enter();
       const triageResponse = await this.triageAgent.handleTask(userQuery);
+      triageSpan.exit();
       
       if (!triageResponse.success) {
-        return {
+        const result = {
           success: false,
           report: '',
           error: `Triage failed: ${triageResponse.error}`,
@@ -69,6 +87,9 @@ export class Orchestrator {
             executionTimeMs: Date.now() - startTime
           }
         };
+        
+        await queryTrace.finish();
+        return result;
       }
       
       // Parse the triage result
@@ -98,7 +119,7 @@ export class Orchestrator {
       }
       
       // Add triage metadata to the result
-      return {
+      const finalResult = {
         ...result,
         metadata: {
           ...(result.metadata || { executionTimeMs: Date.now() - startTime }),
@@ -106,19 +127,27 @@ export class Orchestrator {
           triageConfidence: triageResult.confidence,
           triageReasoning: triageResult.reasoning,
           originalQuery: userQuery,
-          processedQuery
+          processedQuery,
+          trace_id: traceInstance.trace_id
         }
       };
+      
+      await queryTrace.finish();
+      return finalResult;
     } catch (error) {
       console.error('Orchestration error:', error);
-      return {
+      const result = {
         success: false,
         report: 'An error occurred during the research and report generation process.',
         error: error instanceof Error ? error.message : 'Unknown error',
         metadata: {
-          executionTimeMs: Date.now() - startTime
+          executionTimeMs: Date.now() - startTime,
+          trace_id: traceInstance.trace_id
         }
       };
+      
+      await queryTrace.finish();
+      return result;
     }
   }
   
@@ -126,7 +155,14 @@ export class Orchestrator {
    * Handle a research-only task
    */
   private async handleResearchTask(query: string, startTime: number): Promise<OrchestrationResult> {
+    const researchSpan = agent_span("Research Agent", {
+      agent_name: this.researchAgent.name,
+      input: query
+    });
+    
+    researchSpan.enter();
     const researchResponse = await this.researchAgent.handleTask(query);
+    researchSpan.exit();
     
     return {
       success: researchResponse.success,
@@ -145,7 +181,14 @@ export class Orchestrator {
    * Handle a report-only task
    */
   private async handleReportTask(query: string, startTime: number): Promise<OrchestrationResult> {
+    const reportSpan = agent_span("Report Agent", {
+      agent_name: this.reportAgent.name,
+      input: query
+    });
+    
+    reportSpan.enter();
     const reportResponse = await this.reportAgent.handleTask(query);
+    reportSpan.exit();
     
     return {
       success: reportResponse.success,
@@ -165,7 +208,14 @@ export class Orchestrator {
    */
   private async handleCombinedTask(query: string, startTime: number): Promise<OrchestrationResult> {
     // 1. Get research data using the Research Agent
+    const researchSpan = agent_span("Research Agent", {
+      agent_name: this.researchAgent.name,
+      input: query
+    });
+    
+    researchSpan.enter();
     const researchResponse = await this.researchAgent.handleTask(query);
+    researchSpan.exit();
     
     // If research failed, return early with the error
     if (!researchResponse.success) {
@@ -187,7 +237,14 @@ export class Orchestrator {
     const promptForReport = `User asked: "${query}".\n\nResearch Notes:\n${researchResponse.content}\n\nPlease write a comprehensive report that integrates this information with clear citations.`;
     
     // 3. Generate a report using the Report Agent
+    const reportSpan = agent_span("Report Agent", {
+      agent_name: this.reportAgent.name,
+      input: promptForReport
+    });
+    
+    reportSpan.enter();
     const reportResponse = await this.reportAgent.handleTask(promptForReport);
+    reportSpan.exit();
     
     // Calculate total execution time
     const executionTimeMs = Date.now() - startTime;
@@ -213,11 +270,20 @@ export class Orchestrator {
    * Stream the entire orchestration process, from triage to final result
    * @param userQuery The user's query to process
    * @param callbacks Callbacks for handling the streaming process
+   * @param config Optional run configuration including tracing options
    */
   async streamQuery(
     userQuery: string,
-    callbacks: StreamOrchestrationCallbacks
+    callbacks: StreamOrchestrationCallbacks,
+    config?: RunConfig
   ): Promise<void> {
+    // Configure tracing based on provided config
+    configureTracing(config);
+    
+    // Create a trace for this streaming query
+    const streamTrace = trace(config?.workflow_name || "Streaming agent query", config);
+    const traceInstance = streamTrace.start();
+    
     const startTime = Date.now();
     let researchData = '';
     
@@ -225,6 +291,7 @@ export class Orchestrator {
       // 1. Validate input
       if (!userQuery || userQuery.trim() === '') {
         callbacks.onError?.(new Error('Empty query provided. Please provide a valid query.'));
+        await streamTrace.finish();
         return;
       }
       
@@ -234,10 +301,18 @@ export class Orchestrator {
       // 2. Triage the query
       callbacks.onToken?.('🔎 Analyzing your query...\n\n');
       
+      const triageSpan = agent_span("Triage Agent Stream", {
+        agent_name: this.triageAgent.name,
+        input: userQuery
+      });
+      
+      triageSpan.enter();
       const triageResponse = await this.triageAgent.handleTask(userQuery);
+      triageSpan.exit();
       
       if (!triageResponse.success) {
         callbacks.onError?.(new Error(`Triage failed: ${triageResponse.error}`));
+        await streamTrace.finish();
         return;
       }
       
@@ -248,7 +323,11 @@ export class Orchestrator {
       
       // Notify about the triage result
       callbacks.onTriageComplete?.(triageResult);
-      callbacks.onToken?.(`I'll ${this.getTaskExplanation(triageResult.taskType)} for you.\n\n`);
+      
+      // Add trace ID to the callback context if needed
+      const contextWithTrace = {
+        trace_id: traceInstance.trace_id
+      };
       
       // 3. Route to the appropriate streaming workflow based on task type
       switch (triageResult.taskType) {
@@ -284,9 +363,12 @@ export class Orchestrator {
         }
       });
       
+      // Add trace completion at the end of function
+      await streamTrace.finish();
     } catch (error) {
-      console.error('Orchestration streaming error:', error);
+      console.error('Stream orchestration error:', error);
       callbacks.onError?.(error instanceof Error ? error : new Error('Unknown streaming error'));
+      await streamTrace.finish();
     }
   }
   

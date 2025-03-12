@@ -1,5 +1,6 @@
 import { Agent, AgentResponse, AgentContext, StreamCallbacks } from './agent';
 import OpenAI from 'openai';
+import { generation_span, function_span } from './tracing';
 
 // Initialize OpenAI client
 const client = new OpenAI({
@@ -19,28 +20,59 @@ export class ResearchAgent implements Agent {
         };
       }
 
-      // Get current timestamp for metadata
       const startTime = Date.now();
-
-      // Use the OpenAI Response API with web_search tool enabled
+      
+      // Create a generation span for the OpenAI call
+      const genSpan = generation_span("Research Query", {
+        model: 'gpt-4o',
+        input: userQuery
+      });
+      
+      genSpan.enter();
+      
+      // Use OpenAI to perform the research
       const response = await client.responses.create({
         model: 'gpt-4o',
-        tools: [{ type: 'web_search_preview' }],
-        instructions: 'You are an AI research assistant. Search the web for current and relevant information and return a summary with citations. Include the source URLs for all information.',
+        instructions: `You are a research assistant with web search capabilities. Your job is to thoroughly research the user's query and provide accurate, up-to-date information with proper citation of sources.
+
+        For each major claim or piece of information, cite the source using a numbered format like [1], [2], etc.
+        At the end of your response, list all the sources you cited in the format:
+        
+        SOURCES:
+        [1] Source title, URL, and date (if available)
+        [2] Source title, URL, and date (if available)
+        
+        If you can't find sufficient information to answer the query, be honest about the limitations.
+        Your response should be thorough, accurate, and well-organized.`,
         input: userQuery,
       });
+      
+      const outputText = response.output_text;
+      
+      genSpan.exit();
+      
+      // Create a function span for citation counting
+      const countSpan = function_span("Count Citations", {
+        function_name: "countCitations",
+        arguments: { text: outputText }
+      });
+      
+      countSpan.enter();
+      const citationCount = this.countCitations(outputText);
+      countSpan.exit();
 
+      // Record end time for performance tracking
       const endTime = Date.now();
       const responseTime = endTime - startTime;
 
-      // Build and return the agent response
+      // Return the agent response
       return {
         success: true,
-        content: response.output_text || 'No research data found.',
+        content: outputText,
         metadata: {
           model: 'gpt-4o',
           responseTime,
-          toolsUsed: 'web_search_preview',
+          citationCount,
           query: userQuery,
           context
         }
@@ -49,7 +81,7 @@ export class ResearchAgent implements Agent {
       console.error('ResearchAgent error:', error);
       return {
         success: false,
-        content: 'An error occurred while conducting research.',
+        content: '',
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
@@ -152,5 +184,11 @@ export class ResearchAgent implements Agent {
       // If we can't parse the chunk, just return null
       return null;
     }
+  }
+
+  private countCitations(text: string): number {
+    // Count citations in formats like [1], [2], etc.
+    const citationMatches = text.match(/\[\d+\]/g);
+    return citationMatches ? citationMatches.length : 0;
   }
 } 

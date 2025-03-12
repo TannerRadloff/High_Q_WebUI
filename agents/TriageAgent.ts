@@ -1,5 +1,6 @@
 import { Agent, AgentResponse, AgentContext, StreamCallbacks } from './agent';
 import OpenAI from 'openai';
+import { generation_span } from './tracing';
 
 // Initialize OpenAI client
 const client = new OpenAI({
@@ -38,6 +39,14 @@ export class TriageAgent implements Agent {
       // Get current timestamp for metadata
       const startTime = Date.now();
 
+      // Create a generation span for tracing the OpenAI call
+      const genSpan = generation_span("Triage Classification", {
+        model: 'gpt-4o',
+        input: userQuery
+      });
+      
+      genSpan.enter();
+      
       // Use OpenAI to triage the query
       const response = await client.responses.create({
         model: 'gpt-4o',
@@ -57,11 +66,16 @@ export class TriageAgent implements Agent {
         Respond ONLY with the JSON object, no other text.`,
         input: userQuery,
       });
+      
+      const outputText = response.output_text;
+      
+      // Update the span with the output
+      genSpan.exit();
 
       // Parse the model's response as JSON
       try {
         // Extract the JSON content - the model might wrap it in code blocks or add extra text
-        const jsonText = this.extractJsonFromText(response.output_text);
+        const jsonText = this.extractJsonFromText(outputText);
         const triageResult: TriageResult = JSON.parse(jsonText);
 
         const endTime = Date.now();

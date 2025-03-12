@@ -1,5 +1,6 @@
 import { Agent, AgentResponse, AgentContext, StreamCallbacks } from './agent';
 import OpenAI from 'openai';
+import { generation_span } from './tracing';
 
 // Initialize OpenAI client
 const client = new OpenAI({
@@ -9,37 +10,58 @@ const client = new OpenAI({
 export class ReportAgent implements Agent {
   name = 'ReportAgent';
 
-  async handleTask(content: string, context?: AgentContext): Promise<AgentResponse> {
+  async handleTask(userQuery: string, context?: AgentContext): Promise<AgentResponse> {
     try {
-      if (!content || content.trim() === '') {
+      if (!userQuery || userQuery.trim() === '') {
         return {
           success: false,
           content: '',
-          error: 'Empty content provided. Please provide valid content for report generation.'
+          error: 'Empty query provided. Please provide content for report generation.'
         };
       }
 
-      // Get current timestamp for metadata
       const startTime = Date.now();
-
-      // Use the OpenAI Response API for report generation
+      
+      // Create a generation span for the OpenAI call
+      const genSpan = generation_span("Report Generation", {
+        model: 'gpt-4o',
+        input: userQuery
+      });
+      
+      genSpan.enter();
+      
+      // Use OpenAI to generate the report
       const response = await client.responses.create({
         model: 'gpt-4o',
-        instructions: 'You are a professional report-writing assistant. Produce a structured, clear report in Markdown format, incorporating citations for all referenced information. Use proper headings, bullet points, and formatting to enhance readability.',
-        input: content,
-      });
+        instructions: `You are a professional report writer who creates clear, well-structured reports based on provided information.
 
+        When generating a report:
+        1. Organize information logically with headings and subheadings
+        2. Include an executive summary if appropriate
+        3. Maintain appropriate tone (formal, analytical)
+        4. Preserve all citation references in the original format
+        5. Format content for clarity and readability
+        
+        The report should be comprehensive but concise, focusing on key findings and insights.`,
+        input: userQuery,
+      });
+      
+      const outputText = response.output_text;
+      
+      genSpan.exit();
+
+      // Record end time for performance tracking
       const endTime = Date.now();
       const responseTime = endTime - startTime;
 
-      // Build and return the agent response
+      // Return the agent response
       return {
         success: true,
-        content: response.output_text || 'Failed to generate report.',
+        content: outputText,
         metadata: {
           model: 'gpt-4o',
           responseTime,
-          contentLength: content.length,
+          query: userQuery,
           context
         }
       };
@@ -47,7 +69,7 @@ export class ReportAgent implements Agent {
       console.error('ReportAgent error:', error);
       return {
         success: false,
-        content: 'An error occurred while generating the report.',
+        content: '',
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }

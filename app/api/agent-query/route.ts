@@ -4,6 +4,7 @@ import { ResearchAgent } from '../../../agents/ResearchAgent';
 import { ReportAgent } from '../../../agents/ReportAgent';
 import { TriageAgent, TaskType, TriageResult } from '../../../agents/TriageAgent';
 import { AgentResponse, StreamCallbacks } from '../../../agents/agent';
+import { RunConfig } from '../../../agents/tracing';
 
 // Simple in-memory rate limiting (would be replaced with Redis or similar in production)
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
@@ -54,7 +55,25 @@ export async function POST(req: NextRequest) {
     
     // Parse request body
     const body = await req.json();
-    const { query, agentType = 'auto', stream = false } = body;
+    const { 
+      query, 
+      agentType = 'auto', 
+      stream = false,
+      workflow_name,
+      group_id,
+      tracing_disabled,
+      trace_include_sensitive_data,
+      metadata 
+    } = body;
+    
+    // Create run config for tracing
+    const runConfig: RunConfig = {
+      workflow_name: workflow_name || `API Request - ${agentType}`,
+      group_id,
+      tracing_disabled,
+      trace_include_sensitive_data,
+      metadata
+    };
     
     // Validate request
     if (!query || typeof query !== 'string' || query.trim() === '') {
@@ -66,7 +85,7 @@ export async function POST(req: NextRequest) {
     
     // If streaming is requested, handle it differently
     if (stream) {
-      return handleStreamingResponse(query, agentType);
+      return handleStreamingResponse(query, agentType, runConfig);
     }
     
     // Non-streaming response handling
@@ -98,17 +117,16 @@ export async function POST(req: NextRequest) {
             result = {
               success: false,
               error: 'Failed to parse triage response',
-              content: triageResponse.content,
               metadata: {
-                processingTime: Date.now() - startTime,
-                parseError: parseError instanceof Error ? parseError.message : 'Unknown parsing error'
+                parsingError: parseError instanceof Error ? parseError.message : 'Unknown parsing error',
+                processingTime: Date.now() - startTime
               }
             };
           }
         } else {
           result = {
             success: false,
-            error: triageResponse.error,
+            error: triageResponse.error || 'Triage agent failed without specific error',
             metadata: {
               processingTime: Date.now() - startTime
             }
@@ -117,55 +135,53 @@ export async function POST(req: NextRequest) {
         break;
         
       case 'research':
+        // Only perform research
         const researchAgent = new ResearchAgent();
-        const researchResponse: AgentResponse = await researchAgent.handleTask(query);
+        const researchResponse = await researchAgent.handleTask(query);
         result = {
           success: researchResponse.success,
           content: researchResponse.content,
           error: researchResponse.error,
           metadata: {
             ...researchResponse.metadata,
-            processingTime: Date.now() - startTime,
-            taskType: TaskType.RESEARCH
+            processingTime: Date.now() - startTime
           }
         };
         break;
         
       case 'report':
+        // Only generate a report
         const reportAgent = new ReportAgent();
-        const reportResponse: AgentResponse = await reportAgent.handleTask(query);
+        const reportResponse = await reportAgent.handleTask(query);
         result = {
           success: reportResponse.success,
           content: reportResponse.content,
           error: reportResponse.error,
           metadata: {
             ...reportResponse.metadata,
-            processingTime: Date.now() - startTime,
-            taskType: TaskType.REPORT
+            processingTime: Date.now() - startTime
           }
         };
         break;
-
-      case 'auto':
-      case 'orchestrator':
-      default:
-        // Use the orchestrator with dynamic triage
-        const orchestrator = new Orchestrator();
-        const orchestratorResult: OrchestrationResult = await orchestrator.handleQuery(query);
         
+      case 'auto':
+      default:
+        // Use the orchestrator to handle the query with all agents
+        const orchestrator = new Orchestrator();
+        const orchestrationResult = await orchestrator.handleQuery(query, runConfig);
         result = {
-          success: orchestratorResult.success,
-          report: orchestratorResult.report,
-          error: orchestratorResult.error,
+          success: orchestrationResult.success,
+          report: orchestrationResult.report,
+          error: orchestrationResult.error,
           metadata: {
-            ...orchestratorResult.metadata,
+            ...orchestrationResult.metadata,
             processingTime: Date.now() - startTime
           }
         };
         break;
     }
     
-    // Return the result as JSON
+    // Return the result
     return NextResponse.json(result);
     
   } catch (error) {
@@ -183,10 +199,14 @@ export async function POST(req: NextRequest) {
 /**
  * Handle streaming response for real-time agent output
  */
-function handleStreamingResponse(query: string, agentType: string): Response {
+function handleStreamingResponse(query: string, agentType: string, runConfig?: RunConfig): Response {
   // Create a readable stream from a ReadableStream
   const stream = new ReadableStream({
     async start(controller) {
+      // Setup heartbeat and timeout tracking
+      let heartbeatIntervalId: NodeJS.Timeout | null = null;
+      let timeoutId: NodeJS.Timeout | null = null;
+      
       try {
         // Set up and encode the initial response
         sendEventMessage(controller, { 
@@ -195,7 +215,7 @@ function handleStreamingResponse(query: string, agentType: string): Response {
         });
         
         // Set up heartbeat to prevent connection timeouts
-        const heartbeatInterval = setInterval(() => {
+        heartbeatIntervalId = setInterval(() => {
           sendEventMessage(controller, {
             event: 'heartbeat',
             data: { timestamp: Date.now() }
@@ -203,8 +223,8 @@ function handleStreamingResponse(query: string, agentType: string): Response {
         }, HEARTBEAT_INTERVAL);
         
         // Set request timeout
-        const timeoutId = setTimeout(() => {
-          clearInterval(heartbeatInterval);
+        timeoutId = setTimeout(() => {
+          if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
           sendEventMessage(controller, {
             event: 'error',
             data: { message: 'Request timed out' }
@@ -214,8 +234,8 @@ function handleStreamingResponse(query: string, agentType: string): Response {
         
         // Shared error handler
         const handleError = (error: Error) => {
-          clearInterval(heartbeatInterval);
-          clearTimeout(timeoutId);
+          if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
+          if (timeoutId) clearTimeout(timeoutId);
           
           console.error(`Stream error in ${agentType}:`, error);
           sendEventMessage(controller, { 
@@ -235,8 +255,8 @@ function handleStreamingResponse(query: string, agentType: string): Response {
         
         // Shared completion handler
         const handleComplete = (response: AgentResponse) => {
-          clearInterval(heartbeatInterval);
-          clearTimeout(timeoutId);
+          if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
+          if (timeoutId) clearTimeout(timeoutId);
           
           sendEventMessage(controller, {
             event: 'complete',
@@ -349,62 +369,64 @@ function handleStreamingResponse(query: string, agentType: string): Response {
           }
             
           case 'auto':
-          case 'orchestrator':
-          default: {
+          default:
+            // Use the full orchestration process with streaming
             const orchestrator = new Orchestrator();
             
-            await orchestrator.streamQuery(
-              query,
-              {
-                onStart: () => {
-                  sendEventMessage(controller, {
-                    event: 'agent_start',
-                    data: { agent: 'orchestrator' }
-                  });
-                },
+            await orchestrator.streamQuery(query, {
+              onStart: () => {
+                // Send notification that processing has started
+                sendEventMessage(controller, {
+                  event: 'start',
+                  data: { timestamp: Date.now() }
+                });
                 
-                onTriageComplete: (triageResult) => {
+                // Start sending heartbeats
+                heartbeatIntervalId = setInterval(() => {
                   sendEventMessage(controller, {
-                    event: 'triage_complete',
-                    data: { 
-                      taskType: triageResult.taskType,
-                      confidence: triageResult.confidence,
-                      reasoning: triageResult.reasoning
-                    }
+                    event: 'heartbeat',
+                    data: { timestamp: Date.now() }
                   });
-                },
+                }, HEARTBEAT_INTERVAL);
                 
-                onResearchStart: () => {
-                  sendEventMessage(controller, {
-                    event: 'research_start',
-                    data: { message: 'Starting research phase' }
-                  });
-                },
-                
-                onResearchComplete: (researchData) => {
-                  sendEventMessage(controller, {
-                    event: 'research_complete',
-                    data: { 
-                      message: 'Research phase complete',
-                      citations: orchestrator.countCitations(researchData)
-                    }
-                  });
-                },
-                
-                onReportStart: () => {
-                  sendEventMessage(controller, {
-                    event: 'report_start',
-                    data: { message: 'Starting report generation' }
-                  });
-                },
-                
-                onToken: handleToken,
-                onError: handleError,
-                onComplete: handleComplete
+                // Set timeout
+                timeoutId = setTimeout(() => {
+                  if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
+                  handleError(new Error('Request timed out after ' + (REQUEST_TIMEOUT / 1000) + ' seconds'));
+                }, REQUEST_TIMEOUT);
+              },
+              onToken: handleToken,
+              onComplete: handleComplete,
+              onError: handleError,
+              onTriageComplete: (result) => {
+                sendEventMessage(controller, {
+                  event: 'triage',
+                  data: result
+                });
+              },
+              onResearchStart: () => {
+                sendEventMessage(controller, {
+                  event: 'research_start',
+                  data: { timestamp: Date.now() }
+                });
+              },
+              onResearchComplete: (researchData) => {
+                sendEventMessage(controller, {
+                  event: 'research_complete',
+                  data: { 
+                    timestamp: Date.now(),
+                    citations: orchestrator.countCitations(researchData) 
+                  }
+                });
+              },
+              onReportStart: () => {
+                sendEventMessage(controller, {
+                  event: 'report_start',
+                  data: { timestamp: Date.now() }
+                });
               }
-            );
+            }, runConfig);
             break;
-          }
         }
       } catch (error) {
         console.error('Stream setup error:', error);
