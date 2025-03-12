@@ -1,20 +1,12 @@
+// This file is being removed as the animation toggle feature is non-essential
+// to the core functionality of the chatbot. Removing this feature will simplify
+// the codebase while maintaining all essential functionality.
+
 'use client';
 
-import { usePathname } from 'next/navigation';
-import { AnimationToggle } from './animation-toggle';
+import React from 'react';
 
-export function AnimationToggleWrapper() {
-  const pathname = usePathname();
-  
-  // Don't render the AnimationToggle on any auth-related pages
-  // Using a more robust check for auth routes
-  const authRoutes = ['/login', '/register', '/forgot-password', '/reset-password'];
-  const isAuthPage = authRoutes.some(route => pathname.includes(route));
-  
-  // Additional check for route groups
-  if (isAuthPage || pathname.startsWith('/(auth)')) {
-    return null;
-  }
-  
-  return <AnimationToggle />;
+export default function AnimationToggleWrapper() {
+  // Return null as we've removed the animation toggle feature
+  return null;
 } 

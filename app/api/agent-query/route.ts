@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Orchestrator, OrchestrationResult, StreamOrchestrationCallbacks, DelegationAgent } from '../../../orchestrator';
+import { AgentRunner, RunResult, StreamRunCallbacks } from '../../../runner';
 import { ResearchAgent } from '../../../agents/ResearchAgent';
 import { ReportAgent } from '../../../agents/ReportAgent';
 import { TriageAgent, TaskType, TriageResult } from '../../../agents/TriageAgent';
@@ -8,6 +8,18 @@ import { RunConfig } from '../../../agents/tracing';
 import AgentStateService from '../../../services/agentStateService';
 import { v4 as uuidv4 } from 'uuid';
 import { AgentType } from '../../../agents/AgentFactory';
+import { BaseAgent } from '../../../agents/BaseAgent';
+
+// Define the AgentRequest type with properly typed properties
+type AgentRequest = {
+  id: string;
+  timestamp: string;
+  query: string;
+  agentType: AgentType;
+  status: 'pending' | 'in-progress' | 'completed' | 'failed';
+  response?: string; // Using response instead of result for consistency
+  error?: string;
+};
 
 // Simple in-memory rate limiting (would be replaced with Redis or similar in production)
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
@@ -117,166 +129,80 @@ export async function POST(req: NextRequest) {
     // Non-streaming response handling
     // Record start time for performance tracking
     const startTime = Date.now();
-    let result: { success: boolean; content?: string; report?: string; error?: string; metadata?: any };
+    let result: { success: boolean; content?: string; output?: string; error?: string; metadata?: any };
     
     try {
       // Update request status to in-progress
       AgentStateService.updateRequest(requestId, { status: 'in-progress' });
       
-      // Route to the appropriate agent based on the agentType
-      switch (agentType) {
-        case 'triage':
-          // Only perform triage without executing agents
-          const triageAgent = new TriageAgent();
-          const triageResponse: AgentResponse = await triageAgent.handleTask(query);
-          
-          if (triageResponse.success) {
-            // Parse the triage result
-            try {
-              const triageResult = JSON.parse(triageResponse.content) as TriageResult;
-              result = {
-                success: true,
-                content: triageResponse.content,
-                metadata: {
-                  ...triageResponse.metadata,
-                  processingTime: Date.now() - startTime,
-                  taskType: triageResult.taskType
-                }
-              };
-            } catch (parseError) {
-              result = {
-                success: false,
-                error: 'Failed to parse triage response',
-                metadata: {
-                  parsingError: parseError instanceof Error ? parseError.message : 'Unknown parsing error',
-                  processingTime: Date.now() - startTime
-                }
-              };
-            }
-          } else {
-            result = {
-              success: false,
-              error: triageResponse.error || 'Triage agent failed without specific error',
-              metadata: {
-                processingTime: Date.now() - startTime
-              }
-            };
-          }
-          break;
-          
-        case 'research':
-          // Only perform research
-          const researchAgent = new ResearchAgent();
-          const researchResponse = await researchAgent.handleTask(query);
-          result = {
-            success: researchResponse.success,
-            content: researchResponse.content,
-            error: researchResponse.error,
-            metadata: {
-              ...researchResponse.metadata,
-              processingTime: Date.now() - startTime
-            }
-          };
-          break;
-          
-        case 'report':
-          // Only generate a report
-          const reportAgent = new ReportAgent();
-          const reportResponse = await reportAgent.handleTask(query);
-          result = {
-            success: reportResponse.success,
-            content: reportResponse.content,
-            error: reportResponse.error,
-            metadata: {
-              ...reportResponse.metadata,
-              processingTime: Date.now() - startTime
-            }
-          };
-          break;
-          
-        case 'delegation':
-          // Use the DelegationAgent directly
-          const delegationAgent = new DelegationAgent();
-          const delegationResponse = await delegationAgent.handleTask(query, {
-            originalQuery: query
-          });
-          result = {
-            success: delegationResponse.success,
-            content: delegationResponse.content,
-            error: delegationResponse.error,
-            metadata: {
-              ...delegationResponse.metadata,
-              processingTime: Date.now() - startTime
-            }
-          };
-          break;
-          
-        case 'auto':
-        default:
-          // Use the orchestrator to handle the query with all agents
-          const orchestrator = new Orchestrator();
-          const orchestrationResult = await orchestrator.handleQuery(query, runConfig);
-          result = {
-            success: orchestrationResult.success,
-            report: orchestrationResult.report,
-            error: orchestrationResult.error,
-            metadata: {
-              ...orchestrationResult.metadata,
-              processingTime: Date.now() - startTime
-            }
-          };
-          break;
-      }
+      // Create a runner with the appropriate agent based on the requested type
+      const runner = createRunnerForAgentType(agentType);
       
-      // Update the request with the result
-      if (result.success) {
-        AgentStateService.updateRequest(requestId, {
-          status: 'completed',
-          response: result.content || result.report,
-          metadata: result.metadata
-        });
-        
-        // Update agent state to idle
-        AgentStateService.updateAgentState(getAgentTypeEnum(agentType), 'idle');
-      } else {
-        AgentStateService.updateRequest(requestId, {
-          status: 'failed',
-          error: result.error,
-          metadata: result.metadata
-        });
-        
-        // Update agent state to error
-        AgentStateService.updateAgentState(getAgentTypeEnum(agentType), 'error');
-      }
+      // Run the agent using the runner
+      const runResult = await runner.run(query, runConfig);
       
-      // Return the result
-      return NextResponse.json(result);
-    } catch (error) {
-      console.error('API error in non-streaming mode:', error);
+      // Format the result for API response
+      result = {
+        success: runResult.success,
+        content: runResult.output, // For backwards compatibility
+        output: runResult.output,
+        error: runResult.error,
+        metadata: {
+          ...runResult.metadata,
+          processingTime: Date.now() - startTime
+        }
+      };
       
-      // Update request with error
-      AgentStateService.updateRequest(requestId, {
-        status: 'failed',
-        error: error instanceof Error ? error.message : 'An unknown error occurred'
+      // Update request status
+      AgentStateService.updateRequest(requestId, { 
+        status: result.success ? 'completed' : 'failed',
+        response: result.success ? (result.output || '') : undefined, // Using response instead of result
+        error: result.error
       });
       
-      // Update agent state to error
-      AgentStateService.updateAgentState(getAgentTypeEnum(agentType), 'error');
+      // Update agent state to idle
+      AgentStateService.updateAgentState(
+        getAgentTypeEnum(agentType),
+        'idle',
+        ''
+      );
+      
+      return NextResponse.json(result);
+    } catch (error) {
+      console.error('API error:', error);
+      
+      // Update request status
+      AgentStateService.updateRequest(requestId, { 
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      // Update agent state to idle
+      AgentStateService.updateAgentState(
+        getAgentTypeEnum(agentType),
+        'idle',
+        ''
+      );
       
       return NextResponse.json(
         { 
-          error: error instanceof Error ? error.message : 'An unknown error occurred',
-          success: false
+          success: false, 
+          error: error instanceof Error ? error.message : 'Unknown error during processing',
+          metadata: {
+            requestId,
+            processingTime: Date.now() - startTime
+          }
         },
         { status: 500 }
       );
     }
   } catch (error) {
-    console.error('API error:', error);
+    console.error('Unhandled API error:', error);
+    
     return NextResponse.json(
       { 
-        error: error instanceof Error ? error.message : 'An unknown error occurred',
-        success: false
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unhandled error in API route'
       },
       { status: 500 }
     );
@@ -284,402 +210,281 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * Handle streaming response for real-time agent output
+ * Creates a runner with the appropriate agent based on the requested type
  */
-function handleStreamingResponse(
-  query: string, 
-  agentType: string, 
-  requestId: string,
-  runConfig?: RunConfig
-): Response {
-  // Create a readable stream from a ReadableStream
-  const stream = new ReadableStream({
-    async start(controller) {
-      // Setup heartbeat and timeout tracking
-      let heartbeatIntervalId: NodeJS.Timeout | null = null;
-      let timeoutId: NodeJS.Timeout | null = null;
+function createRunnerForAgentType(agentType: string): AgentRunner {
+  let agent: BaseAgent | undefined = undefined;
+  
+  // Create specific agent if requested, otherwise use default DelegationAgent
+  switch (agentType) {
+    case 'triage':
+      agent = new TriageAgent() as unknown as BaseAgent;
+      break;
       
-      try {
-        // Update request to in-progress
-        AgentStateService.updateRequest(requestId, { status: 'in-progress' });
+    case 'research':
+      agent = new ResearchAgent() as unknown as BaseAgent;
+      break;
+      
+    case 'report':
+      agent = new ReportAgent() as unknown as BaseAgent;
+      break;
+  }
+  
+  // Return a runner with the selected agent or the default DelegationAgent
+  return new AgentRunner(agent);
+}
+
+/**
+ * Handle a streaming response for agent-based processing
+ */
+async function handleStreamingResponse(
+  query: string,
+  agentType: string,
+  requestId: string,
+  runConfig: RunConfig
+): Promise<Response> {
+  // Create an encoder for the stream
+  const encoder = new TextEncoder();
+  
+  // Variables to keep track of the response
+  let controller: ReadableStreamDefaultController | null = null;
+  let lastResponseTime = Date.now();
+  let heartbeatInterval: NodeJS.Timeout | null = null;
+  
+  // Create a stream
+  const stream = new ReadableStream({
+    start(c) {
+      controller = c;
+      
+      // Start a heartbeat to prevent timeouts
+      heartbeatInterval = setInterval(() => {
+        const timeElapsed = Date.now() - lastResponseTime;
         
-        // Set up and encode the initial response
-        sendEventMessage(controller, { 
-          event: 'start', 
-          data: { message: 'Stream started', requestId }
-        });
-        
-        // Set up heartbeat to prevent connection timeouts
-        heartbeatIntervalId = setInterval(() => {
-          sendEventMessage(controller, {
-            event: 'heartbeat',
-            data: { timestamp: Date.now() }
-          });
-        }, HEARTBEAT_INTERVAL);
-        
-        // Set request timeout
-        timeoutId = setTimeout(() => {
-          if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
-          
-          // Update request with timeout error
-          AgentStateService.updateRequest(requestId, {
-            status: 'failed',
-            error: 'Request timed out'
-          });
-          
-          // Update agent state to error
-          AgentStateService.updateAgentState(getAgentTypeEnum(agentType), 'error');
-          
-          sendEventMessage(controller, {
-            event: 'error',
-            data: { message: 'Request timed out' }
-          });
-          controller.close();
-        }, REQUEST_TIMEOUT);
-        
-        // Shared error handler
-        const handleError = (error: Error) => {
-          if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
-          if (timeoutId) clearTimeout(timeoutId);
-          
-          console.error(`Stream error in ${agentType}:`, error);
-          
-          // Update request with error
-          AgentStateService.updateRequest(requestId, {
-            status: 'failed',
-            error: error.message
-          });
-          
-          // Update agent state to error
-          AgentStateService.updateAgentState(getAgentTypeEnum(agentType), 'error');
-          
-          sendEventMessage(controller, { 
-            event: 'error', 
-            data: { message: error.message } 
-          });
-          controller.close();
-        };
-        
-        // Shared token handler to send event to client
-        const handleToken = (token: string) => {
-          // Ensure token is not undefined or null before sending
-          if (token !== undefined && token !== null) {
-            sendEventMessage(controller, {
-              event: 'token',
-              data: { token, requestId }
-            });
-          } else {
-            console.warn('Attempted to send undefined/null token, skipping');
-          }
-        };
-        
-        // Shared completion handler
-        const handleComplete = (response: AgentResponse) => {
-          if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
-          if (timeoutId) clearTimeout(timeoutId);
-          
-          // Update request with success
-          AgentStateService.updateRequest(requestId, {
-            status: 'completed',
-            response: response.content,
-            metadata: response.metadata
-          });
-          
-          // Update agent state to idle
-          AgentStateService.updateAgentState(getAgentTypeEnum(agentType), 'idle');
-          
-          // Send a trace event with the spans
-          if (response.metadata?.trace_id) {
-            // Get trace information from the metadata
-            sendEventMessage(controller, {
-              event: 'trace',
-              data: {
-                trace_id: response.metadata.trace_id,
-                // In a real implementation, this would include the actual spans from the trace
-                spans: response.metadata.spans || []
-              }
-            });
-          }
-          
-          sendEventMessage(controller, {
-            event: 'complete',
-            data: {
-              success: response.success,
-              content: response.content,
-              metadata: response.metadata,
-              requestId
-            }
-          });
-          controller.close();
-        };
-        
-        // Route to the appropriate agent based on the agentType
-        switch (agentType) {
-          case 'triage': {
-            const triageAgent = new TriageAgent();
-            if (!triageAgent.streamTask) {
-              // Triage doesn't support streaming, so fake it with regular task execution
-              try {
-                sendEventMessage(controller, {
-                  event: 'agent_start',
-                  data: { agent: 'triage', requestId }
-                });
-                
-                const response = await triageAgent.handleTask(query);
-                if (response.success) {
-                  try {
-                    const triageResult = JSON.parse(response.content) as TriageResult;
-                    handleToken(`Analyzed your query. This appears to be a ${triageResult.taskType} task.\n\n`);
-                    handleToken(`Reasoning: ${triageResult.reasoning}\n\n`);
-                    
-                    if (triageResult.modifiedQuery && triageResult.modifiedQuery !== query) {
-                      handleToken(`Suggested query reformulation: ${triageResult.modifiedQuery}\n\n`);
-                    }
-                  } catch (parseError) {
-                    handleToken('Analysis complete, but could not parse the result format.\n\n');
-                  }
-                }
-                handleComplete(response);
-              } catch (error) {
-                handleError(error instanceof Error ? error : new Error('Triage processing failed'));
-              }
-              return;
-            }
-            
-            // If triage agent implements streamTask in the future, this code would run
-            await triageAgent.streamTask(
-              query,
-              {
-                onStart: () => {
-                  sendEventMessage(controller, {
-                    event: 'agent_start',
-                    data: { agent: 'triage', requestId }
-                  });
-                },
-                onToken: handleToken,
-                onError: handleError,
-                onComplete: handleComplete
-              }
-            );
-            break;
-          }
-          
-          case 'research': {
-            const researchAgent = new ResearchAgent();
-            if (!researchAgent.streamTask) {
-              handleError(new Error('Research agent does not support streaming'));
-              return;
-            }
-            
-            await researchAgent.streamTask(
-              query,
-              {
-                onStart: () => {
-                  sendEventMessage(controller, {
-                    event: 'agent_start',
-                    data: { agent: 'research', requestId }
-                  });
-                },
-                onToken: handleToken,
-                onError: handleError,
-                onComplete: handleComplete
-              }
-            );
-            break;
-          }
-            
-          case 'report': {
-            const reportAgent = new ReportAgent();
-            if (!reportAgent.streamTask) {
-              handleError(new Error('Report agent does not support streaming'));
-              return;
-            }
-            
-            await reportAgent.streamTask(
-              query,
-              {
-                onStart: () => {
-                  sendEventMessage(controller, {
-                    event: 'agent_start',
-                    data: { agent: 'report', requestId }
-                  });
-                },
-                onToken: handleToken,
-                onError: handleError,
-                onComplete: handleComplete
-              }
-            );
-            break;
-          }
-            
-          case 'delegation': {
-            const delegationAgent = new DelegationAgent();
-            if (!delegationAgent.streamTask) {
-              handleError(new Error('Delegation agent does not support streaming'));
-              return;
-            }
-            
-            await delegationAgent.streamTask(
-              query,
-              {
-                onStart: () => {
-                  sendEventMessage(controller, {
-                    event: 'agent_start',
-                    data: { agent: 'delegation', requestId }
-                  });
-                },
-                onToken: handleToken,
-                onError: handleError,
-                onComplete: handleComplete,
-                onHandoff: (from, to) => {
-                  // Log the handoff in the service (could be expanded)
-                  console.log(`Handoff from ${from} to ${to}`);
-                  
-                  sendEventMessage(controller, {
-                    event: 'handoff',
-                    data: { from, to, timestamp: Date.now(), requestId }
-                  });
-                }
-              },
-              { originalQuery: query }
-            );
-            break;
-          }
-            
-          case 'auto':
-          default: {
-            // Use the full orchestration process with streaming
-            const orchestrator = new Orchestrator();
-            
-            await orchestrator.streamQuery(query, {
-              onStart: () => {
-                // Send notification that processing has started
-                sendEventMessage(controller, {
-                  event: 'start',
-                  data: { timestamp: Date.now(), requestId }
-                });
-                
-                // Start sending heartbeats
-                heartbeatIntervalId = setInterval(() => {
-                  sendEventMessage(controller, {
-                    event: 'heartbeat',
-                    data: { timestamp: Date.now() }
-                  });
-                }, HEARTBEAT_INTERVAL);
-                
-                // Set timeout
-                timeoutId = setTimeout(() => {
-                  if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
-                  handleError(new Error('Request timed out after ' + (REQUEST_TIMEOUT / 1000) + ' seconds'));
-                }, REQUEST_TIMEOUT);
-              },
-              onToken: handleToken,
-              onComplete: handleComplete,
-              onError: handleError,
-              onTriageComplete: (result) => {
-                sendEventMessage(controller, {
-                  event: 'triage',
-                  data: result
-                });
-              },
-              onResearchStart: () => {
-                sendEventMessage(controller, {
-                  event: 'research_start',
-                  data: { timestamp: Date.now(), requestId }
-                });
-              },
-              onResearchComplete: (researchData) => {
-                sendEventMessage(controller, {
-                  event: 'research_complete',
-                  data: { 
-                    timestamp: Date.now(),
-                    citations: orchestrator.countCitations(researchData),
-                    requestId
-                  }
-                });
-              },
-              onReportStart: () => {
-                sendEventMessage(controller, {
-                  event: 'report_start',
-                  data: { timestamp: Date.now(), requestId }
-                });
-              },
-              onHandoff: (from, to) => {
-                sendEventMessage(controller, {
-                  event: 'handoff',
-                  data: {
-                    from,
-                    to,
-                    timestamp: Date.now(),
-                    requestId
-                  }
-                });
-              }
-            }, runConfig);
-            break;
+        // If no response for a while, send a heartbeat
+        if (timeElapsed > HEARTBEAT_INTERVAL / 2) {
+          try {
+            controller?.enqueue(encoder.encode('data: {"type": "heartbeat"}\n\n'));
+          } catch (err) {
+            console.error('Error sending heartbeat:', err);
           }
         }
-      } catch (error) {
-        console.error('Stream setup error:', error);
         
-        // Update request with error
-        AgentStateService.updateRequest(requestId, {
-          status: 'failed',
-          error: error instanceof Error ? error.message : 'Unknown stream error'
-        });
-        
-        // Update agent state to error
-        AgentStateService.updateAgentState(getAgentTypeEnum(agentType), 'error');
-        
-        sendEventMessage(controller, { 
-          event: 'error', 
-          data: { message: error instanceof Error ? error.message : 'Unknown stream error' } 
-        });
-        controller.close();
+        // If no response for too long, timeout
+        if (timeElapsed > REQUEST_TIMEOUT) {
+          try {
+            controller?.enqueue(encoder.encode('data: {"type": "error", "value": "Request timed out"}\n\n'));
+            controller?.close();
+          } catch (err) {
+            console.error('Error closing stream on timeout:', err);
+          } finally {
+            if (heartbeatInterval) {
+              clearInterval(heartbeatInterval);
+            }
+          }
+        }
+      }, HEARTBEAT_INTERVAL);
+    },
+    
+    cancel() {
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
       }
     }
   });
   
-  // Return the stream as a server-sent events response
+  // Update request status
+  AgentStateService.updateRequest(requestId, { status: 'in-progress' });
+  
+  // Create a runner with the appropriate agent based on the requested type
+  const runner = createRunnerForAgentType(agentType);
+  
+  // Create streaming callbacks
+  const callbacks: StreamRunCallbacks = {
+    onStart: () => {
+      lastResponseTime = Date.now();
+      try {
+        controller?.enqueue(encoder.encode('data: {"type": "start"}\n\n'));
+      } catch (err) {
+        console.error('Error sending start event:', err);
+      }
+    },
+    
+    onToken: (token: string) => {
+      lastResponseTime = Date.now();
+      try {
+        controller?.enqueue(encoder.encode(`data: {"type": "token", "value": ${JSON.stringify(token)}}\n\n`));
+      } catch (err) {
+        console.error('Error sending token:', err);
+      }
+    },
+    
+    onTriageComplete: (result: TriageResult) => {
+      lastResponseTime = Date.now();
+      try {
+        controller?.enqueue(encoder.encode(`data: {"type": "triage", "value": ${JSON.stringify(result)}}\n\n`));
+      } catch (err) {
+        console.error('Error sending triage result:', err);
+      }
+    },
+    
+    onResearchStart: () => {
+      lastResponseTime = Date.now();
+      try {
+        controller?.enqueue(encoder.encode('data: {"type": "research_start"}\n\n'));
+      } catch (err) {
+        console.error('Error sending research start event:', err);
+      }
+    },
+    
+    onResearchComplete: (researchData: string) => {
+      lastResponseTime = Date.now();
+      try {
+        controller?.enqueue(encoder.encode(`data: {"type": "research_complete", "value": ${JSON.stringify(researchData)}}\n\n`));
+      } catch (err) {
+        console.error('Error sending research complete event:', err);
+      }
+    },
+    
+    onReportStart: () => {
+      lastResponseTime = Date.now();
+      try {
+        controller?.enqueue(encoder.encode('data: {"type": "report_start"}\n\n'));
+      } catch (err) {
+        console.error('Error sending report start event:', err);
+      }
+    },
+    
+    onHandoff: (from: string, to: string) => {
+      lastResponseTime = Date.now();
+      try {
+        controller?.enqueue(encoder.encode(`data: {"type": "handoff", "from": ${JSON.stringify(from)}, "to": ${JSON.stringify(to)}}\n\n`));
+      } catch (err) {
+        console.error('Error sending handoff event:', err);
+      }
+    },
+    
+    onComplete: (finalResponse: AgentResponse) => {
+      lastResponseTime = Date.now();
+      try {
+        // Extract content from the agent response
+        const content = finalResponse.content;
+        
+        controller?.enqueue(encoder.encode(`data: {"type": "complete", "value": ${JSON.stringify(content)}}\n\n`));
+        controller?.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller?.close();
+        
+        // Update request status
+        AgentStateService.updateRequest(requestId, { 
+          status: 'completed',
+          response: content // Using response instead of result
+        });
+        
+        // Update agent state to idle
+        AgentStateService.updateAgentState(
+          getAgentTypeEnum(agentType),
+          'idle',
+          ''
+        );
+      } catch (err) {
+        console.error('Error sending complete event:', err);
+      } finally {
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval);
+        }
+      }
+    },
+    
+    onError: (error: Error) => {
+      lastResponseTime = Date.now();
+      console.error('Streaming error:', error);
+      
+      try {
+        controller?.enqueue(encoder.encode(`data: {"type": "error", "value": ${JSON.stringify(error.message)}}\n\n`));
+        controller?.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller?.close();
+        
+        // Update request status
+        AgentStateService.updateRequest(requestId, { 
+          status: 'failed',
+          error: error.message
+        });
+        
+        // Update agent state to idle
+        AgentStateService.updateAgentState(
+          getAgentTypeEnum(agentType),
+          'idle',
+          ''
+        );
+      } catch (err) {
+        console.error('Error sending error event:', err);
+      } finally {
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval);
+        }
+      }
+    }
+  };
+  
+  // Start the streaming run process
+  // We do this in a separate task to not block the response
+  Promise.resolve().then(async () => {
+    try {
+      await runner.streamRun(query, callbacks, runConfig);
+    } catch (error) {
+      console.error('Error starting agent stream:', error);
+      
+      try {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error starting agent stream';
+        controller?.enqueue(encoder.encode(`data: {"type": "error", "value": ${JSON.stringify(errorMessage)}}\n\n`));
+        controller?.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller?.close();
+        
+        // Update request status
+        AgentStateService.updateRequest(requestId, { 
+          status: 'failed',
+          error: errorMessage
+        });
+        
+        // Update agent state to idle
+        AgentStateService.updateAgentState(
+          getAgentTypeEnum(agentType),
+          'idle',
+          ''
+        );
+      } catch (err) {
+        console.error('Error sending stream error:', err);
+      } finally {
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval);
+        }
+      }
+    }
+  });
+  
+  // Return the response with the stream
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive'
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
     }
   });
 }
 
 /**
- * Send an SSE-formatted message through the controller
+ * Convert string agent type to enum
  */
-function sendEventMessage(
-  controller: ReadableStreamDefaultController,
-  { event, data }: { event: string; data: any }
-): void {
-  // Format as SSE
-  const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  
-  // Send to client
-  controller.enqueue(new TextEncoder().encode(message));
-}
-
-/**
- * Helper to convert string agent type to enum
- */
-function getAgentTypeEnum(agentTypeStr: string): AgentType {
-  switch (agentTypeStr.toLowerCase()) {
-    case 'delegation':
-      return AgentType.DELEGATION;
+function getAgentTypeEnum(agentType: string): AgentType {
+  switch (agentType) {
     case 'triage':
       return AgentType.TRIAGE;
     case 'research':
       return AgentType.RESEARCH;
     case 'report':
       return AgentType.REPORT;
-    case 'custom':
-      return AgentType.CUSTOM;
+    case 'delegation':
+      return AgentType.DELEGATION;
     default:
-      return AgentType.DELEGATION; // Default to delegation
+      return AgentType.DELEGATION;
   }
 } 
