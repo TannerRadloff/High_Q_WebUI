@@ -5,6 +5,9 @@ import { ReportAgent } from '../../../agents/ReportAgent';
 import { TriageAgent, TaskType, TriageResult } from '../../../agents/TriageAgent';
 import { AgentResponse, StreamCallbacks } from '../../../agents/agent';
 import { RunConfig } from '../../../agents/tracing';
+import AgentStateService from '../../../services/agentStateService';
+import { v4 as uuidv4 } from 'uuid';
+import { AgentType } from '../../../agents/AgentFactory';
 
 // Simple in-memory rate limiting (would be replaced with Redis or similar in production)
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
@@ -63,8 +66,11 @@ export async function POST(req: NextRequest) {
       group_id,
       tracing_disabled,
       trace_include_sensitive_data,
-      metadata 
+      metadata = {} 
     } = body;
+    
+    // Generate a unique request ID
+    const requestId = `req_${uuidv4()}`;
     
     // Create run config for tracing
     const runConfig: RunConfig = {
@@ -72,7 +78,11 @@ export async function POST(req: NextRequest) {
       group_id,
       tracing_disabled,
       trace_include_sensitive_data,
-      metadata
+      metadata: {
+        ...metadata,
+        requestId,
+        ip
+      }
     };
     
     // Validate request
@@ -83,9 +93,25 @@ export async function POST(req: NextRequest) {
       );
     }
     
+    // Record the new request
+    AgentStateService.recordRequest({
+      id: requestId,
+      timestamp: new Date().toISOString(),
+      query,
+      agentType: getAgentTypeEnum(agentType),
+      status: 'pending'
+    });
+    
+    // Update agent state to working
+    AgentStateService.updateAgentState(
+      getAgentTypeEnum(agentType),
+      'working',
+      query.substring(0, 50) + (query.length > 50 ? '...' : '')
+    );
+    
     // If streaming is requested, handle it differently
     if (stream) {
-      return handleStreamingResponse(query, agentType, runConfig);
+      return handleStreamingResponse(query, agentType, requestId, runConfig);
     }
     
     // Non-streaming response handling
@@ -93,114 +119,158 @@ export async function POST(req: NextRequest) {
     const startTime = Date.now();
     let result: { success: boolean; content?: string; report?: string; error?: string; metadata?: any };
     
-    // Route to the appropriate agent based on the agentType
-    switch (agentType) {
-      case 'triage':
-        // Only perform triage without executing agents
-        const triageAgent = new TriageAgent();
-        const triageResponse: AgentResponse = await triageAgent.handleTask(query);
-        
-        if (triageResponse.success) {
-          // Parse the triage result
-          try {
-            const triageResult = JSON.parse(triageResponse.content) as TriageResult;
-            result = {
-              success: true,
-              content: triageResponse.content,
-              metadata: {
-                ...triageResponse.metadata,
-                processingTime: Date.now() - startTime,
-                taskType: triageResult.taskType
-              }
-            };
-          } catch (parseError) {
+    try {
+      // Update request status to in-progress
+      AgentStateService.updateRequest(requestId, { status: 'in-progress' });
+      
+      // Route to the appropriate agent based on the agentType
+      switch (agentType) {
+        case 'triage':
+          // Only perform triage without executing agents
+          const triageAgent = new TriageAgent();
+          const triageResponse: AgentResponse = await triageAgent.handleTask(query);
+          
+          if (triageResponse.success) {
+            // Parse the triage result
+            try {
+              const triageResult = JSON.parse(triageResponse.content) as TriageResult;
+              result = {
+                success: true,
+                content: triageResponse.content,
+                metadata: {
+                  ...triageResponse.metadata,
+                  processingTime: Date.now() - startTime,
+                  taskType: triageResult.taskType
+                }
+              };
+            } catch (parseError) {
+              result = {
+                success: false,
+                error: 'Failed to parse triage response',
+                metadata: {
+                  parsingError: parseError instanceof Error ? parseError.message : 'Unknown parsing error',
+                  processingTime: Date.now() - startTime
+                }
+              };
+            }
+          } else {
             result = {
               success: false,
-              error: 'Failed to parse triage response',
+              error: triageResponse.error || 'Triage agent failed without specific error',
               metadata: {
-                parsingError: parseError instanceof Error ? parseError.message : 'Unknown parsing error',
                 processingTime: Date.now() - startTime
               }
             };
           }
-        } else {
+          break;
+          
+        case 'research':
+          // Only perform research
+          const researchAgent = new ResearchAgent();
+          const researchResponse = await researchAgent.handleTask(query);
           result = {
-            success: false,
-            error: triageResponse.error || 'Triage agent failed without specific error',
+            success: researchResponse.success,
+            content: researchResponse.content,
+            error: researchResponse.error,
             metadata: {
+              ...researchResponse.metadata,
               processingTime: Date.now() - startTime
             }
           };
-        }
-        break;
-        
-      case 'research':
-        // Only perform research
-        const researchAgent = new ResearchAgent();
-        const researchResponse = await researchAgent.handleTask(query);
-        result = {
-          success: researchResponse.success,
-          content: researchResponse.content,
-          error: researchResponse.error,
-          metadata: {
-            ...researchResponse.metadata,
-            processingTime: Date.now() - startTime
-          }
-        };
-        break;
-        
-      case 'report':
-        // Only generate a report
-        const reportAgent = new ReportAgent();
-        const reportResponse = await reportAgent.handleTask(query);
-        result = {
-          success: reportResponse.success,
-          content: reportResponse.content,
-          error: reportResponse.error,
-          metadata: {
-            ...reportResponse.metadata,
-            processingTime: Date.now() - startTime
-          }
-        };
-        break;
-        
-      case 'delegation':
-        // Use the DelegationAgent directly
-        const delegationAgent = new DelegationAgent();
-        const delegationResponse = await delegationAgent.handleTask(query, {
-          originalQuery: query
+          break;
+          
+        case 'report':
+          // Only generate a report
+          const reportAgent = new ReportAgent();
+          const reportResponse = await reportAgent.handleTask(query);
+          result = {
+            success: reportResponse.success,
+            content: reportResponse.content,
+            error: reportResponse.error,
+            metadata: {
+              ...reportResponse.metadata,
+              processingTime: Date.now() - startTime
+            }
+          };
+          break;
+          
+        case 'delegation':
+          // Use the DelegationAgent directly
+          const delegationAgent = new DelegationAgent();
+          const delegationResponse = await delegationAgent.handleTask(query, {
+            originalQuery: query
+          });
+          result = {
+            success: delegationResponse.success,
+            content: delegationResponse.content,
+            error: delegationResponse.error,
+            metadata: {
+              ...delegationResponse.metadata,
+              processingTime: Date.now() - startTime
+            }
+          };
+          break;
+          
+        case 'auto':
+        default:
+          // Use the orchestrator to handle the query with all agents
+          const orchestrator = new Orchestrator();
+          const orchestrationResult = await orchestrator.handleQuery(query, runConfig);
+          result = {
+            success: orchestrationResult.success,
+            report: orchestrationResult.report,
+            error: orchestrationResult.error,
+            metadata: {
+              ...orchestrationResult.metadata,
+              processingTime: Date.now() - startTime
+            }
+          };
+          break;
+      }
+      
+      // Update the request with the result
+      if (result.success) {
+        AgentStateService.updateRequest(requestId, {
+          status: 'completed',
+          response: result.content || result.report,
+          metadata: result.metadata
         });
-        result = {
-          success: delegationResponse.success,
-          content: delegationResponse.content,
-          error: delegationResponse.error,
-          metadata: {
-            ...delegationResponse.metadata,
-            processingTime: Date.now() - startTime
-          }
-        };
-        break;
         
-      case 'auto':
-      default:
-        // Use the orchestrator to handle the query with all agents
-        const orchestrator = new Orchestrator();
-        const orchestrationResult = await orchestrator.handleQuery(query, runConfig);
-        result = {
-          success: orchestrationResult.success,
-          report: orchestrationResult.report,
-          error: orchestrationResult.error,
-          metadata: {
-            ...orchestrationResult.metadata,
-            processingTime: Date.now() - startTime
-          }
-        };
-        break;
+        // Update agent state to idle
+        AgentStateService.updateAgentState(getAgentTypeEnum(agentType), 'idle');
+      } else {
+        AgentStateService.updateRequest(requestId, {
+          status: 'failed',
+          error: result.error,
+          metadata: result.metadata
+        });
+        
+        // Update agent state to error
+        AgentStateService.updateAgentState(getAgentTypeEnum(agentType), 'error');
+      }
+      
+      // Return the result
+      return NextResponse.json(result);
+    } catch (error) {
+      console.error('API error in non-streaming mode:', error);
+      
+      // Update request with error
+      AgentStateService.updateRequest(requestId, {
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'An unknown error occurred'
+      });
+      
+      // Update agent state to error
+      AgentStateService.updateAgentState(getAgentTypeEnum(agentType), 'error');
+      
+      return NextResponse.json(
+        { 
+          error: error instanceof Error ? error.message : 'An unknown error occurred',
+          success: false
+        },
+        { status: 500 }
+      );
     }
-    
-    // Return the result
-    return NextResponse.json(result);
-    
   } catch (error) {
     console.error('API error:', error);
     return NextResponse.json(
@@ -216,7 +286,12 @@ export async function POST(req: NextRequest) {
 /**
  * Handle streaming response for real-time agent output
  */
-function handleStreamingResponse(query: string, agentType: string, runConfig?: RunConfig): Response {
+function handleStreamingResponse(
+  query: string, 
+  agentType: string, 
+  requestId: string,
+  runConfig?: RunConfig
+): Response {
   // Create a readable stream from a ReadableStream
   const stream = new ReadableStream({
     async start(controller) {
@@ -225,10 +300,13 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
       let timeoutId: NodeJS.Timeout | null = null;
       
       try {
+        // Update request to in-progress
+        AgentStateService.updateRequest(requestId, { status: 'in-progress' });
+        
         // Set up and encode the initial response
         sendEventMessage(controller, { 
           event: 'start', 
-          data: { message: 'Stream started' }
+          data: { message: 'Stream started', requestId }
         });
         
         // Set up heartbeat to prevent connection timeouts
@@ -242,6 +320,16 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
         // Set request timeout
         timeoutId = setTimeout(() => {
           if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
+          
+          // Update request with timeout error
+          AgentStateService.updateRequest(requestId, {
+            status: 'failed',
+            error: 'Request timed out'
+          });
+          
+          // Update agent state to error
+          AgentStateService.updateAgentState(getAgentTypeEnum(agentType), 'error');
+          
           sendEventMessage(controller, {
             event: 'error',
             data: { message: 'Request timed out' }
@@ -255,6 +343,16 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
           if (timeoutId) clearTimeout(timeoutId);
           
           console.error(`Stream error in ${agentType}:`, error);
+          
+          // Update request with error
+          AgentStateService.updateRequest(requestId, {
+            status: 'failed',
+            error: error.message
+          });
+          
+          // Update agent state to error
+          AgentStateService.updateAgentState(getAgentTypeEnum(agentType), 'error');
+          
           sendEventMessage(controller, { 
             event: 'error', 
             data: { message: error.message } 
@@ -268,7 +366,7 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
           if (token !== undefined && token !== null) {
             sendEventMessage(controller, {
               event: 'token',
-              data: { token }
+              data: { token, requestId }
             });
           } else {
             console.warn('Attempted to send undefined/null token, skipping');
@@ -279,6 +377,16 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
         const handleComplete = (response: AgentResponse) => {
           if (heartbeatIntervalId) clearInterval(heartbeatIntervalId);
           if (timeoutId) clearTimeout(timeoutId);
+          
+          // Update request with success
+          AgentStateService.updateRequest(requestId, {
+            status: 'completed',
+            response: response.content,
+            metadata: response.metadata
+          });
+          
+          // Update agent state to idle
+          AgentStateService.updateAgentState(getAgentTypeEnum(agentType), 'idle');
           
           // Send a trace event with the spans
           if (response.metadata?.trace_id) {
@@ -298,7 +406,8 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
             data: {
               success: response.success,
               content: response.content,
-              metadata: response.metadata
+              metadata: response.metadata,
+              requestId
             }
           });
           controller.close();
@@ -313,7 +422,7 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
               try {
                 sendEventMessage(controller, {
                   event: 'agent_start',
-                  data: { agent: 'triage' }
+                  data: { agent: 'triage', requestId }
                 });
                 
                 const response = await triageAgent.handleTask(query);
@@ -344,7 +453,7 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
                 onStart: () => {
                   sendEventMessage(controller, {
                     event: 'agent_start',
-                    data: { agent: 'triage' }
+                    data: { agent: 'triage', requestId }
                   });
                 },
                 onToken: handleToken,
@@ -368,7 +477,7 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
                 onStart: () => {
                   sendEventMessage(controller, {
                     event: 'agent_start',
-                    data: { agent: 'research' }
+                    data: { agent: 'research', requestId }
                   });
                 },
                 onToken: handleToken,
@@ -392,7 +501,7 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
                 onStart: () => {
                   sendEventMessage(controller, {
                     event: 'agent_start',
-                    data: { agent: 'report' }
+                    data: { agent: 'report', requestId }
                   });
                 },
                 onToken: handleToken,
@@ -416,16 +525,19 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
                 onStart: () => {
                   sendEventMessage(controller, {
                     event: 'agent_start',
-                    data: { agent: 'delegation' }
+                    data: { agent: 'delegation', requestId }
                   });
                 },
                 onToken: handleToken,
                 onError: handleError,
                 onComplete: handleComplete,
                 onHandoff: (from, to) => {
+                  // Log the handoff in the service (could be expanded)
+                  console.log(`Handoff from ${from} to ${to}`);
+                  
                   sendEventMessage(controller, {
                     event: 'handoff',
-                    data: { from, to, timestamp: Date.now() }
+                    data: { from, to, timestamp: Date.now(), requestId }
                   });
                 }
               },
@@ -435,7 +547,7 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
           }
             
           case 'auto':
-          default:
+          default: {
             // Use the full orchestration process with streaming
             const orchestrator = new Orchestrator();
             
@@ -444,7 +556,7 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
                 // Send notification that processing has started
                 sendEventMessage(controller, {
                   event: 'start',
-                  data: { timestamp: Date.now() }
+                  data: { timestamp: Date.now(), requestId }
                 });
                 
                 // Start sending heartbeats
@@ -473,7 +585,7 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
               onResearchStart: () => {
                 sendEventMessage(controller, {
                   event: 'research_start',
-                  data: { timestamp: Date.now() }
+                  data: { timestamp: Date.now(), requestId }
                 });
               },
               onResearchComplete: (researchData) => {
@@ -481,14 +593,15 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
                   event: 'research_complete',
                   data: { 
                     timestamp: Date.now(),
-                    citations: orchestrator.countCitations(researchData) 
+                    citations: orchestrator.countCitations(researchData),
+                    requestId
                   }
                 });
               },
               onReportStart: () => {
                 sendEventMessage(controller, {
                   event: 'report_start',
-                  data: { timestamp: Date.now() }
+                  data: { timestamp: Date.now(), requestId }
                 });
               },
               onHandoff: (from, to) => {
@@ -497,15 +610,27 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
                   data: {
                     from,
                     to,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    requestId
                   }
                 });
               }
             }, runConfig);
             break;
+          }
         }
       } catch (error) {
         console.error('Stream setup error:', error);
+        
+        // Update request with error
+        AgentStateService.updateRequest(requestId, {
+          status: 'failed',
+          error: error instanceof Error ? error.message : 'Unknown stream error'
+        });
+        
+        // Update agent state to error
+        AgentStateService.updateAgentState(getAgentTypeEnum(agentType), 'error');
+        
         sendEventMessage(controller, { 
           event: 'error', 
           data: { message: error instanceof Error ? error.message : 'Unknown stream error' } 
@@ -537,4 +662,24 @@ function sendEventMessage(
   
   // Send to client
   controller.enqueue(new TextEncoder().encode(message));
+}
+
+/**
+ * Helper to convert string agent type to enum
+ */
+function getAgentTypeEnum(agentTypeStr: string): AgentType {
+  switch (agentTypeStr.toLowerCase()) {
+    case 'delegation':
+      return AgentType.DELEGATION;
+    case 'triage':
+      return AgentType.TRIAGE;
+    case 'research':
+      return AgentType.RESEARCH;
+    case 'report':
+      return AgentType.REPORT;
+    case 'custom':
+      return AgentType.CUSTOM;
+    default:
+      return AgentType.DELEGATION; // Default to delegation
+  }
 } 
