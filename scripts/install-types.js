@@ -12,7 +12,6 @@ const typePackages = [
   '@types/react',
   '@types/react-dom',
   '@types/node',
-  '@types/lucide-react',
 ];
 
 // Check package.json to see if we need to add any packages
