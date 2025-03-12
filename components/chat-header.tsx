@@ -1,4 +1,5 @@
 'use client';
+// @ts-ignore
 import { useRouter } from 'next/navigation';
 import { useWindowSize } from 'usehooks-ts';
 

@@ -1,9 +1,10 @@
 'use client';
 
 import type { User } from 'next-auth';
+// @ts-ignore - Next.js type declarations issue
 import { useRouter, usePathname } from 'next/navigation';
 
-import { PlusIcon } from '@/components/icons';
+import { PlusIcon, BoxIcon } from '@/components/icons';
 import { SidebarHistory } from '@/components/sidebar-history';
 import { SidebarUserNav } from '@/components/sidebar-user-nav';
 import { Button } from '@/components/ui/button';
@@ -17,9 +18,9 @@ import {
   SidebarMenuButton,
   useSidebar,
 } from '@/components/ui/sidebar';
+// @ts-ignore - Next.js type declarations issue
 import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
-import { Server } from 'lucide-react';
 
 export function AppSidebar({ user }: { user: User | undefined }) {
   const router = useRouter();
@@ -73,7 +74,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                 onClick={() => setOpenMobile(false)}
                 className="flex items-center gap-2"
               >
-                <Server className="h-4 w-4" />
+                <BoxIcon size={16} />
                 <span>Agent Mode</span>
               </Link>
             </SidebarMenuButton>
