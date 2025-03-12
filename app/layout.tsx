@@ -1,5 +1,3 @@
-'use client';
-
 import type { Metadata } from 'next';
 import { Toaster } from 'sonner';
 import Script from 'next/script';
