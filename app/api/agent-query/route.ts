@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Orchestrator, OrchestrationResult, StreamOrchestrationCallbacks } from '../../../orchestrator';
 import { ResearchAgent } from '../../../agents/ResearchAgent';
 import { ReportAgent } from '../../../agents/ReportAgent';
+import { TriageAgent, TaskType, TriageResult } from '../../../agents/TriageAgent';
 import { AgentResponse, StreamCallbacks } from '../../../agents/agent';
 
 // Simple in-memory rate limiting (would be replaced with Redis or similar in production)
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
     
     // Parse request body
     const body = await req.json();
-    const { query, agentType = 'orchestrator', stream = false } = body;
+    const { query, agentType = 'auto', stream = false } = body;
     
     // Validate request
     if (!query || typeof query !== 'string' || query.trim() === '') {
@@ -75,6 +76,46 @@ export async function POST(req: NextRequest) {
     
     // Route to the appropriate agent based on the agentType
     switch (agentType) {
+      case 'triage':
+        // Only perform triage without executing agents
+        const triageAgent = new TriageAgent();
+        const triageResponse: AgentResponse = await triageAgent.handleTask(query);
+        
+        if (triageResponse.success) {
+          // Parse the triage result
+          try {
+            const triageResult = JSON.parse(triageResponse.content) as TriageResult;
+            result = {
+              success: true,
+              content: triageResponse.content,
+              metadata: {
+                ...triageResponse.metadata,
+                processingTime: Date.now() - startTime,
+                taskType: triageResult.taskType
+              }
+            };
+          } catch (parseError) {
+            result = {
+              success: false,
+              error: 'Failed to parse triage response',
+              content: triageResponse.content,
+              metadata: {
+                processingTime: Date.now() - startTime,
+                parseError: parseError instanceof Error ? parseError.message : 'Unknown parsing error'
+              }
+            };
+          }
+        } else {
+          result = {
+            success: false,
+            error: triageResponse.error,
+            metadata: {
+              processingTime: Date.now() - startTime
+            }
+          };
+        }
+        break;
+        
       case 'research':
         const researchAgent = new ResearchAgent();
         const researchResponse: AgentResponse = await researchAgent.handleTask(query);
@@ -84,7 +125,8 @@ export async function POST(req: NextRequest) {
           error: researchResponse.error,
           metadata: {
             ...researchResponse.metadata,
-            processingTime: Date.now() - startTime
+            processingTime: Date.now() - startTime,
+            taskType: TaskType.RESEARCH
           }
         };
         break;
@@ -98,48 +140,40 @@ export async function POST(req: NextRequest) {
           error: reportResponse.error,
           metadata: {
             ...reportResponse.metadata,
-            processingTime: Date.now() - startTime
+            processingTime: Date.now() - startTime,
+            taskType: TaskType.REPORT
           }
         };
         break;
-        
+
+      case 'auto':
       case 'orchestrator':
       default:
+        // Use the orchestrator with dynamic triage
         const orchestrator = new Orchestrator();
-        const orchestratorResponse: OrchestrationResult = await orchestrator.handleQuery(query);
+        const orchestratorResult: OrchestrationResult = await orchestrator.handleQuery(query);
+        
         result = {
-          success: orchestratorResponse.success,
-          report: orchestratorResponse.report,
-          error: orchestratorResponse.error,
+          success: orchestratorResult.success,
+          report: orchestratorResult.report,
+          error: orchestratorResult.error,
           metadata: {
-            ...orchestratorResponse.metadata,
+            ...orchestratorResult.metadata,
             processingTime: Date.now() - startTime
           }
         };
         break;
     }
     
-    // Return appropriate response based on success/failure
-    if (result.success) {
-      return NextResponse.json({
-        success: true,
-        answer: result.content || result.report,
-        metadata: result.metadata
-      });
-    } else {
-      return NextResponse.json({
-        success: false,
-        error: result.error || 'Processing failed',
-        metadata: result.metadata
-      }, { status: 422 });
-    }
+    // Return the result as JSON
+    return NextResponse.json(result);
+    
   } catch (error) {
-    console.error("Agent query error:", error);
+    console.error('API error:', error);
     return NextResponse.json(
       { 
-        success: false,
-        error: 'Internal Server Error',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'An unknown error occurred',
+        success: false
       },
       { status: 500 }
     );
@@ -217,6 +251,55 @@ function handleStreamingResponse(query: string, agentType: string): Response {
         
         // Route to the appropriate agent based on the agentType
         switch (agentType) {
+          case 'triage': {
+            const triageAgent = new TriageAgent();
+            if (!triageAgent.streamTask) {
+              // Triage doesn't support streaming, so fake it with regular task execution
+              try {
+                sendEventMessage(controller, {
+                  event: 'agent_start',
+                  data: { agent: 'triage' }
+                });
+                
+                const response = await triageAgent.handleTask(query);
+                if (response.success) {
+                  try {
+                    const triageResult = JSON.parse(response.content) as TriageResult;
+                    handleToken(`Analyzed your query. This appears to be a ${triageResult.taskType} task.\n\n`);
+                    handleToken(`Reasoning: ${triageResult.reasoning}\n\n`);
+                    
+                    if (triageResult.modifiedQuery && triageResult.modifiedQuery !== query) {
+                      handleToken(`Suggested query reformulation: ${triageResult.modifiedQuery}\n\n`);
+                    }
+                  } catch (parseError) {
+                    handleToken('Analysis complete, but could not parse the result format.\n\n');
+                  }
+                }
+                handleComplete(response);
+              } catch (error) {
+                handleError(error instanceof Error ? error : new Error('Triage processing failed'));
+              }
+              return;
+            }
+            
+            // If triage agent implements streamTask in the future, this code would run
+            await triageAgent.streamTask(
+              query,
+              {
+                onStart: () => {
+                  sendEventMessage(controller, {
+                    event: 'agent_start',
+                    data: { agent: 'triage' }
+                  });
+                },
+                onToken: handleToken,
+                onError: handleError,
+                onComplete: handleComplete
+              }
+            );
+            break;
+          }
+          
           case 'research': {
             const researchAgent = new ResearchAgent();
             if (!researchAgent.streamTask) {
@@ -265,6 +348,7 @@ function handleStreamingResponse(query: string, agentType: string): Response {
             break;
           }
             
+          case 'auto':
           case 'orchestrator':
           default: {
             const orchestrator = new Orchestrator();
@@ -278,27 +362,42 @@ function handleStreamingResponse(query: string, agentType: string): Response {
                     data: { agent: 'orchestrator' }
                   });
                 },
+                
+                onTriageComplete: (triageResult) => {
+                  sendEventMessage(controller, {
+                    event: 'triage_complete',
+                    data: { 
+                      taskType: triageResult.taskType,
+                      confidence: triageResult.confidence,
+                      reasoning: triageResult.reasoning
+                    }
+                  });
+                },
+                
                 onResearchStart: () => {
                   sendEventMessage(controller, {
                     event: 'research_start',
-                    data: {}
+                    data: { message: 'Starting research phase' }
                   });
                 },
+                
                 onResearchComplete: (researchData) => {
                   sendEventMessage(controller, {
                     event: 'research_complete',
                     data: { 
-                      researchDataLength: researchData.length,
-                      sources: orchestrator.countCitations(researchData)
+                      message: 'Research phase complete',
+                      citations: orchestrator.countCitations(researchData)
                     }
                   });
                 },
+                
                 onReportStart: () => {
                   sendEventMessage(controller, {
                     event: 'report_start',
-                    data: {}
+                    data: { message: 'Starting report generation' }
                   });
                 },
+                
                 onToken: handleToken,
                 onError: handleError,
                 onComplete: handleComplete
@@ -308,19 +407,11 @@ function handleStreamingResponse(query: string, agentType: string): Response {
           }
         }
       } catch (error) {
-        console.error("Streaming error:", error);
-        // Send error as SSE event
-        if (error instanceof Error) {
-          sendEventMessage(controller, { 
-            event: 'error', 
-            data: { message: error.message } 
-          });
-        } else {
-          sendEventMessage(controller, { 
-            event: 'error', 
-            data: { message: 'Unknown streaming error' } 
-          });
-        }
+        console.error('Stream setup error:', error);
+        sendEventMessage(controller, { 
+          event: 'error', 
+          data: { message: error instanceof Error ? error.message : 'Unknown stream error' } 
+        });
         controller.close();
       }
     }

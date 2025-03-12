@@ -22,12 +22,22 @@ interface EnhancedMessage extends Message {
   isStreaming?: boolean;
   error?: string;
   metadata?: {
+    // Triage metadata
+    triageInProgress?: boolean;
+    triageComplete?: boolean;
+    taskType?: string;
+    triageConfidence?: number;
+    triageReasoning?: string;
+    
+    // Research metadata
     researchInProgress?: boolean;
     researchComplete?: boolean;
     researchStats?: {
       sources?: number;
       researchDataLength?: number;
     };
+    
+    // Report metadata
     reportInProgress?: boolean;
   };
 }
@@ -41,9 +51,25 @@ function AgentMessage({ message }: { message: EnhancedMessage }) {
           ? 'bg-primary text-primary-foreground' 
           : 'bg-muted text-foreground'
       }`}>
+        {message.role === 'assistant' && message.metadata?.triageInProgress && (
+          <div className="text-sm text-purple-500 mb-1 flex items-center gap-1">
+            <Loader2 className="h-3 w-3 animate-spin" /> 
+            <span>Analyzing query type...</span>
+          </div>
+        )}
+        
+        {message.role === 'assistant' && message.metadata?.triageComplete && (
+          <div className="text-sm text-indigo-500 mb-1">
+            <div className="font-medium">Query analyzed as: {message.metadata.taskType}</div>
+            {message.metadata.triageConfidence && (
+              <div className="text-xs">Confidence: {(message.metadata.triageConfidence * 100).toFixed(1)}%</div>
+            )}
+          </div>
+        )}
+        
         {message.role === 'assistant' && message.metadata?.researchInProgress && (
           <div className="text-sm text-amber-500 mb-1 flex items-center gap-1">
-            <Loader2 className="size-3 animate-spin" /> 
+            <Loader2 className="h-3 w-3 animate-spin" /> 
             <span>Researching the web...</span>
           </div>
         )}
@@ -56,7 +82,7 @@ function AgentMessage({ message }: { message: EnhancedMessage }) {
         
         {message.role === 'assistant' && message.metadata?.reportInProgress && (
           <div className="text-sm text-blue-500 mb-1 flex items-center gap-1">
-            <Loader2 className="size-3 animate-spin" />
+            <Loader2 className="h-3 w-3 animate-spin" />
             <span>Generating report...</span>
           </div>
         )}
@@ -84,7 +110,7 @@ function AgentMessage({ message }: { message: EnhancedMessage }) {
   );
 }
 
-type AgentType = 'research' | 'report' | 'orchestrator';
+type AgentType = 'auto' | 'triage' | 'research' | 'report' | 'orchestrator';
 
 // Add reconnection mechanism
 const MAX_RECONNECT_ATTEMPTS = 3;
@@ -99,7 +125,7 @@ export function AgentInterface() {
   const [messages, setMessages] = useState<EnhancedMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState<AgentType>('orchestrator');
+  const [selectedAgent, setSelectedAgent] = useState<AgentType>('auto');
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -142,9 +168,8 @@ export function AgentInterface() {
   // Cleanup any active EventSource on unmount
   useEffect(() => {
     return () => {
-      const eventSource = eventSourceRef.current;
-      if (eventSource) {
-        eventSource.close();
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
       }
       
       // Also clean up any heartbeat timeouts
@@ -233,7 +258,14 @@ export function AgentInterface() {
         id: assistantMessageId,
         role: 'assistant',
         content: '',
-        isStreaming: true
+        isStreaming: true,
+        metadata: {
+          // For 'auto' or 'triage', show triage in progress
+          triageInProgress: selectedAgent === 'auto' || selectedAgent === 'triage',
+          // For other agents, set appropriate flags
+          researchInProgress: selectedAgent === 'research' || selectedAgent === 'orchestrator',
+          reportInProgress: selectedAgent === 'report'
+        }
       };
       
       // Update messages with user message and empty assistant message
@@ -346,6 +378,49 @@ export function AgentInterface() {
               
               // Handle different event types
               switch (eventType) {
+                case 'start':
+                  // Set metadata based on agent type
+                  setMessages(prev => {
+                    const msgIndex = prev.findIndex(m => m.id === assistantMessageId);
+                    if (msgIndex === -1) return prev;
+                    
+                    const updatedMsgs = [...prev];
+                    updatedMsgs[msgIndex] = {
+                      ...updatedMsgs[msgIndex],
+                      metadata: {
+                        ...updatedMsgs[msgIndex].metadata,
+                        // For 'auto' or 'triage', show triage in progress
+                        triageInProgress: selectedAgent === 'auto' || selectedAgent === 'triage',
+                        // For other agents, set appropriate flags based on agent type
+                        researchInProgress: selectedAgent === 'research' || selectedAgent === 'orchestrator',
+                        reportInProgress: selectedAgent === 'report'
+                      }
+                    };
+                    return updatedMsgs;
+                  });
+                  break;
+                  
+                case 'triage_complete':
+                  setMessages(prev => {
+                    const msgIndex = prev.findIndex(m => m.id === assistantMessageId);
+                    if (msgIndex === -1) return prev;
+                    
+                    const updatedMsgs = [...prev];
+                    updatedMsgs[msgIndex] = {
+                      ...updatedMsgs[msgIndex],
+                      metadata: {
+                        ...updatedMsgs[msgIndex].metadata,
+                        triageInProgress: false,
+                        triageComplete: true,
+                        taskType: data.taskType,
+                        triageConfidence: data.confidence,
+                        triageReasoning: data.reasoning
+                      }
+                    };
+                    return updatedMsgs;
+                  });
+                  break;
+                  
                 case 'heartbeat':
                   // Update last heartbeat time
                   lastHeartbeatTime = Date.now();
@@ -524,12 +599,16 @@ export function AgentInterface() {
 
   const getAgentDescription = () => {
     switch (selectedAgent) {
+      case 'auto':
+        return 'Automatically analyze your query and choose the best agent';
+      case 'triage':
+        return 'Analyze your query without generating a response';
       case 'research':
-        return 'Research Agent searches the web for current information and provides detailed answers with citations.';
+        return 'Search the web for current information';
       case 'report':
-        return 'Report Agent generates well-structured reports in Markdown format based on your input.';
+        return 'Format and analyze existing information';
       case 'orchestrator':
-        return 'Orchestrator combines research and report generation to create comprehensive reports on any topic.';
+        return 'Research and generate a comprehensive report';
       default:
         return '';
     }
@@ -553,7 +632,7 @@ export function AgentInterface() {
           onClick={toggleAgentMode}
           className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="size-4" />
+          <ArrowLeft className="h-4 w-4" />
           <span>Back to Chat</span>
         </Button>
         
@@ -563,17 +642,39 @@ export function AgentInterface() {
             value={selectedAgent} 
             onValueChange={(value) => setSelectedAgent(value as AgentType)}
           >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select Agent" />
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Select agent type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="research">Research Agent</SelectItem>
-              <SelectItem value="report">Report Agent</SelectItem>
-              <SelectItem value="orchestrator">Orchestrator</SelectItem>
+              <SelectItem value="auto">
+                <div className="flex items-center">
+                  <span className="mr-2">🧠</span> Auto
+                </div>
+              </SelectItem>
+              <SelectItem value="triage">
+                <div className="flex items-center">
+                  <span className="mr-2">🔍</span> Query Analysis
+                </div>
+              </SelectItem>
+              <SelectItem value="research">
+                <div className="flex items-center">
+                  <Search className="mr-2 h-4 w-4" /> Research
+                </div>
+              </SelectItem>
+              <SelectItem value="report">
+                <div className="flex items-center">
+                  <FileText className="mr-2 h-4 w-4" /> Report
+                </div>
+              </SelectItem>
+              <SelectItem value="orchestrator">
+                <div className="flex items-center">
+                  <span className="mr-2">🤖</span> Full Research Report
+                </div>
+              </SelectItem>
             </SelectContent>
           </Select>
           
-          {messages.length > 0 && (
+          {selectedAgent !== 'auto' && selectedAgent !== 'triage' && (
             <Button 
               variant="ghost" 
               size="sm" 
@@ -587,7 +688,7 @@ export function AgentInterface() {
       </div>
       
       <div className="flex-1 overflow-y-auto px-4 pt-4">
-        {messages.length === 0 ? (
+        {selectedAgent === 'auto' || selectedAgent === 'triage' ? (
           <div className="flex-1 flex items-center justify-center h-full">
             <div className="text-center">
               <h1 className="text-2xl font-bold mb-2">Agent Mode</h1>
@@ -640,7 +741,7 @@ export function AgentInterface() {
             disabled={isLoading}
           />
           <Button type="submit" disabled={isLoading || !input.trim()}>
-            {isLoading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </form>
       </div>
