@@ -79,9 +79,48 @@ function zodToJsonSchema(schema: z.ZodType<any, any>): object {
         if (!isOptional) {
           baseSchema.required.push(key);
         }
+      } else if (value instanceof z.ZodEnum) {
+        baseSchema.properties[key] = { 
+          type: 'string',
+          enum: value._def.values
+        };
+        
+        if (value._def.description) {
+          baseSchema.properties[key].description = value._def.description;
+        }
+        
+        // Check if it's optional
+        const isOptional = value instanceof z.ZodOptional ||
+                          Object.getPrototypeOf(value).constructor.name === 'ZodOptional';
+        
+        if (!isOptional) {
+          baseSchema.required.push(key);
+        }
+      } else if (value instanceof z.ZodArray) {
+        baseSchema.properties[key] = { 
+          type: 'array',
+          items: { type: 'string' } // Default to string items
+        };
+        
+        if (value._def.description) {
+          baseSchema.properties[key].description = value._def.description;
+        }
+        
+        // Check if it's optional
+        const isOptional = value instanceof z.ZodOptional ||
+                          Object.getPrototypeOf(value).constructor.name === 'ZodOptional';
+        
+        if (!isOptional) {
+          baseSchema.required.push(key);
+        }
       }
       // Add other types as needed
     });
+  }
+  
+  // If we have no required fields, omit the required property entirely
+  if (baseSchema.required.length === 0) {
+    delete baseSchema.required;
   }
   
   return baseSchema;

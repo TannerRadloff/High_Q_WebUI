@@ -282,9 +282,9 @@ export function AgentInterface() {
         content: '',
         isStreaming: true,
         metadata: {
-          // For 'auto' or 'triage', show triage in progress
-          triageInProgress: selectedAgent === 'auto' || selectedAgent === 'triage',
-          // For other agents, set appropriate flags
+          // For 'auto', show triage in progress
+          triageInProgress: selectedAgent === 'auto',
+          // For other agents, set appropriate flags based on agent type
           researchInProgress: selectedAgent === 'research' || selectedAgent === 'orchestrator',
           reportInProgress: selectedAgent === 'report'
         }
@@ -411,8 +411,8 @@ export function AgentInterface() {
                       ...updatedMsgs[msgIndex],
                       metadata: {
                         ...updatedMsgs[msgIndex].metadata,
-                        // For 'auto' or 'triage', show triage in progress
-                        triageInProgress: selectedAgent === 'auto' || selectedAgent === 'triage',
+                        // For 'auto', show triage in progress
+                        triageInProgress: selectedAgent === 'auto',
                         // For other agents, set appropriate flags based on agent type
                         researchInProgress: selectedAgent === 'research' || selectedAgent === 'orchestrator',
                         reportInProgress: selectedAgent === 'report'
@@ -705,8 +705,6 @@ export function AgentInterface() {
     switch (selectedAgent) {
       case 'auto':
         return 'Automatically analyze your query and choose the best agent';
-      case 'triage':
-        return 'Analyze your query without generating a response';
       case 'research':
         return 'Search the web for current information';
       case 'report':
@@ -756,11 +754,6 @@ export function AgentInterface() {
                   <span className="mr-2">🧠</span> Auto
                 </div>
               </SelectItem>
-              <SelectItem value="triage">
-                <div className="flex items-center">
-                  <span className="mr-2">🔍</span> Query Analysis
-                </div>
-              </SelectItem>
               <SelectItem value="research">
                 <div className="flex items-center">
                   <Search className="mr-2 h-4 w-4" /> Research
@@ -779,7 +772,7 @@ export function AgentInterface() {
             </SelectContent>
           </Select>
           
-          {selectedAgent !== 'auto' && selectedAgent !== 'triage' && (
+          {selectedAgent !== 'auto' && (
             <Button 
               variant="ghost" 
               size="sm" 
@@ -793,7 +786,7 @@ export function AgentInterface() {
       </div>
       
       <div className="flex-1 overflow-y-auto px-4 pt-4">
-        {selectedAgent === 'auto' || selectedAgent === 'triage' ? (
+        {selectedAgent === 'auto' ? (
           <div className="flex-1 flex items-center justify-center h-full">
             <div className="text-center">
               <h1 className="text-2xl font-bold mb-2">Agent Mode</h1>

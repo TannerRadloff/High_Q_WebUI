@@ -74,6 +74,7 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
     // Convert our tools to OpenAI's format
     const apiTools = this.tools.map(tool => ({
       type: 'function',
+      name: tool.name,
       function: {
         name: tool.name,
         description: tool.description,
@@ -82,25 +83,58 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
     }));
 
     // Convert handoffs to tools
-    const handoffTools = this.handoffs.map(agent => ({
-      type: 'function',
-      function: {
-        name: `transfer_to_${agent.name.toLowerCase().replace(/\s+/g, '_')}`,
-        description: `Transfer the conversation to the ${agent.name}`,
-        parameters: {
-          type: 'object',
-          properties: {
-            reason: {
-              type: 'string',
-              description: 'Optional reason for the handoff'
-            }
-          },
-          required: []
+    const handoffTools = this.handoffs.map(agent => {
+      const name = `transfer_to_${agent.name.toLowerCase().replace(/\s+/g, '_')}`;
+      return {
+        type: 'function',
+        name: name,
+        function: {
+          name: name,
+          description: `Transfer the conversation to the ${agent.name}`,
+          parameters: {
+            type: 'object',
+            properties: {
+              reason: {
+                type: 'string',
+                description: 'Optional reason for the handoff'
+              }
+            },
+            required: []
+          }
+        }
+      };
+    });
+    
+    // Log the tools before returning to help debug
+    const allTools = [...apiTools, ...handoffTools];
+    
+    // Ensure every tool has the required fields according to OpenAI API
+    for (const tool of allTools) {
+      if (!tool.type) {
+        console.error('Tool missing type field:', tool);
+        tool.type = 'function'; // Set default type
+      }
+      
+      if (!tool.name) {
+        console.error('Tool missing name field:', tool);
+        // If missing name, try to get it from function.name
+        if (tool.function && tool.function.name) {
+          tool.name = tool.function.name;
+        } else {
+          tool.name = 'unnamed_tool';
         }
       }
-    }));
+      
+      if (!tool.function || !tool.function.name) {
+        console.error('Tool missing function.name field:', tool);
+        if (tool.function && !tool.function.name && tool.name) {
+          // Copy the name from the tool to the function if missing
+          tool.function.name = tool.name;
+        }
+      }
+    }
 
-    return [...apiTools, ...handoffTools];
+    return allTools;
   }
 
   /**
@@ -247,10 +281,53 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
       // Add tools if we have any
       if (hasTools) {
         createParams.tools = apiTools;
+        
+        // Add debug logging
+        console.log('Sending tools to OpenAI API:', JSON.stringify(apiTools, null, 2));
       }
       
       // Extract conversation history from context if available
       const conversationHistory = context?.conversationHistory || [];
+      
+      // Log full params for debugging
+      console.log('Creating response with params:', JSON.stringify(createParams, null, 2));
+      
+      // Ensure tools format is correct for OpenAI API
+      if (createParams.tools && createParams.tools.length > 0) {
+        // Double check that all tools have the required format
+        createParams.tools = createParams.tools.map((tool: any) => {
+          // Make sure each tool has a 'type' field and a 'name' field
+          if (!tool.type) {
+            tool.type = 'function';
+          }
+          
+          if (!tool.name) {
+            console.error('Tool missing name field:', tool);
+            // Try to get name from function.name if available
+            if (tool.function && tool.function.name) {
+              tool.name = tool.function.name;
+            } else {
+              tool.name = 'unnamed_tool';
+            }
+          }
+          
+          // Make sure the function property has the right structure
+          if (tool.type === 'function' && (!tool.function || !tool.function.name)) {
+            console.error('Tool missing required function fields:', tool);
+            // Try to fix it
+            if (!tool.function) {
+              tool.function = {
+                name: tool.name || 'unnamed_function',
+                description: 'No description provided',
+                parameters: { type: 'object', properties: {} }
+              };
+            } else if (!tool.function.name) {
+              tool.function.name = tool.name || 'unnamed_function';
+            }
+          }
+          return tool;
+        });
+      }
       
       // Call OpenAI
       const response = await client.responses.create(createParams) as unknown as OpenAIResponse;
@@ -355,10 +432,53 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
       // Add tools if we have any
       if (hasTools) {
         streamParams.tools = apiTools;
+        
+        // Add debug logging
+        console.log('Sending tools to OpenAI streaming API:', JSON.stringify(apiTools, null, 2));
       }
       
       // Extract conversation history from context if available
       const conversationHistory = context?.conversationHistory || [];
+      
+      // Log full params for debugging
+      console.log('Creating streaming response with params:', JSON.stringify(streamParams, null, 2));
+      
+      // Ensure tools format is correct for OpenAI API
+      if (streamParams.tools && streamParams.tools.length > 0) {
+        // Double check that all tools have the required format
+        streamParams.tools = streamParams.tools.map((tool: any) => {
+          // Make sure each tool has a 'type' field and a 'name' field
+          if (!tool.type) {
+            tool.type = 'function';
+          }
+          
+          if (!tool.name) {
+            console.error('Tool missing name field for streaming:', tool);
+            // Try to get name from function.name if available
+            if (tool.function && tool.function.name) {
+              tool.name = tool.function.name;
+            } else {
+              tool.name = 'unnamed_tool';
+            }
+          }
+          
+          // Make sure the function property has the right structure
+          if (tool.type === 'function' && (!tool.function || !tool.function.name)) {
+            console.error('Tool missing required function fields for streaming:', tool);
+            // Try to fix it
+            if (!tool.function) {
+              tool.function = {
+                name: tool.name || 'unnamed_function',
+                description: 'No description provided',
+                parameters: { type: 'object', properties: {} }
+              };
+            } else if (!tool.function.name) {
+              tool.function.name = tool.name || 'unnamed_function';
+            }
+          }
+          return tool;
+        });
+      }
       
       // Stream the response
       const stream = await client.responses.create(streamParams);
