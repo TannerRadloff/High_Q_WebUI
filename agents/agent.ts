@@ -1,6 +1,12 @@
 // agents/agent.ts
 import { Tool } from './tools';
 
+// Forward declaration to avoid circular dependency
+interface Handoff {
+  agent: Agent;
+  // Other properties defined in handoff.ts
+}
+
 export interface AgentResponse {
   content: string;
   metadata?: Record<string, any>;
@@ -37,7 +43,8 @@ export interface AgentConfig<OutputType = any> {
     [key: string]: any;
   };
   tools?: Tool[];
-  handoffs?: Agent[];
+  handoffs?: (Agent | Handoff)[];
+  handoffInputFilter?: HandoffInputFilter; // Global input filter for all handoffs
   outputType?: OutputType;
 }
 
@@ -52,7 +59,7 @@ export interface Agent<OutputType = any> {
     [key: string]: any;
   };
   tools: Tool[];
-  handoffs: Agent[];
+  handoffs: (Agent | Handoff)[];
   outputType?: OutputType;
   
   /**

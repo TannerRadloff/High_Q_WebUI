@@ -29,71 +29,15 @@ export interface OpenAIRequestParams {
 /**
  * Prepare tools for the OpenAI API
  */
-export function prepareToolsForAPI(tools: Tool[], handoffs: Agent[]): any[] {
-  // Convert our tools to OpenAI's format
-  const apiTools = tools.map(tool => ({
+export function prepareToolsForAPI(tools: Tool[], includeHandoffs = true): any[] {
+  return tools.map(tool => ({
     type: 'function',
-    name: tool.name,
     function: {
       name: tool.name,
       description: tool.description,
       parameters: tool.parametersSchema
     }
   }));
-
-  // Convert handoffs to tools
-  const handoffTools = handoffs.map(agent => {
-    const name = `transfer_to_${agent.name.toLowerCase().replace(/\s+/g, '_')}`;
-    return {
-      type: 'function',
-      name: name,
-      function: {
-        name: name,
-        description: `Transfer the conversation to the ${agent.name}`,
-        parameters: {
-          type: 'object',
-          properties: {
-            reason: {
-              type: 'string',
-              description: 'Optional reason for the handoff'
-            }
-          },
-          required: []
-        }
-      }
-    };
-  });
-  
-  // Log the tools before returning to help debug
-  const allTools = [...apiTools, ...handoffTools];
-  
-  // Ensure every tool has the required fields according to OpenAI API
-  for (const tool of allTools) {
-    if (!tool.type) {
-      console.error('Tool missing type field:', tool);
-      tool.type = 'function'; // Set default type
-    }
-    
-    if (!tool.name) {
-      console.error('Tool missing name field:', tool);
-      // If missing name, try to get it from function.name
-      if (tool.function && tool.function.name) {
-        tool.name = tool.function.name;
-      } else {
-        tool.name = 'unnamed_tool';
-      }
-    }
-    
-    if (!tool.function || !tool.function.name) {
-      console.error('Tool missing function.name field:', tool);
-      if (tool.function && !tool.function.name && tool.name) {
-        // Copy the name from the tool to the function if missing
-        tool.function.name = tool.name;
-      }
-    }
-  }
-
-  return allTools;
 }
 
 /**

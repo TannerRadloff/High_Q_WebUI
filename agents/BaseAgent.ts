@@ -15,6 +15,7 @@ import {
   streamOpenAI
 } from './api-utils';
 import { MaxTurnsExceededError } from '../runner';
+import { Handoff, defaultToolName, defaultToolDescription } from './handoff';
 
 // Type for OpenAI API response
 type OpenAIResponse = {
@@ -42,10 +43,15 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
     [key: string]: any;
   };
   tools: Tool[];
-  handoffs: Agent[];
+  handoffs: (Agent | Handoff)[];
   outputType?: OutputType;
   protected memory?: MemoryManager;
+  protected handoffInputFilter?: HandoffInputFilter;
+  handoffCallbacks: Map<string, (ctx: AgentContext, inputData?: any) => void | Promise<void>>;
+  handoffInputTypes: Map<string, z.ZodType<any>>;
   handoffInputFilters: Map<string, HandoffInputFilter>;
+  handoffToolNames: Map<string, string>;
+  handoffToolDescriptions: Map<string, string>;
 
   constructor(config: AgentConfig<OutputType>) {
     this.name = config.name;
@@ -55,13 +61,67 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
     this.tools = config.tools || [];
     this.handoffs = config.handoffs || [];
     this.outputType = config.outputType;
-    this.handoffInputFilters = new Map<string, HandoffInputFilter>();
+    this.handoffInputFilter = config.handoffInputFilter;
+    
+    // Maps for handoff customizations
+    this.handoffCallbacks = new Map();
+    this.handoffInputTypes = new Map();
+    this.handoffInputFilters = new Map();
+    this.handoffToolNames = new Map();
+    this.handoffToolDescriptions = new Map();
+    
+    // Process handoffs to extract customizations
+    this.processHandoffs();
     
     // Initialize memory if not provided
     if (!this.memory && config.name) {
       const storage = new InMemoryStorage();
       this.memory = new MemoryManager(storage, config.name);
     }
+  }
+
+  /**
+   * Process the handoffs array to extract customizations
+   */
+  private processHandoffs(): void {
+    this.handoffs.forEach(handoffItem => {
+      let agent: Agent;
+      let customHandoff: Handoff | null = null;
+      
+      // Check if it's a direct Agent or a Handoff object
+      if ('handleTask' in handoffItem) {
+        agent = handoffItem as Agent;
+      } else {
+        customHandoff = handoffItem as Handoff;
+        agent = customHandoff.agent;
+      }
+      
+      // Create a unique key for this agent
+      const agentKey = agent.name.toLowerCase().replace(/\s+/g, '_');
+      
+      if (customHandoff) {
+        // Store customizations if provided
+        if (customHandoff.onHandoff) {
+          this.handoffCallbacks.set(agentKey, customHandoff.onHandoff);
+        }
+        
+        if (customHandoff.inputType) {
+          this.handoffInputTypes.set(agentKey, customHandoff.inputType);
+        }
+        
+        if (customHandoff.inputFilter) {
+          this.handoffInputFilters.set(agentKey, customHandoff.inputFilter);
+        }
+        
+        if (customHandoff.toolNameOverride) {
+          this.handoffToolNames.set(agentKey, customHandoff.toolNameOverride);
+        }
+        
+        if (customHandoff.toolDescriptionOverride) {
+          this.handoffToolDescriptions.set(agentKey, customHandoff.toolDescriptionOverride);
+        }
+      }
+    });
   }
 
   /**
@@ -100,20 +160,47 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
       const { id, function: { name, arguments: argsStr } } = toolCall;
       
       try {
-        // Check if this is a handoff tool call
-        if (name.startsWith('transfer_to_')) {
-          const targetAgentName = name.replace('transfer_to_', '').toLowerCase();
+        // Check if this is a handoff tool call by matching against our custom tool names
+        const isHandoff = name.startsWith('transfer_to_') || 
+          [...this.handoffToolNames.values()].includes(name);
+        
+        if (isHandoff) {
+          // Parse arguments
+          const handoffArgs = JSON.parse(argsStr);
+          const reason = handoffArgs.reason || 'No reason provided';
           
-          // Find the target agent in handoffs
-          const targetAgent = this.handoffs.find(agent => 
-            agent.name.toLowerCase().replace(/\s+/g, '_') === targetAgentName
-          );
+          // Find the target agent by matching the tool name
+          let targetAgent: Agent | null = null;
+          let targetAgentKey = '';
+          
+          // First check if it's a custom tool name
+          for (const [key, toolName] of this.handoffToolNames.entries()) {
+            if (toolName === name) {
+              targetAgentKey = key;
+              break;
+            }
+          }
+          
+          // If not found, check if it's a default tool name (transfer_to_<agent_name>)
+          if (!targetAgentKey && name.startsWith('transfer_to_')) {
+            const agentNameFromTool = name.replace('transfer_to_', '').toLowerCase();
+            targetAgentKey = agentNameFromTool;
+          }
+          
+          // Find the actual agent from the handoffs array
+          for (const handoffItem of this.handoffs) {
+            const agent = 'handleTask' in handoffItem ? 
+              handoffItem as Agent : 
+              (handoffItem as Handoff).agent;
+            
+            const agentKey = agent.name.toLowerCase().replace(/\s+/g, '_');
+            if (agentKey === targetAgentKey) {
+              targetAgent = agent;
+              break;
+            }
+          }
           
           if (targetAgent) {
-            // Parse arguments
-            const handoffArgs = JSON.parse(argsStr);
-            const reason = handoffArgs.reason || 'No reason provided';
-            
             // Create a span for the handoff
             const handoffSpanWrapper = handoff_span(this.name, targetAgent.name, {
               source_agent: this.name,
@@ -141,59 +228,71 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
               
               // Prepare input for the target agent
               let handoffInput = conversationHistory 
-                ? `I need your help with: ${conversationHistory[conversationHistory.length - 1].content}` 
-                : context?.originalQuery || 'Please help with this task';
+                ? { messages: conversationHistory }
+                : { messages: [{ role: 'user', content: context?.originalQuery || 'Please help with this task' }] };
               
-              // Apply input filter if available for this specific handoff
-              const targetAgentKey = targetAgent.name.toLowerCase().replace(/\s+/g, '_');
-              if (this.handoffInputFilters.has(targetAgentKey)) {
-                const inputFilter = this.handoffInputFilters.get(targetAgentKey);
-                if (inputFilter && typeof inputFilter === 'function') {
-                  handoffInput = inputFilter(handoffInput);
+              // Call the onHandoff callback if it exists
+              const onHandoffCallback = this.handoffCallbacks.get(targetAgentKey);
+              if (onHandoffCallback) {
+                // Check if we have an input type for this handoff
+                const inputType = this.handoffInputTypes.get(targetAgentKey);
+                if (inputType) {
+                  try {
+                    // Parse and validate the input data
+                    const parsedData = inputType.parse(handoffArgs);
+                    await onHandoffCallback(handoffContext, parsedData);
+                  } catch (error) {
+                    console.error(`Error parsing handoff input data: ${error}`);
+                    await onHandoffCallback(handoffContext);
+                  }
+                } else {
+                  await onHandoffCallback(handoffContext);
                 }
-              } 
-              // Or apply global handoff input filter if available
-              else if (runConfig?.handoff_input_filter && typeof runConfig.handoff_input_filter === 'function') {
-                handoffInput = runConfig.handoff_input_filter(handoffInput);
               }
               
-              // Execute the handoff by calling the target agent's handleTask method
-              const response = await targetAgent.handleTask(
-                handoffInput,
-                handoffContext
-              );
+              // Apply input filter for this specific handoff if available
+              const specificInputFilter = this.handoffInputFilters.get(targetAgentKey);
+              if (specificInputFilter) {
+                handoffInput = specificInputFilter(handoffInput);
+              } 
+              // Otherwise apply the global input filter if available
+              else if (this.handoffInputFilter) {
+                handoffInput = this.handoffInputFilter(handoffInput);
+              }
               
-              // Return the result from the target agent
-              handoffResult = response;
+              // Process the handoff - extract the latest user message
+              const latestUserMessage = handoffInput.messages
+                ? handoffInput.messages.findLast((msg: any) => msg.role === 'user')?.content
+                : context?.originalQuery || 'Please help with this task';
               
-              // Add a tool result for the handoff
+              // Call the target agent's handleTask method
+              handoffResult = await targetAgent.handleTask(latestUserMessage, handoffContext);
+              
+              // Mark this handoff as used in the tool results
               toolResults.push({
                 tool_call_id: id,
                 role: 'tool',
                 name,
-                content: JSON.stringify({
-                  status: 'success',
-                  message: `Handoff to ${targetAgent.name} completed successfully`,
-                  handoffId: uuidv4().substring(0, 8)
+                content: JSON.stringify({ 
+                  success: true, 
+                  message: `Successfully handed off to ${targetAgent.name}` 
                 })
               });
               
-              // Exit the handoff span
-              handoffSpanWrapper.exit();
-              
-              // In case of a handoff, we stop processing other tool calls
+              // No need to process further tool calls after a handoff
               break;
             } catch (error) {
-              console.error(`Handoff to ${targetAgent.name} failed:`, error);
+              console.error(`Error during handoff to ${targetAgent.name}: ${error}`);
               handoffSpanWrapper.exit();
               
+              // Add error to tool results
               toolResults.push({
                 tool_call_id: id,
                 role: 'tool',
                 name,
-                content: JSON.stringify({
-                  status: 'error',
-                  message: `Handoff to ${targetAgent.name} failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+                content: JSON.stringify({ 
+                  success: false, 
+                  error: `Handoff to ${targetAgent.name} failed: ${error}` 
                 })
               });
             }
@@ -203,9 +302,9 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
               tool_call_id: id,
               role: 'tool',
               name,
-              content: JSON.stringify({
-                status: 'error',
-                message: `Target agent '${targetAgentName}' not found in available handoffs`
+              content: JSON.stringify({ 
+                success: false, 
+                error: `Target agent not found for handoff: ${name}` 
               })
             });
           }
@@ -240,13 +339,12 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
           }
         }
       } catch (error) {
-        console.error(`Error processing tool call:`, error);
-        
+        console.error(`Error processing tool call ${name}: ${error}`);
         toolResults.push({
           tool_call_id: id,
           role: 'tool',
           name,
-          content: `Error: ${error instanceof Error ? error.message : 'Unknown error during tool execution'}`
+          content: JSON.stringify({ success: false, error: `${error}` })
         });
       }
     }
@@ -336,7 +434,7 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
         currentTurn++;
         
         // Prepare the LLM call with the conversation history
-        const formattedTools = prepareToolsForAPI(this.tools, this.handoffs);
+        const formattedTools = this.prepareTools(enhancedContext);
         
         // Prepare API parameters for LLM call
         const requestParams = prepareCompletionParams({
@@ -447,7 +545,7 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
       const instructions = this.resolveInstructions(context);
       
       // Get prepared tools
-      const formattedTools = prepareToolsForAPI(this.tools, this.handoffs);
+      const formattedTools = this.prepareTools(context);
       
       // Prepare streaming parameters
       const streamParams = prepareStreamingParams({
@@ -725,6 +823,95 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
         }
       }
     };
+  }
+
+  /**
+   * Prepare tools for the OpenAI API, including handoffs
+   */
+  prepareTools(context?: AgentContext): any[] {
+    const tools = prepareToolsForAPI(this.tools);
+    
+    // Create handoff tools
+    const handoffTools = this.handoffs.map(handoffItem => {
+      let agent: Agent;
+      let toolName: string;
+      let toolDescription: string;
+      
+      // Check if it's a direct Agent or a Handoff object
+      if ('handleTask' in handoffItem) {
+        agent = handoffItem as Agent;
+        const agentKey = agent.name.toLowerCase().replace(/\s+/g, '_');
+        
+        // Use custom tool name if available, otherwise use default
+        toolName = this.handoffToolNames.get(agentKey) || defaultToolName(agent.name);
+        
+        // Use custom tool description if available, otherwise use default
+        toolDescription = this.handoffToolDescriptions.get(agentKey) || defaultToolDescription(agent.name);
+      } else {
+        const handoff = handoffItem as Handoff;
+        agent = handoff.agent;
+        const agentKey = agent.name.toLowerCase().replace(/\s+/g, '_');
+        
+        // Use custom tool name if available, otherwise use default
+        toolName = handoff.toolNameOverride || this.handoffToolNames.get(agentKey) || defaultToolName(agent.name);
+        
+        // Use custom tool description if available, otherwise use default
+        toolDescription = handoff.toolDescriptionOverride || this.handoffToolDescriptions.get(agentKey) || defaultToolDescription(agent.name);
+      }
+      
+      // Get the input schema for this handoff
+      const agentKey = agent.name.toLowerCase().replace(/\s+/g, '_');
+      const inputType = this.handoffInputTypes.get(agentKey);
+      
+      // Create the parameters schema
+      let parameters: any = {
+        type: 'object',
+        properties: {
+          reason: {
+            type: 'string',
+            description: 'Optional reason for the handoff'
+          }
+        }
+      };
+      
+      // If we have an input type, try to incorporate its schema
+      if (inputType) {
+        try {
+          // For zod schemas, we need to extract properties differently
+          // This is a simplified approach that works with basic schemas
+          const schemaObject = inputType.safeParse({}).error?.format();
+          if (schemaObject) {
+            const additionalProps: Record<string, any> = {};
+            Object.keys(schemaObject).forEach(key => {
+              if (key !== '_errors') {
+                additionalProps[key] = {
+                  type: 'string',
+                  description: `${key} for the handoff`
+                };
+              }
+            });
+            
+            parameters.properties = {
+              ...parameters.properties,
+              ...additionalProps
+            };
+          }
+        } catch (error) {
+          console.error(`Error extracting schema from input type: ${error}`);
+        }
+      }
+      
+      return {
+        type: 'function',
+        function: {
+          name: toolName,
+          description: toolDescription,
+          parameters
+        }
+      };
+    });
+    
+    return [...tools, ...handoffTools];
   }
 
   /**

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { AgentContext } from './agent';
 import { BaseAgent } from './BaseAgent';
 import { functionTool } from './tools';
+import { promptWithHandoffInstructions } from './handoff';
 
 /**
  * A specialized agent that formats and structures information into reports
@@ -11,16 +12,17 @@ export class ReportAgent extends BaseAgent {
   constructor() {
     super({
       name: 'ReportAgent',
-      instructions: `You are a professional report writer who creates clear, well-structured reports based on provided information.
+      instructions: promptWithHandoffInstructions(`You are a specialized report generation agent that excels at formatting and presenting information in a clear, structured manner.
 
-      When generating a report:
-      1. Organize information logically with headings and subheadings
-      2. Include an executive summary if appropriate
-      3. Maintain appropriate tone (formal, analytical)
-      4. Preserve all citation references in the original format
-      5. Format content for clarity and readability
+      Your capabilities include:
+      - Creating well-structured reports from information provided
+      - Formatting data in tables, lists, and other easy-to-read formats
+      - Organizing information into logical sections with headers
+      - Adding professional styling and formatting
       
-      The report should be comprehensive but concise, focusing on key findings and insights.`,
+      If you need additional research or information to complete the report, use the transfer_to_researchagent function to hand off the task to the ResearchAgent.
+      
+      Focus on clarity, professionalism, and making complex information easy to understand. Use markdown formatting wherever appropriate to enhance readability.`),
       model: 'gpt-4o',
       modelSettings: {
         temperature: 0.5, // Slightly lower temperature for more consistent formatting

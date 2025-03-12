@@ -7,6 +7,7 @@ import { trace, configureTracing, RunConfig } from './agents/tracing';
 import { BaseAgent } from './agents/BaseAgent';
 import { functionTool } from './agents/tools';
 import { z } from 'zod';
+import { handoff, handoffFilters, promptWithHandoffInstructions, RECOMMENDED_PROMPT_PREFIX } from './agents/handoff';
 
 /**
  * Event types for streaming - aligns with OpenAI Agent SDK events
@@ -121,10 +122,21 @@ export class AgentRunner {
       const researchAgent = new ResearchAgent();
       const reportAgent = new ReportAgent();
       
+      // Example of a handoff callback
+      const onHandoff = (ctx: AgentContext) => {
+        console.log(`Handoff detected to agent: ${ctx.handoffTracker?.at(-1)}`);
+      };
+      
+      // Example of input type for a handoff using regular Zod schema
+      const ResearchRequestSchema = z.object({
+        topic: z.string().describe('Research topic to investigate'),
+        depth: z.enum(['basic', 'detailed', 'comprehensive']).describe('Depth of research required')
+      });
+      
       // Create a delegation agent with handoffs to specialized agents
       this.agent = new BaseAgent({
         name: 'DelegationAgent',
-        instructions: `You are an intelligent assistant that helps users by delegating tasks to specialized agents.
+        instructions: promptWithHandoffInstructions(`You are an intelligent assistant that helps users by delegating tasks to specialized agents.
         
         Your job is to:
         1. Understand the user's request 
@@ -136,20 +148,30 @@ export class AgentRunner {
         - ResearchAgent: For finding current information and answering factual questions
         - ReportAgent: For formatting information and creating structured reports
         
-        Always delegate to the most appropriate agent. If unsure, delegate to the TriageAgent which can further analyze the request.`,
+        Always delegate to the most appropriate agent. If unsure, delegate to the TriageAgent which can further analyze the request.`),
         model: 'gpt-4o',
         modelSettings: {
           temperature: 0.3,
         },
-        handoffs: [triageAgent, researchAgent, reportAgent],
+        handoffs: [
+          triageAgent, 
+          handoff(researchAgent, {
+            onHandoff: onHandoff,
+            inputType: ResearchRequestSchema
+          }),
+          handoff(reportAgent, {
+            toolNameOverride: 'format_as_report',
+            toolDescriptionOverride: 'Format the information as a structured report'
+          })
+        ],
+        handoffInputFilter: handoffFilters.removeAllTools,
         tools: [
           functionTool(
             'analyze_request',
             'Analyze the user request to determine appropriate delegation',
             z.object({
               request: z.string().describe('The user request to analyze'),
-              recommendation: z.string().describe('The recommended agent to handle this'),
-              reason: z.string().describe('Why this agent is the best choice')
+              category: z.string().describe('The category of the request')
             }),
             async (args) => {
               return JSON.stringify(args);

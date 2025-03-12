@@ -3,6 +3,7 @@ import { AgentContext } from './agent';
 import { BaseAgent } from './BaseAgent';
 import { functionTool, webSearchTool } from './tools';
 import { ReportAgent } from './ReportAgent';
+import { promptWithHandoffInstructions } from './handoff';
 
 /**
  * A specialized agent that performs research on user queries
@@ -15,22 +16,19 @@ export class ResearchAgent extends BaseAgent {
 
     super({
       name: 'ResearchAgent',
-      instructions: `You are a research assistant with web search capabilities. Your job is to thoroughly research the user's query and provide accurate, up-to-date information with proper citation of sources.
+      instructions: promptWithHandoffInstructions(`You are a specialized research agent that handles tasks requiring investigation, information gathering, and providing factual answers.
 
-      For each major claim or piece of information, cite the source using a numbered format like [1], [2], etc.
-      At the end of your response, list all the sources you cited in the format:
-      
-      SOURCES:
-      [1] Source title, URL, and date (if available)
-      [2] Source title, URL, and date (if available)
-      
-      If you can't find sufficient information to answer the query, be honest about the limitations.
-      Your response should be thorough, accurate, and well-organized.
+      Your capabilities include:
+      - Answering factual questions with precise, accurate information 
+      - Finding current information on topics the user is interested in
+      - Providing explanations for complex concepts
       
       If the original request appears to require a formal report format after your research is complete, use the transfer_to_reportagent function to hand off your research findings to the ReportAgent which can format them appropriately. You should do this when:
-      1. The original query explicitly asks for a report, essay, article, or similar formal document
-      2. The research you've gathered would benefit from being organized into a structured report with headings, sections, etc.
-      3. The query is complex and would be better presented as a well-formatted document`,
+      - The user explicitly asks for a report or formal document
+      - The information would benefit from structured formatting like tables, headers, or sections
+      - The answer is comprehensive enough that organization would improve readability
+      
+      Provide thorough, factual responses and include citations whenever possible to support your information.`),
       model: 'gpt-4o',
       modelSettings: {
         temperature: 0.7,

@@ -4,6 +4,7 @@ import { BaseAgent } from './BaseAgent';
 import { functionTool } from './tools';
 import { ResearchAgent } from './ResearchAgent';
 import { ReportAgent } from './ReportAgent';
+import { RECOMMENDED_PROMPT_PREFIX, promptWithHandoffInstructions } from './handoff';
 
 // Define the types of tasks our agents can handle
 export enum TaskType {
@@ -33,19 +34,23 @@ export class TriageAgent extends BaseAgent<TriageResult> {
 
     super({
       name: 'TriageAgent',
-      instructions: `You are a task classification AI whose job is to analyze user queries and determine which specialized agent should handle them. Analyze the query and classify it into one of these task types:
-        
-      - RESEARCH: The query asks for information that requires web search to find current or specific factual information. Hand off to ResearchAgent.
-      - REPORT: The query is asking to analyze, summarize, or format existing information (no new research needed). Hand off to ReportAgent.
-      - COMBINED: The query requires both research and report generation (this is common for complex queries). Hand off to ResearchAgent first, then the results will be passed to ReportAgent.
-      - UNKNOWN: The query doesn't clearly fit into any category above. Try to handle it as best you can or suggest a better query.
+      instructions: promptWithHandoffInstructions(`You are a Triage Agent that helps analyze user requests and determine the best next steps.
       
-      When you analyze a query, you should:
-      1. Determine the task type 
+      Your job is to:
+      1. Analyze the user's request to understand what they need
       2. Hand off to the appropriate agent using the transfer_to_researchagent or transfer_to_reportagent functions
-      3. For COMBINED tasks, always hand off to the ResearchAgent first
       
-      You should hand off as soon as you've classified the query - do not try to answer it yourself.`,
+      When to use ResearchAgent:
+      - When the user needs information or answers to factual questions
+      - When data analysis or information synthesis is required
+      - When the request involves finding or validating information
+      
+      When to use ReportAgent:
+      - When the user wants information formatted in a structured way
+      - When the final output should be a report, summary, or formatted document
+      - When tables, charts, or structured data presentation would be helpful
+      
+      If you're not sure, use your best judgment based on the user's request.`),
       model: 'gpt-4o',
       modelSettings: {
         temperature: 0.3, // Lower temperature for more predictable outputs

@@ -180,14 +180,79 @@ This project implements a chatbot system that follows OpenAI Agent SDK patterns,
 The system implements proper handoffs between agents following OpenAI Agent SDK patterns:
 
 1. **Tool-based Handoffs**: Handoffs are implemented as function tools with names like `transfer_to_<agent_name>`
-
 2. **Dynamic Decision-making**: The LLM decides when to initiate a handoff based on the task requirements
-
 3. **Context Preservation**: When a handoff occurs, the entire conversation context is passed to the new agent
-
 4. **Tracing**: Handoffs are tracked using a specialized `handoff_span` to monitor the flow between agents
-
 5. **Streaming Support**: The system supports streaming responses during handoffs, with appropriate callbacks
+
+### OpenAI Agents SDK-Aligned Implementation
+
+Our implementation follows the patterns from OpenAI's Agents SDK:
+
+1. **The `handoff()` Function**: We provide a dedicated `handoff()` function for creating customized handoffs:
+   ```typescript
+   handoff(
+     agent,
+     {
+       toolNameOverride: 'custom_tool_name',
+       toolDescriptionOverride: 'Custom description',
+       onHandoff: callbackFunction,
+       inputType: zodSchema,
+       inputFilter: filterFunction
+     }
+   )
+   ```
+
+2. **Handoff Customization**: Our implementation supports:
+   - Custom tool names and descriptions
+   - Callbacks executed when handoffs are invoked
+   - Input types with Zod schema validation
+   - Input filters to transform data passed to the next agent
+
+3. **Standardized Prompts**: We include the recommended prompt prefix for handoffs to ensure agents understand how to use handoffs properly.
+
+4. **Handoff Input Filters**: We provide common filter patterns:
+   - `handoffFilters.removeAllTools`: Remove all tool calls from the conversation history
+   - `handoffFilters.preserveLastN`: Keep only the last N messages
+
+### Example Usage
+
+```typescript
+// Create agents
+const billingAgent = new BillingAgent();
+const refundAgent = new RefundAgent();
+
+// Define input type
+const RefundDataSchema = z.object({
+  reason: z.string().describe('Reason for the refund'),
+  orderNumber: z.string().describe('Order number to refund')
+});
+
+// Define callback
+const onRefundHandoff = (ctx, inputData) => {
+  console.log(`Refund requested: ${inputData.reason}`);
+};
+
+// Create triage agent with handoffs
+const triageAgent = new BaseAgent({
+  name: 'TriageAgent', 
+  instructions: promptWithHandoffInstructions(`Your instructions here...`),
+  handoffs: [
+    billingAgent, // Regular handoff
+    handoff(
+      refundAgent, // Customized handoff
+      {
+        onHandoff: onRefundHandoff,
+        inputType: RefundDataSchema,
+        toolNameOverride: 'process_refund'
+      }
+    )
+  ],
+  handoffInputFilter: handoffFilters.removeAllTools // Global filter
+});
+```
+
+For more detailed examples, see the `examples/handoff-example.ts` file.
 
 ## How Handoffs Work
 
