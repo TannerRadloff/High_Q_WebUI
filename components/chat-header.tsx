@@ -32,7 +32,7 @@ function PureChatHeader({
   const { agentMode, toggleAgentMode } = useAgentMode();
 
   return (
-    <header className="flex sticky top-0 bg-background py-1.5 items-center px-2 md:px-2 gap-2 chat-header">
+    <header className="flex sticky top-0 z-10 bg-background py-1.5 items-center px-2 md:px-2 gap-2 chat-header">
       <SidebarToggle />
 
       {(!open || windowWidth < 768) && (
@@ -70,17 +70,30 @@ function PureChatHeader({
       )}
 
       {/* Agent Mode Toggle */}
-      <div className="order-1 md:order-4 flex items-center gap-2">
-        <Switch
-          id="agent-mode"
-          checked={agentMode}
-          onCheckedChange={toggleAgentMode}
-          className="data-[state=checked]:bg-primary"
-        />
-        <Label htmlFor="agent-mode" className="text-sm cursor-pointer">
-          Agent Mode
-        </Label>
-      </div>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className={`order-1 md:order-4 flex items-center gap-2 px-2 py-1 rounded transition-colors ${
+            agentMode ? 'bg-primary/10' : ''
+          }`}>
+            <Switch
+              id="agent-mode"
+              checked={agentMode}
+              onCheckedChange={toggleAgentMode}
+              className="data-[state=checked]:bg-primary"
+            />
+            <Label htmlFor="agent-mode" className={`text-sm cursor-pointer ${
+              agentMode ? 'font-semibold text-primary' : ''
+            }`}>
+              Agent Mode
+            </Label>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          {agentMode 
+            ? 'Currently in Agent Mode - Switch back to chat mode' 
+            : 'Switch to Agent Mode - Use AI agents with tool access'}
+        </TooltipContent>
+      </Tooltip>
 
       <div className="ml-auto order-3 md:order-5">
         <UserAuthStatus />

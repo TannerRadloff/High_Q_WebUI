@@ -28,6 +28,29 @@ export function AgentInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Load any previous agent messages from localStorage
+  useEffect(() => {
+    try {
+      const savedMessages = localStorage.getItem('agent-messages');
+      if (savedMessages) {
+        setMessages(JSON.parse(savedMessages));
+      }
+    } catch (error) {
+      console.error('Error loading saved agent messages:', error);
+    }
+  }, []);
+  
+  // Save messages to localStorage when they change
+  useEffect(() => {
+    try {
+      if (messages.length > 0) {
+        localStorage.setItem('agent-messages', JSON.stringify(messages));
+      }
+    } catch (error) {
+      console.error('Error saving agent messages:', error);
+    }
+  }, [messages]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -89,14 +112,15 @@ export function AgentInterface() {
   };
 
   return (
-    <div className="flex flex-col w-full h-full pt-4">
-      <div className="flex-1 overflow-y-auto px-4">
+    <div className="flex flex-col w-full h-[calc(100vh-4rem)] overflow-hidden">
+      <div className="flex-1 overflow-y-auto px-4 pt-4">
         {messages.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center h-full">
             <div className="text-center">
               <h1 className="text-2xl font-bold mb-2">Agent Mode</h1>
-              <p className="text-muted-foreground">
-                Interact with an AI agent that can help you accomplish tasks.
+              <p className="text-muted-foreground max-w-md">
+                Interact with an AI agent that can help you accomplish tasks. The agent has access to tools 
+                and can perform actions on your behalf.
               </p>
             </div>
           </div>
@@ -110,7 +134,7 @@ export function AgentInterface() {
         )}
       </div>
       
-      <div className="border-t p-4">
+      <div className="border-t p-4 bg-background">
         <form onSubmit={handleSubmit} className="flex items-end gap-2">
           <Textarea
             ref={inputRef}

@@ -2,6 +2,7 @@
 
 import { type Message } from 'ai';
 import { useState, useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 import { Chat } from '@/components/chat';
 import { AgentInterface } from '@/components/agent-interface';
@@ -29,19 +30,40 @@ export function AgentModeSwitcher({
     // For now, we're just setting empty initial messages
     setInitialMessages([]);
   }, []);
-
-  if (agentMode) {
-    return <AgentInterface />;
-  }
-
+  
+  // We'll use Framer Motion to animate between the two modes
   return (
-    <Chat
-      key={id}
-      id={id}
-      initialMessages={initialMessages}
-      selectedChatModel={selectedChatModel}
-      selectedVisibilityType={selectedVisibilityType}
-      isReadonly={isReadonly}
-    />
+    <AnimatePresence mode="wait">
+      {agentMode ? (
+        <motion.div
+          key="agent-interface"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.2 }}
+          className="w-full h-full"
+        >
+          <AgentInterface />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="chat-interface"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.2 }}
+          className="w-full h-full"
+        >
+          <Chat
+            key={id}
+            id={id}
+            initialMessages={initialMessages}
+            selectedChatModel={selectedChatModel}
+            selectedVisibilityType={selectedVisibilityType}
+            isReadonly={isReadonly}
+          />
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 } 
