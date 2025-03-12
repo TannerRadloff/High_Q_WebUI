@@ -492,12 +492,12 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
       try {
         for await (const chunk of stream as any) {
           // Handle different types of chunks in the stream
-          if ('delta' in chunk) {
-            if ('text' in chunk.delta) {
+          if ('delta' in chunk && chunk.delta && typeof chunk.delta === 'object') {
+            if ('text' in chunk.delta && chunk.delta.text) {
               const newContent = chunk.delta.text;
               callbacks.onToken?.(newContent);
               content += newContent;
-            } else if ('tool_calls' in chunk.delta) {
+            } else if ('tool_calls' in chunk.delta && chunk.delta.tool_calls) {
               // We're starting to collect a tool call
               isCollectingToolCall = true;
               
@@ -513,7 +513,7 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
               } else if (Array.isArray(chunk.delta.tool_calls)) {
                 // Each item in the array might be a partial tool call
                 chunk.delta.tool_calls.forEach((call: any) => {
-                  if (call.function?.arguments) {
+                  if (call && call.function && call.function.arguments) {
                     currentToolCall += call.function.arguments;
                   }
                 });

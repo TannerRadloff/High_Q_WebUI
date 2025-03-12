@@ -247,10 +247,15 @@ function handleStreamingResponse(query: string, agentType: string, runConfig?: R
         
         // Shared token handler to send event to client
         const handleToken = (token: string) => {
-          sendEventMessage(controller, {
-            event: 'token',
-            data: { token }
-          });
+          // Ensure token is not undefined or null before sending
+          if (token !== undefined && token !== null) {
+            sendEventMessage(controller, {
+              event: 'token',
+              data: { token }
+            });
+          } else {
+            console.warn('Attempted to send undefined/null token, skipping');
+          }
         };
         
         // Shared completion handler

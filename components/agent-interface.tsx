@@ -467,15 +467,21 @@ export function AgentInterface() {
                 case 'token':
                   // Reset the heartbeat timeout whenever we receive a token
                   lastHeartbeatTime = Date.now();
-                  fullContent += data.token;
-                  setMessages(prev => {
-                    const newMessages = [...prev];
-                    const index = newMessages.findIndex(m => m.id === assistantMessageId);
-                    if (index !== -1) {
-                      newMessages[index].content = fullContent;
-                    }
-                    return newMessages;
-                  });
+                  
+                  // Check if data.token exists before using it
+                  if (data && 'token' in data && data.token) {
+                    fullContent += data.token;
+                    setMessages(prev => {
+                      const newMessages = [...prev];
+                      const index = newMessages.findIndex(m => m.id === assistantMessageId);
+                      if (index !== -1) {
+                        newMessages[index].content = fullContent;
+                      }
+                      return newMessages;
+                    });
+                  } else {
+                    console.warn('Received token event with missing or empty token data:', data);
+                  }
                   break;
                   
                 case 'error':
