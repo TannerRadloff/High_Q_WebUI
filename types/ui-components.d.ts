@@ -40,6 +40,7 @@ declare module '@/components/ui/select' {
     onValueChange?: (value: string) => void;
     defaultValue?: string;
     disabled?: boolean;
+    children?: React.ReactNode;
   }
   
   export interface SelectTriggerProps extends React.HTMLAttributes<HTMLButtonElement> {

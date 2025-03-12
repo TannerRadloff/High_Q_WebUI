@@ -566,24 +566,9 @@ export function AgentInterface() {
               <SelectValue placeholder="Select Agent" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="research">
-                <div className="flex items-center gap-2">
-                  <Search className="h-4 w-4" />
-                  <span>Research Agent</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="report">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  <span>Report Agent</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="orchestrator">
-                <div className="flex items-center gap-2">
-                  <span>🔄</span>
-                  <span>Orchestrator</span>
-                </div>
-              </SelectItem>
+              <SelectItem value="research">Research Agent</SelectItem>
+              <SelectItem value="report">Report Agent</SelectItem>
+              <SelectItem value="orchestrator">Orchestrator</SelectItem>
             </SelectContent>
           </Select>
           
