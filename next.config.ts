@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  webpack: (config, { isServer, dev }) => {
+  experimental: {
+    ppr: true,
+  },
+  webpack: (config: any, { isServer, dev }: { isServer: boolean; dev: boolean }) => {
     // Only include the pdf-parse module on the server side
     if (!isServer) {
       config.resolve.fallback = {
@@ -29,12 +32,15 @@ const nextConfig = {
   },
   // Ensure pdf-parse is only used on the server
   transpilePackages: ['pdf-parse'],
-  // Add the images configuration to allow avatar.vercel.sh domain
   images: {
-    domains: ['avatar.vercel.sh'],
+    remotePatterns: [
+      {
+        hostname: 'avatar.vercel.sh',
+      },
+    ],
   },
   // Fix development asset loading
   assetPrefix: process.env.NODE_ENV === 'development' ? '' : undefined,
 };
 
-module.exports = nextConfig; 
+export default nextConfig;

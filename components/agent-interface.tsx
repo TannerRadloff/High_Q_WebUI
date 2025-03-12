@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { type Message } from 'ai';
-import { Send, ArrowLeft, Search, FileText, Loader2, ChevronUp } from 'lucide-react';
+import { Send, ArrowLeft, Search, FileText, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { generateUUID } from '@/lib/utils';
@@ -141,11 +141,10 @@ export function AgentInterface() {
   
   // Cleanup any active EventSource on unmount
   useEffect(() => {
-    const currentEventSource = eventSourceRef.current;
-    
     return () => {
-      if (currentEventSource) {
-        currentEventSource.close();
+      const eventSource = eventSourceRef.current;
+      if (eventSource) {
+        eventSource.close();
       }
       
       // Also clean up any heartbeat timeouts
@@ -554,7 +553,7 @@ export function AgentInterface() {
           onClick={toggleAgentMode}
           className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="size-4" />
           <span>Back to Chat</span>
         </Button>
         
@@ -641,13 +640,12 @@ export function AgentInterface() {
             disabled={isLoading}
           />
           <Button type="submit" disabled={isLoading || !input.trim()}>
-            {isLoading ? <Loader2 className="size-3 animate-spin" /> : <Send className="h-4 w-4" />}
+            {isLoading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
           </Button>
         </form>
       </div>
       
-      <style jsx global>{`
-        .cursor {
+      <style jsx global>{`        .cursor {
           display: inline-block;
           width: 2px;
           opacity: 1;
