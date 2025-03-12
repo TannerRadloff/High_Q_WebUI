@@ -20,6 +20,7 @@ declare module 'lucide-react' {
   export const Check: LucideIcon;
   export const ChevronRight: LucideIcon;
   export const Circle: LucideIcon;
+  export const PanelLeft: LucideIcon;
   // Add any other icons used in your project
   
   // Default export if needed
