@@ -3,6 +3,8 @@ import { Agent, AgentConfig, AgentContext, AgentResponse, StreamCallbacks } from
 import { Tool, agentAsTool } from './tools';
 import { generation_span, handoff_span, agent_span, SpanType, TraceMetadata } from './tracing';
 import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
+import { MemoryManager, InMemoryStorage, MemoryType } from './memory';
 
 // Initialize OpenAI client
 const client = new OpenAI({
@@ -40,6 +42,7 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
   tools: Tool[];
   handoffs: Agent[];
   outputType?: OutputType;
+  protected memory?: MemoryManager;
 
   constructor(config: AgentConfig<OutputType>) {
     this.name = config.name;
@@ -49,6 +52,12 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
     this.tools = config.tools || [];
     this.handoffs = config.handoffs || [];
     this.outputType = config.outputType;
+    
+    // Initialize memory if not provided
+    if (!this.memory && config.name) {
+      const storage = new InMemoryStorage();
+      this.memory = new MemoryManager(storage, config.name);
+    }
   }
 
   /**
@@ -292,6 +301,54 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
   }
 
   /**
+   * Get memories to enhance the context for a task
+   */
+  protected async getMemoryEnhancedContext(userQuery: string, context?: AgentContext): Promise<AgentContext> {
+    if (!this.memory || !context) {
+      return context || {};
+    }
+    
+    try {
+      return await this.memory.enhanceContext(context, userQuery);
+    } catch (error) {
+      console.error('Error enhancing context with memories:', error);
+      return context;
+    }
+  }
+  
+  /**
+   * Store a memory from the interaction
+   */
+  protected async storeMemory(userQuery: string, response: AgentResponse): Promise<void> {
+    if (!this.memory) {
+      return;
+    }
+    
+    try {
+      // Store the interaction as conversation memory
+      await this.memory.addConversationMemory(
+        userQuery,
+        typeof response === 'string' ? response : response.content
+      );
+      
+      // For important insights, store as long-term memory
+      if (response.metadata?.important) {
+        await this.memory.store(
+          typeof response === 'string' ? response : response.content,
+          MemoryType.LONG_TERM,
+          { 
+            query: userQuery,
+            importance: response.metadata?.importance || 'medium',
+            tags: response.metadata?.tags || []
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error storing memory:', error);
+    }
+  }
+
+  /**
    * Process a task through this agent
    */
   async handleTask(userQuery: string, context?: AgentContext): Promise<AgentResponse> {
@@ -317,6 +374,9 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
         { role: 'system', content: this.resolveInstructions(agentContext) },
         { role: 'user', content: userQuery }
       ];
+      
+      // Enhance context with relevant memories
+      const enhancedContext = await this.getMemoryEnhancedContext(userQuery, context);
       
       // Prepare for the response
       let finalResponse: string = '';
@@ -380,7 +440,7 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
               // Handle the tool calls
               const { toolResults, handoffResult } = await this.handleToolCalls(
                 responseMessage.tool_calls,
-                agentContext,
+                enhancedContext,
                 conversationHistory
               );
               
@@ -445,6 +505,18 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
       });
       
       agentSpanWrapper.exit();
+      
+      // After getting the response, store it in memory
+      await this.storeMemory(userQuery, {
+        success: true,
+        content: finalResponse,
+        metadata: {
+          ...metadata,
+          agentName: this.name,
+          model: this.model,
+          temperature: this.modelSettings?.temperature
+        }
+      });
       
       // Return the successful result
       return {
@@ -692,9 +764,71 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
   }
 
   /**
-   * Converts this agent to a tool that can be used by other agents
+   * Converts this agent into a Tool that can be used by other agents
+   * 
+   * @param name - The name of the tool
+   * @param description - A description of what the tool does
+   * @param customSchema - Optional custom schema for the tool
+   * @returns A Tool object that can be used by other agents
    */
-  asTool(toolName: string, toolDescription: string): Tool {
-    return agentAsTool(this, toolName, toolDescription);
+  asTool(name: string, description: string, customSchema?: object): Tool {
+    // Define parameters using zod schema
+    const parameters = z.object({
+      input: z.string().describe("The input to send to the agent"),
+      context: z.record(z.any()).optional().describe("Additional context for the agent")
+    });
+    
+    // Define JSON schema for parameters
+    const parametersSchema = customSchema || {
+      type: "object",
+      properties: {
+        input: {
+          type: "string",
+          description: "The input to send to the agent"
+        },
+        context: {
+          type: "object",
+          description: "Additional context for the agent",
+          additionalProperties: true
+        }
+      },
+      required: ["input"]
+    };
+    
+    return {
+      name,
+      description,
+      parameters,
+      parametersSchema,
+      execute: async (args: any): Promise<string> => {
+        try {
+          const { input, context = {} } = args;
+          
+          // Set up monitoring
+          const metadata = {
+            tool_name: name,
+            agent_name: this.name,
+            input
+          };
+          
+          // Execute the task
+          const response = await this.handleTask(input, {
+            ...context,
+            isToolCall: true,
+            callerAgent: context.callerAgent || 'unknown'
+          });
+          
+          // Format the response
+          if (typeof response === 'string') {
+            return response;
+          } else {
+            return JSON.stringify(response);
+          }
+        } catch (error: any) {
+          console.error(`Error executing agent as tool ${name}:`, error);
+          throw new Error(`Tool ${name} failed: ${error.message || 'Unknown error'}`);
+        }
+      }
+    };
   }
 } 

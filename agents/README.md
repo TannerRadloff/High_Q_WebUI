@@ -1,259 +1,182 @@
-# Agent System Architecture
+# Agent Architecture
 
-This system implements a multi-agent architecture that allows for delegation and specialization. The architecture is inspired by the OpenAI Agents SDK patterns but implemented in TypeScript.
+This module implements a flexible and extensible architecture for building AI-powered agents. It follows best practices inspired by the OpenAI Assistants API and Agent SDK, while providing a more customizable foundation.
 
-## Core Architecture
+## Core Concepts
 
-The system uses a delegation-based approach:
+### Agents
 
-1. **DelegationAgent**: The main entry point that users interact with first. It analyzes user requests and delegates to specialized agents.
+Agents are the main building blocks of the system. Each agent has:
 
-2. **Specialized Agents**:
-   - **TriageAgent**: Analyzes and categorizes tasks
-   - **ResearchAgent**: Performs research and gathers information
-   - **ReportAgent**: Formats information into structured reports
+- A name and instructions
+- A model and model settings
+- Optional tools they can use
+- Optional agents they can hand off to
+- Optional memory for context persistence
 
-## Agent Delegation Flow
+The base implementation is in `BaseAgent.ts`, which other specialized agents can extend.
 
-1. A user submits a query to the `Orchestrator`
-2. The `Orchestrator` passes the query to the `DelegationAgent`
-3. The `DelegationAgent` analyzes the query and delegates to the appropriate specialized agent using handoffs
-4. The specialized agent processes the request and returns a result
-5. The result is returned to the user through the `Orchestrator`
+### Factory Pattern
 
-## Using the Agent System
+The `AgentFactory` class provides a consistent way to create agents with:
+
+- Default configuration
+- Instance caching
+- Ready-made agent types
+- Easy creation of composite workflows
+
+### Agent-as-Tool Pattern
+
+Agents can be converted to tools using the `asTool` method, allowing them to be used by other agents. This enables powerful composition patterns where specialized agents can be combined to solve complex tasks.
+
+### Memory System
+
+The memory system provides:
+
+- Short-term and long-term memory
+- Conversation history tracking
+- Contextual retrieval for relevant information
+- Automatic enhancement of agent context
+
+## Key Components
+
+- `agent.ts`: Core interfaces for agents and their configurations
+- `BaseAgent.ts`: Base implementation of the Agent interface
+- `AgentFactory.ts`: Factory for creating agent instances
+- `tools.ts`: Tool interfaces and factory functions
+- `memory.ts`: Memory system for persistent context
+- `tracing.ts`: Tracing infrastructure for debugging and monitoring
+
+## Usage Examples
+
+### Creating a Basic Agent
 
 ```typescript
-// Create an orchestrator instance
-const orchestrator = new Orchestrator();
+import { AgentFactory, AgentType } from './agents/AgentFactory';
 
-// Process a user query
-const result = await orchestrator.handleQuery("What are the latest advancements in renewable energy?");
+const factory = new AgentFactory();
 
-// Access the result
-console.log(result.report); // The final content returned by the agent chain
-console.log(result.metadata.handoffPath); // The path of handoffs between agents
+const agent = factory.createAgent(AgentType.CUSTOM, {
+  name: 'MyAgent',
+  instructions: 'You are a helpful assistant.',
+  model: 'gpt-4o',
+  modelSettings: {
+    temperature: 0.7
+  }
+});
+
+const response = await agent.handleTask("What is the capital of France?");
+console.log(response.content);
 ```
 
-## Streaming Responses
-
-The system supports streaming responses for real-time updates:
+### Using Tools
 
 ```typescript
-await orchestrator.streamQuery(
-  "What are the environmental impacts of electric vehicles?",
-  {
-    onStart: () => console.log("Processing started"),
-    onToken: (token) => console.log("New token:", token),
-    onHandoff: (from, to) => console.log(`Handoff from ${from} to ${to}`),
-    onComplete: (response) => console.log("Final response:", response),
-    onError: (error) => console.error("Error:", error)
-  }
+import { AgentFactory, AgentType } from './agents/AgentFactory';
+import { webSearchTool } from './agents/tools';
+
+const factory = new AgentFactory();
+
+const agent = factory.createAgent(AgentType.CUSTOM, {
+  name: 'ResearchAgent',
+  instructions: 'You are a research assistant that helps find information.',
+  tools: [webSearchTool]
+});
+
+const response = await agent.handleTask(
+  "What are the latest developments in AI research?"
+);
+console.log(response.content);
+```
+
+### Agent Composition
+
+```typescript
+import { AgentFactory, AgentType } from './agents/AgentFactory';
+
+const factory = new AgentFactory();
+
+// Create specialized agents
+const triageAgent = factory.createAgent(AgentType.TRIAGE);
+const researchAgent = factory.createAgent(AgentType.RESEARCH);
+
+// Create an orchestration agent that uses the others as tools
+const orchestrator = factory.createAgent(AgentType.CUSTOM, {
+  name: 'Orchestrator',
+  instructions: 'You coordinate between specialized agents to solve tasks.',
+  tools: [
+    triageAgent.asTool('triage', 'Analyze and categorize the user query'),
+    researchAgent.asTool('research', 'Search for information')
+  ]
+});
+
+// Process a user query through the orchestrator
+const response = await orchestrator.handleTask(
+  "I need to learn about quantum computing for a presentation"
 );
 ```
 
-## Agent Tracing System
-
-The agents include built-in tracing functionality to help debug, visualize, and monitor workflows during development and in production.
-
-### Overview
-
-Tracing collects a comprehensive record of events during an agent run:
-- LLM generations
-- Tool calls
-- Handoffs between agents
-- Custom events
-
-### Using Tracing
-
-#### Default Behavior
-
-Tracing is enabled by default and will log basic information to the console.
-
-#### Disabling Tracing
-
-You can disable tracing in two ways:
-
-1. **Globally**: Set the environment variable `OPENAI_AGENTS_DISABLE_TRACING=1`
-2. **Per run**: Set `tracing_disabled: true` in the run configuration
+### Using Memory
 
 ```typescript
-// Disable tracing for a specific run
-const result = await orchestrator.handleQuery(query, {
-  tracing_disabled: true
-});
-```
+import { AgentFactory, AgentType } from './agents/AgentFactory';
+import { InMemoryStorage, MemoryManager } from './agents/memory';
 
-#### Configuring Traces
+const factory = new AgentFactory();
+const storage = new InMemoryStorage();
 
-When making an API call to the agent-query endpoint, you can include tracing configuration in the request body:
-
-```javascript
-fetch('/api/agent-query', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    query: "What's the latest research on renewable energy?",
-    workflow_name: "Energy Research",
-    group_id: "session_123",
-    tracing_disabled: false,
-    trace_include_sensitive_data: true,
-    metadata: {
-      user_id: "user_123",
-      session_id: "session_abc"
-    }
-  }),
-});
-```
-
-### Trace Properties
-
-- **workflow_name**: Logical name for the workflow (e.g., "Research Query")
-- **trace_id**: Unique ID, automatically generated if not provided
-- **group_id**: Optional group ID to link multiple traces (e.g., chat thread ID)
-- **disabled**: If true, tracing is disabled
-- **metadata**: Optional key-value pairs for the trace
-
-### Spans
-
-Spans represent operations with start and end times:
-
-- **Agent spans**: Track agent execution
-- **Generation spans**: Track LLM generations
-- **Function spans**: Track tool/function calls
-- **Custom spans**: Track any custom operation
-
-Each span includes:
-- Start and end timestamps
-- Relationship to other spans
-- Operation-specific data
-
-### Custom Trace Processors
-
-You can implement custom trace processors to send trace data to external systems:
-
-```typescript
-import { addTraceProcessor, TraceProcessor, Trace } from './agents/tracing';
-
-// Example processor that sends traces to an external API
-class APITraceProcessor implements TraceProcessor {
-  async processTrace(trace: Trace): Promise<void> {
-    if (trace.disabled) return;
-    
-    // Send trace to external system
-    await fetch('https://your-observability-platform.com/traces', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(trace),
-    });
+const agent = factory.createAgent(AgentType.CUSTOM, {
+  name: 'AssistantWithMemory',
+  instructions: context => {
+    // Use context.conversationHistory and context.relevantMemories
+    return `You are an assistant that remembers past interactions.`;
   }
-}
-
-// Add the processor
-addTraceProcessor(new APITraceProcessor());
-```
-
-### Example: High-Level Trace
-
-You can wrap multiple agent runs in a single trace:
-
-```typescript
-import { trace } from './agents/tracing';
-
-async function processUserQuery(userQuery) {
-  // Create a trace for the entire workflow
-  const workflowTrace = trace("User Query Processing", {
-    group_id: "session_123",
-    metadata: { user_id: "user_456" }
-  });
-  
-  // Start the trace
-  workflowTrace.start();
-  
-  try {
-    // First agent call
-    const triageResult = await triageAgent.handleTask(userQuery);
-    
-    // Second agent call
-    const researchResult = await researchAgent.handleTask(userQuery);
-    
-    // Third agent call
-    const reportResult = await reportAgent.handleTask(
-      `User asked: "${userQuery}". Research results: ${researchResult.content}`
-    );
-    
-    return reportResult;
-  } finally {
-    // Always finish the trace
-    await workflowTrace.finish();
-  }
-}
-```
-
-## Viewing Traces
-
-Currently, traces are logged to the console. You can implement custom trace processors to send traces to your preferred observability tools or create a custom dashboard to visualize them.
-
-### Sensitive Data
-
-Some spans might include sensitive data such as the inputs or outputs of LLM generations or function calls. You can control whether this data is included in traces:
-
-```typescript
-// Exclude sensitive data from traces
-await orchestrator.handleQuery(query, {
-  trace_include_sensitive_data: false
 });
+
+// Replace the default memory with our custom storage
+(agent as any).memory = new MemoryManager(storage, agent.name);
+
+// The agent will now store interactions and retrieve relevant context
 ```
+
+## Best Practices
+
+1. **Use the Factory**: Always create agents through the `AgentFactory` for consistent configuration and caching.
+
+2. **Specialized Agents**: Create specialized agents for specific tasks rather than one-size-fits-all agents.
+
+3. **Composition**: Use the agent-as-tool pattern to compose capabilities rather than building monolithic agents.
+
+4. **Dynamic Instructions**: Use functions for agent instructions that can adapt based on context.
+
+5. **Memory Management**: Use the memory system to maintain context across interactions.
+
+6. **Tracing**: Use the tracing system for debugging and monitoring agent behavior.
+
+7. **Error Handling**: Implement proper error handling at both the agent and orchestration levels.
 
 ## Extending the System
 
-### Adding a New Specialized Agent
+To create a new specialized agent type:
 
-To add a new specialized agent:
-
-1. Create a new agent class that extends `BaseAgent`
-2. Add it to the `DelegationAgent`'s handoffs array
-3. Update the `DelegationAgent`'s instructions to include information about the new agent
+1. Create a new class that extends `BaseAgent`
+2. Override the `handleTask` method with specialized logic
+3. Add the agent type to the `AgentType` enum in `AgentFactory.ts`
+4. Add a case in the factory's `createAgent` method to instantiate your agent
 
 Example:
 
 ```typescript
-// 1. Create a new specialized agent
-export class SummaryAgent extends BaseAgent {
-  constructor() {
-    super({
-      name: 'SummaryAgent',
-      instructions: `You are a summarization specialist that creates concise summaries.`,
-      model: 'gpt-4o',
-      // Additional configuration...
-    });
+export class MySpecializedAgent extends BaseAgent {
+  async handleTask(userQuery: string, context?: AgentContext): Promise<AgentResponse> {
+    // Specialized pre-processing
+    
+    // Call the base implementation
+    const response = await super.handleTask(userQuery, context);
+    
+    // Specialized post-processing
+    
+    return response;
   }
-  
-  // Implement any specialized methods...
-}
-
-// 2 & 3. Update the DelegationAgent to include the new agent
-constructor() {
-  // Create agents including the new one
-  const summaryAgent = new SummaryAgent();
-  
-  super({
-    // ...
-    handoffs: [triageAgent, researchAgent, reportAgent, summaryAgent],
-    instructions: `You are an intelligent assistant that helps users by delegating tasks to specialized agents.
-    
-    Available specialized agents:
-    - TriageAgent: For analyzing and categorizing tasks
-    - ResearchAgent: For finding current information
-    - ReportAgent: For formatting information
-    - SummaryAgent: For creating concise summaries
-    
-    // ...
-    `
-  });
 }
 ``` 

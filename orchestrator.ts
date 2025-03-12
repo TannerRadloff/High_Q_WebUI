@@ -2,7 +2,7 @@
 import { ResearchAgent } from './agents/ResearchAgent';
 import { ReportAgent } from './agents/ReportAgent';
 import { TriageAgent, TaskType, TriageResult } from './agents/TriageAgent';
-import { AgentResponse, StreamCallbacks } from './agents/agent';
+import { AgentResponse, StreamCallbacks, AgentContext } from './agents/agent';
 import { trace, configureTracing, RunConfig } from './agents/tracing';
 import { BaseAgent } from './agents/BaseAgent';
 import { functionTool } from './agents/tools';
@@ -41,20 +41,51 @@ export class DelegationAgent extends BaseAgent {
 
     super({
       name: 'DelegationAgent',
-      instructions: `You are an intelligent assistant that helps users by delegating tasks to specialized agents.
-      
-      Your job is to:
-      1. Understand the user's request 
-      2. Determine which specialized agent can best handle this request
-      3. Delegate the task to the appropriate agent using the available handoff tools
-      4. You should NOT attempt to answer the user's question directly - your job is to delegate
-      
-      Available specialized agents:
-      - TriageAgent: For analyzing and categorizing tasks, determining the right workflow
-      - ResearchAgent: For finding current information and answering factual questions
-      - ReportAgent: For formatting information and creating structured reports
-      
-      Always delegate to the most appropriate agent. If unsure, delegate to the TriageAgent which can further analyze the request.`,
+      // Using dynamic instructions that can adapt based on context
+      instructions: (context: AgentContext) => {
+        // Get user information from context if available
+        const userName = context.userName || 'user';
+        const userPreferences = context.userPreferences || {};
+        const userHistory = context.userHistory || [];
+        
+        // Base instructions
+        let dynamicInstructions = `You are an intelligent assistant named Mimir that helps ${userName} by delegating tasks to specialized agents.
+        
+        Your job is to:
+        1. Understand the user's request 
+        2. Determine which specialized agent can best handle this request
+        3. Delegate the task to the appropriate agent using the available handoff tools
+        4. You should NOT attempt to answer the user's question directly - your job is to delegate
+        
+        Available specialized agents:
+        - TriageAgent: For analyzing and categorizing tasks, determining the right workflow
+        - ResearchAgent: For finding current information and answering factual questions
+        - ReportAgent: For formatting information and creating structured reports`;
+        
+        // Add user preferences if available
+        if (Object.keys(userPreferences).length > 0) {
+          dynamicInstructions += `\n\nUser preferences to consider:`;
+          
+          if (userPreferences.responseStyle) {
+            dynamicInstructions += `\n- Prefers ${userPreferences.responseStyle} style responses`;
+          }
+          
+          if (userPreferences.detailLevel) {
+            dynamicInstructions += `\n- Prefers ${userPreferences.detailLevel} level of detail`;
+          }
+          
+          // Other preferences can be added similarly
+        }
+        
+        // Add context about recent interactions if available
+        if (userHistory.length > 0) {
+          dynamicInstructions += `\n\nRecent interactions context: The user has been discussing ${userHistory.join(', ')}`;
+        }
+        
+        dynamicInstructions += `\n\nAlways delegate to the most appropriate agent. If unsure, delegate to the TriageAgent which can further analyze the request.`;
+        
+        return dynamicInstructions;
+      },
       model: 'gpt-4o',
       modelSettings: {
         temperature: 0.3, // Lower temperature for more predictable delegation

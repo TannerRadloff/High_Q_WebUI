@@ -182,27 +182,69 @@ export async function defaultToolErrorFunction(error: Error): Promise<string> {
 export function agentAsTool(
   agent: any, // Using any since we'll define Agent interface later
   toolName: string,
-  toolDescription: string
+  toolDescription: string,
+  customSchema?: object
 ): Tool {
+  // Create a schema based on custom input or use default
+  const schema = customSchema || {
+    type: "object",
+    properties: {
+      input: {
+        type: "string",
+        description: "The input to send to the agent"
+      },
+      context: {
+        type: "object",
+        description: "Optional context to provide to the agent",
+        additionalProperties: true
+      }
+    },
+    required: ["input"]
+  };
+  
+  // Convert schema to Zod
+  const paramsZod = z.object({
+    input: z.string().describe("The input to send to the agent"),
+    context: z.record(z.any()).optional().describe("Optional context to provide to the agent")
+  });
+  
   return {
     name: toolName,
     description: toolDescription,
-    parameters: z.object({
-      input: z.string().describe('The input to send to the agent'),
-    }),
-    parametersSchema: {
-      type: "object",
-      properties: {
-        input: {
-          type: "string",
-          description: "The input to send to the agent"
-        }
-      },
-      required: ["input"]
-    },
+    parameters: paramsZod,
+    parametersSchema: schema,
     execute: async (args) => {
-      const result = await agent.handleTask(args.input);
-      return result.content;
+      try {
+        // Destructure arguments
+        const { input, context = {} } = args;
+        
+        // Add metadata to track tool usage
+        context.calledAsTool = true;
+        context.calledByTool = toolName;
+        context.timestamp = new Date().toISOString();
+        
+        // Execute the agent
+        const result = await agent.handleTask(input, context);
+        
+        // Format the result in a way that makes it clear it came from a sub-agent
+        if (result.success) {
+          // If we have structured output, ensure it's included in the JSON response
+          if (result.structuredOutput) {
+            return JSON.stringify({
+              agentName: agent.name,
+              content: result.content,
+              structuredOutput: result.structuredOutput
+            });
+          }
+          
+          return result.content;
+        } else {
+          return `Error from ${agent.name}: ${result.error || 'Unknown error occurred'}`;
+        }
+      } catch (error) {
+        console.error(`Error executing agent as tool (${toolName}):`, error);
+        return `Error executing ${agent.name}: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
     },
   };
 } 
