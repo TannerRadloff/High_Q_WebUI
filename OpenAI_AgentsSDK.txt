@@ -1,0 +1,142 @@
+# OpenAI Agents SDK and Responses API Overview
+
+## Introduction
+
+This document provides a condensed overview of the OpenAI Agents SDK and Responses API, focusing on building AI agent systems. It covers:
+
+- **Agents SDK**: Tools for creating and managing AI agents.
+- **Responses API**: Mechanisms for handling AI model outputs and integrating tools like web search and file search.
+
+## Agents SDK
+
+The OpenAI Agents SDK is a lightweight framework designed to facilitate the development of agentic AI applications. Its core components include:
+
+- **Agents**: Large Language Models (LLMs) equipped with specific instructions and tools.
+- **Handoffs**: Mechanisms allowing agents to delegate tasks to other agents.
+- **Guardrails**: Safety measures for input validation and content moderation.
+- **Tracing**: Tools for debugging and optimizing agent performance.
+
+### Installation
+
+To install the Agents SDK:
+
+```bash
+pip install openai-agents
+```
+
+### Basic Usage
+
+```python
+from agents import Agent, Runner
+
+agent = Agent(name="Assistant", instructions="You are a helpful assistant")
+
+result = Runner.run_sync(agent, "Write a haiku about recursion in programming.")
+print(result.final_output)
+```
+
+*Output:*
+
+```
+Code within the code,
+Functions calling themselves,
+Infinite loop's dance.
+```
+
+### Key Features
+
+- **Function Tools**: Convert Python functions into tools with automatic schema generation.
+- **Handoffs**: Enable agents to delegate tasks to specialized sub-agents.
+- **Guardrails**: Implement input validations and checks to ensure safety and relevance.
+- **Tracing**: Visualize and debug agent workflows to enhance performance.
+
+## Responses API
+
+The Responses API integrates the simplicity of the Chat Completions API with advanced tool-use capabilities, allowing developers to build more dynamic and interactive AI applications.
+
+### Key Features
+
+- **Built-in Tools**: Access tools like web search and file search within the API.
+- **Unified Design**: Simplifies interactions with models and tools through a cohesive interface.
+- **Streaming**: Supports real-time streaming of model responses.
+
+### Example Usage
+
+```javascript
+const response = await openai.responses.create({
+    model: "gpt-4o",
+    tools: [{ type: "web_search_preview" }],
+    input: "What was a positive news story that happened today?",
+});
+
+console.log(response.output_text);
+```
+
+## Integrating Agents SDK with Responses API
+
+To build an AI agent system that delegates tasks based on user queries:
+
+1. **Define Specialized Agents**: Create agents tailored for specific tasks, such as research or report writing.
+
+2. **Implement Handoffs**: Use the handoff mechanism to allow the main agent to delegate tasks to specialized agents.
+
+3. **Utilize Built-in Tools**: Leverage tools like web search within the Responses API to enable agents to access real-time information.
+
+### Example: Delegation Agent with Handoffs
+
+```python
+from agents import Agent, Runner, function_tool
+
+@function_tool
+def web_search(query: str) -> str:
+    # Implement web search functionality
+    return f"Search results for {query}"
+
+research_agent = Agent(
+    name="Research Agent",
+    instructions="Perform web searches to gather information.",
+    tools=[web_search],
+)
+
+report_agent = Agent(
+    name="Report Writing Agent",
+    instructions="Compile information into a comprehensive report.",
+)
+
+delegation_agent = Agent(
+    name="Delegation Agent",
+    instructions="Delegate tasks based on the user's query.",
+    handoffs=[research_agent, report_agent],
+)
+
+result = Runner.run_sync(delegation_agent, "Research the benefits of AI in healthcare.")
+print(result.final_output)
+```
+
+## Adding New Agent Types
+
+To extend the system with new agent types:
+
+1. **Define the New Agent**: Create an agent with specific instructions and tools.
+
+2. **Update the Delegation Agent**: Add the new agent to the handoffs list of the delegation agent.
+
+3. **Implement Necessary Tools**: Develop any additional tools required by the new agent.
+
+### Example: Adding a Data Analysis Agent
+
+```python
+data_analysis_agent = Agent(
+    name="Data Analysis Agent",
+    instructions="Analyze datasets to extract meaningful insights.",
+    tools=[data_analysis_tool],
+)
+
+delegation_agent = delegation_agent.clone(
+    handoffs=delegation_agent.handoffs + [data_analysis_agent],
+)
+```
+
+## Conclusion
+
+The OpenAI Agents SDK and Responses API provide robust frameworks for building sophisticated AI agent systems. By leveraging agents, handoffs, guardrails, and built-in tools, developers can create modular, efficient, and safe AI applications. 
