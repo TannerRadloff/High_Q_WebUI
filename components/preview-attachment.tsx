@@ -1,7 +1,7 @@
 import type { ExtendedAttachment } from '@/types';
 
-import { LoaderIcon } from './icons';
-import { FileIcon, FileTextIcon } from 'lucide-react';
+import { FileIcon, LoaderIcon } from './icons';
+import { FileText } from 'lucide-react';
 
 export const PreviewAttachment = ({
   attachment,
@@ -32,7 +32,7 @@ export const PreviewAttachment = ({
               rel="noopener noreferrer"
               className="flex items-center justify-center size-full"
             >
-              <FileIcon className="size-8 text-red-500" />
+              <FileIcon size={32} />
             </a>
           ) : contentType === 'text/plain' ? (
             <a 
@@ -41,7 +41,7 @@ export const PreviewAttachment = ({
               rel="noopener noreferrer"
               className="flex items-center justify-center size-full"
             >
-              <FileTextIcon className="size-8 text-blue-500" />
+              <FileText className="size-8 text-blue-500" />
             </a>
           ) : (
             <div className="" />
