@@ -1,11 +1,9 @@
-import { Agent, AgentResponse, AgentContext, StreamCallbacks } from './agent';
-import OpenAI from 'openai';
-import { generation_span } from './tracing';
-
-// Initialize OpenAI client
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { z } from 'zod';
+import { AgentContext } from './agent';
+import { BaseAgent } from './BaseAgent';
+import { functionTool } from './tools';
+import { ResearchAgent } from './ResearchAgent';
+import { ReportAgent } from './ReportAgent';
 
 // Define the types of tasks our agents can handle
 export enum TaskType {
@@ -23,92 +21,164 @@ export interface TriageResult {
   modifiedQuery?: string; // Optionally modified/enhanced query
 }
 
-export class TriageAgent implements Agent {
-  name = 'TriageAgent';
+/**
+ * A specialized agent that determines which agent should handle a user query
+ * Follows OpenAI Agent SDK patterns and uses handoffs to delegate to appropriate agents
+ */
+export class TriageAgent extends BaseAgent<TriageResult> {
+  constructor() {
+    // Create the agents for handoffs
+    const researchAgent = new ResearchAgent();
+    const reportAgent = new ReportAgent();
 
-  async handleTask(userQuery: string, context?: AgentContext): Promise<AgentResponse> {
+    super({
+      name: 'TriageAgent',
+      instructions: `You are a task classification AI whose job is to analyze user queries and determine which specialized agent should handle them. Analyze the query and classify it into one of these task types:
+        
+      - RESEARCH: The query asks for information that requires web search to find current or specific factual information. Hand off to ResearchAgent.
+      - REPORT: The query is asking to analyze, summarize, or format existing information (no new research needed). Hand off to ReportAgent.
+      - COMBINED: The query requires both research and report generation (this is common for complex queries). Hand off to ResearchAgent first, then the results will be passed to ReportAgent.
+      - UNKNOWN: The query doesn't clearly fit into any category above. Try to handle it as best you can or suggest a better query.
+      
+      When you analyze a query, you should:
+      1. Determine the task type 
+      2. Hand off to the appropriate agent using the transfer_to_researchagent or transfer_to_reportagent functions
+      3. For COMBINED tasks, always hand off to the ResearchAgent first
+      
+      You should hand off as soon as you've classified the query - do not try to answer it yourself.`,
+      model: 'gpt-4o',
+      modelSettings: {
+        temperature: 0.3, // Lower temperature for more predictable outputs
+      },
+      outputType: {} as TriageResult, // Type information for the output
+      tools: [
+        // Define a tool to capture the triage classification result
+        functionTool(
+          'classify_query',
+          'Classify the user query into the appropriate task type',
+          z.object({
+            taskType: z.enum([
+              TaskType.RESEARCH,
+              TaskType.REPORT,
+              TaskType.COMBINED,
+              TaskType.UNKNOWN
+            ]).describe('The task type classification'),
+            confidence: z.number().min(0).max(1).describe('Confidence score (0-1)'),
+            reasoning: z.string().describe('Explanation of why this task type was chosen'),
+            modifiedQuery: z.string().optional().describe('Optional improved version of the query')
+          }),
+          async (args) => {
+            // This is a special tool that captures the classification result
+            // The output isn't used directly since we extract it from the tool call
+            return JSON.stringify(args);
+          }
+        )
+      ],
+      // Add handoffs to allow the TriageAgent to delegate to other agents
+      handoffs: [researchAgent, reportAgent]
+    });
+  }
+
+  /**
+   * Extract JSON from text, handling cases where the model might wrap it in code blocks
+   */
+  private extractJsonFromText(text: string): string {
+    // Try to find JSON in code blocks
+    const codeBlockMatch = text.match(/```(?:json)?([\s\S]*?)```/);
+    if (codeBlockMatch && codeBlockMatch[1]) {
+      return codeBlockMatch[1].trim();
+    }
+    
+    // Try to find JSON with curly braces
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return jsonMatch[0];
+    }
+    
+    // Return the original text if no JSON pattern was found
+    return text;
+  }
+
+  /**
+   * Override the handleTask method to extract the TriageResult from the tool call
+   * and trigger handoffs when appropriate
+   */
+  async handleTask(userQuery: string, context?: AgentContext): Promise<{
+    success: boolean;
+    content: string;
+    error?: string;
+    metadata?: Record<string, any>;
+  }> {
     try {
-      if (!userQuery || userQuery.trim() === '') {
-        return {
-          success: false,
-          content: '',
-          error: 'Empty query provided. Please provide a valid query for triage.'
-        };
+      // Handle the task with the base implementation
+      // This will automatically handle any handoffs that occur
+      const response = await super.handleTask(userQuery, context);
+      
+      // If a handoff occurred, the response will contain the result from the target agent
+      // so we can just return it directly
+      if (response.metadata?.handoffOccurred) {
+        return response;
       }
-
-      // Get current timestamp for metadata
-      const startTime = Date.now();
-
-      // Create a generation span for tracing the OpenAI call
-      const genSpan = generation_span("Triage Classification", {
-        model: 'gpt-4o',
-        input: userQuery
-      });
       
-      genSpan.enter();
+      // If no handoff occurred, we need to parse the response manually
+      if (!response.success) {
+        return response;
+      }
       
-      // Use OpenAI to triage the query
-      const response = await client.responses.create({
-        model: 'gpt-4o',
-        instructions: `You are a task classification AI whose job is to analyze user queries and determine which specialized agent should handle them. Analyze the query and classify it into one of these task types:
-        
-        - RESEARCH: The query asks for information that requires web search to find current or specific factual information.
-        - REPORT: The query is asking to analyze, summarize, or format existing information (no new research needed).
-        - COMBINED: The query requires both research and report generation (this is common for complex queries).
-        - UNKNOWN: The query doesn't clearly fit into any category above.
-
-        Return a JSON object with the following fields:
-        - taskType: The task type (one of "research", "report", "combined", or "unknown")
-        - confidence: A number between 0 and 1 indicating your confidence in this classification
-        - reasoning: A brief explanation of why you chose this task type
-        - modifiedQuery: An optionally improved version of the query that would be clearer for the agent to process
-        
-        Respond ONLY with the JSON object, no other text.`,
-        input: userQuery,
-      });
-      
-      const outputText = response.output_text;
-      
-      // Update the span with the output
-      genSpan.exit();
-
-      // Parse the model's response as JSON
+      // Try to extract the JSON from the response
       try {
-        // Extract the JSON content - the model might wrap it in code blocks or add extra text
-        const jsonText = this.extractJsonFromText(outputText);
-        const triageResult: TriageResult = JSON.parse(jsonText);
-
-        const endTime = Date.now();
-        const responseTime = endTime - startTime;
-
-        // Build and return the agent response
+        // First check if there's a tool call in the metadata
+        if (response.metadata?.toolCalls) {
+          const classifyCall = response.metadata.toolCalls.find(
+            (call: any) => call.name === 'classify_query'
+          );
+          
+          if (classifyCall) {
+            const triageResult = JSON.parse(classifyCall.arguments) as TriageResult;
+            
+            // Log the classification but don't hand off here since that would be handled
+            // by the BaseAgent's tool call handling
+            return {
+              success: true,
+              content: JSON.stringify(triageResult),
+              metadata: {
+                ...response.metadata,
+                triageResult
+              }
+            };
+          }
+        }
+        
+        // Otherwise try to extract from the text content
+        const jsonText = this.extractJsonFromText(response.content);
+        const triageResult = JSON.parse(jsonText) as TriageResult;
+        
         return {
           success: true,
           content: JSON.stringify(triageResult),
           metadata: {
-            model: 'gpt-4o',
-            responseTime,
-            triageResult,
-            originalQuery: userQuery,
-            context
+            ...response.metadata,
+            triageResult
           }
         };
       } catch (parseError) {
         console.error('Failed to parse triage response:', parseError);
-        // Fallback to combined task type if parsing fails
+        
+        // Fallback to a default classification
+        const fallbackResult: TriageResult = {
+          taskType: TaskType.COMBINED,
+          confidence: 0.5,
+          reasoning: 'Failed to parse the model response. Defaulting to combined task type.',
+          modifiedQuery: userQuery
+        };
+        
         return {
           success: true,
-          content: JSON.stringify({
-            taskType: TaskType.COMBINED,
-            confidence: 0.5,
-            reasoning: 'Fallback classification due to parsing error',
-            modifiedQuery: userQuery
-          }),
+          content: JSON.stringify(fallbackResult),
           metadata: {
-            model: 'gpt-4o',
-            parsingError: parseError instanceof Error ? parseError.message : 'Unknown parsing error',
-            originalQuery: userQuery,
-            context
+            ...response.metadata,
+            triageResult: fallbackResult,
+            parseError: parseError instanceof Error ? parseError.message : 'Unknown error'
           }
         };
       }
@@ -116,93 +186,9 @@ export class TriageAgent implements Agent {
       console.error('TriageAgent error:', error);
       return {
         success: false,
-        content: 'An error occurred while triaging the query.',
+        content: '',
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
-  }
-
-  /**
-   * Streams the triage process, though technically this doesn't stream from the OpenAI API
-   * but rather processes the full response and then simulates streaming for a consistent interface
-   */
-  async streamTask(
-    userQuery: string,
-    callbacks: StreamCallbacks,
-    context?: AgentContext
-  ): Promise<void> {
-    try {
-      if (!userQuery || userQuery.trim() === '') {
-        callbacks.onError?.(new Error('Empty query provided. Please provide a valid query for triage.'));
-        return;
-      }
-
-      // Notify that streaming has started
-      callbacks.onStart?.();
-
-      // Get triage result (non-streaming, but we'll simulate streaming the response)
-      const response = await this.handleTask(userQuery, context);
-
-      if (!response.success) {
-        callbacks.onError?.(new Error(response.error || 'Triage failed'));
-        return;
-      }
-
-      try {
-        // Parse the triage result
-        const triageResult = JSON.parse(response.content) as TriageResult;
-        
-        // Stream individual parts of the result to simulate streaming
-        callbacks.onToken?.(`Analyzing your query... \n\n`);
-        
-        // Pause briefly to simulate thinking/processing time
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        callbacks.onToken?.(`This appears to be a ${triageResult.taskType.toUpperCase()} task.\n\n`);
-        
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        callbacks.onToken?.(`Confidence: ${(triageResult.confidence * 100).toFixed(1)}%\n\n`);
-        
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        callbacks.onToken?.(`Reasoning: ${triageResult.reasoning}\n\n`);
-        
-        if (triageResult.modifiedQuery && triageResult.modifiedQuery !== userQuery) {
-          await new Promise(resolve => setTimeout(resolve, 300));
-          callbacks.onToken?.(`I've adjusted your query to: "${triageResult.modifiedQuery}"\n\n`);
-        }
-        
-        // Complete the streaming
-        callbacks.onComplete?.(response);
-      } catch (parseError) {
-        console.error('Failed to parse triage result for streaming:', parseError);
-        callbacks.onToken?.('Analysis complete, but encountered an error formatting the results.\n\n');
-        callbacks.onComplete?.(response);
-      }
-    } catch (error) {
-      console.error('TriageAgent streaming error:', error);
-      callbacks.onError?.(error instanceof Error ? error : new Error('Unknown streaming error'));
-    }
-  }
-
-  /**
-   * Helper function to extract JSON from text which might contain markdown or extra content
-   */
-  private extractJsonFromText(text: string): string {
-    // Try to find JSON content within code blocks
-    const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (codeBlockMatch && codeBlockMatch[1]) {
-      return codeBlockMatch[1];
-    }
-
-    // Try to find content that looks like a JSON object
-    const jsonObjectMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonObjectMatch) {
-      return jsonObjectMatch[0];
-    }
-
-    // If we can't extract JSON, return the original text and let the JSON parser handle potential errors
-    return text;
   }
 } 

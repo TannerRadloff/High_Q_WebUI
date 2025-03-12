@@ -69,6 +69,12 @@ export interface FunctionSpanData extends SpanData {
   result?: any;
 }
 
+export interface HandoffSpanData extends SpanData {
+  source_agent: string;
+  target_agent: string;
+  reason?: string;
+}
+
 export interface RunConfig {
   workflow_name?: string;
   trace_id?: string;
@@ -98,256 +104,183 @@ class ConsoleTraceProcessor implements TraceProcessor {
       workflow_name: trace.workflow_name,
       trace_id: trace.trace_id,
       group_id: trace.group_id,
-      span_count: trace.spans.length,
-      duration_ms: trace.ended_at ? trace.ended_at.getTime() - trace.started_at.getTime() : 'ongoing',
-      metadata: trace.metadata
+      spans_count: trace.spans.length,
+      duration_ms: trace.ended_at 
+        ? trace.ended_at.getTime() - trace.started_at.getTime() 
+        : 'unfinished'
     });
   }
 }
 
-// List of trace processors
-const traceProcessors: TraceProcessor[] = [new ConsoleTraceProcessor()];
+// Default trace processor
+let traceProcessor: TraceProcessor = new ConsoleTraceProcessor();
 
 /**
- * Set the trace processors to use
+ * Configure tracing settings
  */
-export function setTraceProcessors(processors: TraceProcessor[]): void {
-  traceProcessors.length = 0;
-  processors.forEach(processor => traceProcessors.push(processor));
-}
-
-/**
- * Add a trace processor
- */
-export function addTraceProcessor(processor: TraceProcessor): void {
-  traceProcessors.push(processor);
-}
-
-/**
- * Process a trace through all registered processors
- */
-async function processTrace(trace: Trace): Promise<void> {
-  if (trace.disabled) return;
-  
-  for (const processor of traceProcessors) {
-    try {
-      await processor.processTrace(trace);
-    } catch (error) {
-      console.error('Error processing trace:', error);
+export function configureTracing(config?: RunConfig): void {
+  if (config) {
+    if (config.tracing_disabled !== undefined) {
+      tracingDisabled = config.tracing_disabled;
+    }
+    
+    if (config.trace_include_sensitive_data !== undefined) {
+      includeSensitiveData = config.trace_include_sensitive_data;
     }
   }
 }
 
 /**
- * Create a new trace
+ * Create a trace
  */
-export function trace(
-  workflowName: string, 
-  config?: Partial<RunConfig>
-): { 
-  start: (opts?: { mark_as_current?: boolean }) => Trace; 
-  finish: (opts?: { reset_current?: boolean }) => Promise<void>;
+export function trace(workflow_name: string, config?: RunConfig): { 
+  start: () => Trace;
+  finish: () => Promise<void>;
 } {
-  // Check if tracing is disabled globally
-  if (isTracingGloballyDisabled() || config?.tracing_disabled) {
-    const disabledTrace: Trace = {
-      workflow_name: workflowName,
-      trace_id: `trace_${uuidv4().replace(/-/g, '')}`,
-      disabled: true,
-      spans: [],
-      started_at: new Date(),
-    };
-    
-    return {
-      start: () => disabledTrace,
-      finish: async () => {/* Do nothing */}
-    };
-  }
+  const isDisabled = tracingDisabled || isTracingGloballyDisabled() || (config?.tracing_disabled ?? false);
   
-  const traceId = config?.trace_id || `trace_${uuidv4().replace(/-/g, '')}`;
-  
-  const newTrace: Trace = {
-    workflow_name: workflowName,
-    trace_id: traceId,
+  const traceObj: Trace = {
+    workflow_name,
+    trace_id: config?.trace_id ?? `trace_${uuidv4().replace(/-/g, '')}`,
     group_id: config?.group_id,
-    disabled: false,
+    disabled: isDisabled,
     metadata: config?.metadata,
     spans: [],
-    started_at: new Date(),
+    started_at: new Date()
   };
   
   return {
-    start: (opts = { mark_as_current: true }) => {
-      if (opts.mark_as_current) {
-        currentTrace = newTrace;
+    start: () => {
+      if (!isDisabled) {
+        currentTrace = traceObj;
       }
-      return newTrace;
+      return traceObj;
     },
-    finish: async (opts = { reset_current: true }) => {
-      newTrace.ended_at = new Date();
+    finish: async () => {
+      if (isDisabled) return;
       
-      if (opts.reset_current && currentTrace?.trace_id === newTrace.trace_id) {
+      traceObj.ended_at = new Date();
+      
+      if (currentTrace?.trace_id === traceObj.trace_id) {
         currentTrace = null;
       }
       
-      // Process the trace through all processors
-      await processTrace(newTrace);
+      try {
+        await traceProcessor.processTrace(traceObj);
+      } catch (error) {
+        console.error('Error processing trace:', error);
+      }
     }
   };
 }
 
 /**
- * Create and start a span
+ * Create a span for an agent operation
  */
-function createSpan(
-  name: string,
-  spanType: SpanType,
-  spanData: SpanData
-): Span {
-  const span: Span = {
-    span_id: uuidv4(),
-    trace_id: currentTrace?.trace_id || `trace_${uuidv4().replace(/-/g, '')}`,
-    parent_id: currentSpan?.span_id,
-    name,
-    span_type: spanType,
-    span_data: spanData,
-    started_at: new Date(),
-  };
-  
-  // Add to current trace if one exists
-  if (currentTrace && !currentTrace.disabled) {
-    currentTrace.spans.push(span);
-  }
-  
-  return span;
+export function agent_span(name: string, data: AgentSpanData): SpanWrapper {
+  return createSpan(name, SpanType.AGENT, data);
 }
 
 /**
- * Create a context manager for a span
+ * Create a span for a generation operation
  */
-function createSpanContextManager(
-  name: string,
-  spanType: SpanType,
-  spanData: SpanData
-) {
-  // Check if tracing is disabled
-  if (isTracingGloballyDisabled() || tracingDisabled || !currentTrace || currentTrace.disabled) {
-    // Return no-op context manager
-    return {
-      enter: () => null,
-      exit: () => {},
-    };
-  }
-  
-  const span = createSpan(name, spanType, spanData);
-  const previousSpan = currentSpan;
-  
-  return {
-    enter: () => {
-      currentSpan = span;
-      return span;
-    },
-    exit: () => {
-      span.ended_at = new Date();
-      currentSpan = previousSpan;
-    },
-  };
+export function generation_span(name: string, data: GenerationSpanData): SpanWrapper {
+  return createSpan(name, SpanType.GENERATION, data);
 }
 
 /**
- * Create an agent span
+ * Create a span for a function call
  */
-export function agent_span(
-  name: string,
-  data: AgentSpanData
-) {
-  // Optionally remove sensitive data
-  if (!includeSensitiveData) {
-    // Create a new object without sensitive fields
-    const sanitizedData = { ...data };
-    delete sanitizedData.input;
-    delete sanitizedData.output;
-    return createSpanContextManager(name, SpanType.AGENT, sanitizedData);
-  }
-  
-  return createSpanContextManager(name, SpanType.AGENT, data);
+export function function_span(name: string, data: FunctionSpanData): SpanWrapper {
+  return createSpan(name, SpanType.FUNCTION, data);
 }
 
 /**
- * Create a generation span
+ * Create a span for a handoff between agents
  */
-export function generation_span(
-  name: string,
-  data: GenerationSpanData
-) {
-  // Optionally remove sensitive data
-  if (!includeSensitiveData) {
-    // Create a new object without sensitive fields
-    const sanitizedData = { ...data };
-    delete sanitizedData.input;
-    delete sanitizedData.output;
-    return createSpanContextManager(name, SpanType.GENERATION, sanitizedData);
-  }
-  
-  return createSpanContextManager(name, SpanType.GENERATION, data);
-}
-
-/**
- * Create a function span
- */
-export function function_span(
-  name: string,
-  data: FunctionSpanData
-) {
-  // Optionally remove sensitive data
-  if (!includeSensitiveData) {
-    // Create a new object without sensitive fields
-    const sanitizedData = { ...data };
-    delete sanitizedData.arguments;
-    delete sanitizedData.result;
-    return createSpanContextManager(name, SpanType.FUNCTION, sanitizedData);
-  }
-  
-  return createSpanContextManager(name, SpanType.FUNCTION, data);
+export function handoff_span(sourceAgent: string, targetAgent: string, data: HandoffSpanData): SpanWrapper {
+  return createSpan(`Handoff from ${sourceAgent} to ${targetAgent}`, SpanType.HANDOFF, data);
 }
 
 /**
  * Create a custom span
  */
-export function custom_span(
-  name: string,
-  data: SpanData
-) {
-  return createSpanContextManager(name, SpanType.CUSTOM, data);
+export function custom_span(name: string, data: SpanData): SpanWrapper {
+  return createSpan(name, SpanType.CUSTOM, data);
+}
+
+// Helper function to create spans
+function createSpan(name: string, span_type: SpanType, span_data: SpanData): SpanWrapper {
+  if (tracingDisabled || isTracingGloballyDisabled() || !currentTrace) {
+    return new DummySpanWrapper();
+  }
+  
+  const span: Span = {
+    span_id: uuidv4(),
+    trace_id: currentTrace.trace_id,
+    parent_id: currentSpan?.span_id,
+    name,
+    span_type,
+    span_data,
+    started_at: new Date()
+  };
+  
+  return new RealSpanWrapper(span);
 }
 
 /**
- * Configure tracing for a run
+ * Interface for span operations
  */
-export function configureTracing(config?: RunConfig): void {
-  if (config) {
-    tracingDisabled = isTracingGloballyDisabled() || !!config.tracing_disabled;
-    includeSensitiveData = config.trace_include_sensitive_data !== false;
+interface SpanWrapper {
+  enter(): void;
+  exit(): void;
+  addData(data: SpanData): void;
+}
+
+/**
+ * Implementation for real spans
+ */
+class RealSpanWrapper implements SpanWrapper {
+  private span: Span;
+  
+  constructor(span: Span) {
+    this.span = span;
+  }
+  
+  enter(): void {
+    if (currentTrace) {
+      currentTrace.spans.push(this.span);
+      currentSpan = this.span;
+    }
+  }
+  
+  exit(): void {
+    if (currentSpan?.span_id === this.span.span_id) {
+      this.span.ended_at = new Date();
+      
+      // Pop the current span and restore parent
+      if (currentTrace) {
+        const parentId = this.span.parent_id;
+        currentSpan = parentId
+          ? currentTrace.spans.find(s => s.span_id === parentId) || null
+          : null;
+      }
+    }
+  }
+  
+  addData(data: SpanData): void {
+    this.span.span_data = {
+      ...this.span.span_data,
+      ...data
+    };
   }
 }
 
 /**
- * Use a trace as a context manager
+ * Dummy implementation for when tracing is disabled
  */
-export class TraceContextManager {
-  private traceObj: ReturnType<typeof trace>;
-  private trace: Trace | null = null;
-  
-  constructor(workflowName: string, config?: Partial<RunConfig>) {
-    this.traceObj = trace(workflowName, config);
-  }
-  
-  async enter(): Promise<Trace> {
-    this.trace = this.traceObj.start();
-    return this.trace;
-  }
-  
-  async exit(): Promise<void> {
-    await this.traceObj.finish();
-  }
+class DummySpanWrapper implements SpanWrapper {
+  enter(): void {}
+  exit(): void {}
+  addData(_data: SpanData): void {}
 } 

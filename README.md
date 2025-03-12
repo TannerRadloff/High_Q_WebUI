@@ -163,3 +163,60 @@ Custom type declarations are located in the `types/` directory:
 - `vercel-modules.d.ts` - Type definitions for Vercel modules
 
 If you encounter TypeScript errors, check if you need to add or update these type declarations.
+
+# AI Chatbot with Agent Handoffs
+
+This project implements a chatbot system that follows OpenAI Agent SDK patterns, with a focus on proper implementation of handoffs between specialized agents.
+
+## Key Components
+
+- **BaseAgent**: A foundation class that implements the core Agent functionality, including handoffs between agents
+- **TriageAgent**: The entry point agent that analyzes user queries and determines which specialized agent should handle them
+- **ResearchAgent**: An agent that performs research on topics using web search capabilities
+- **ReportAgent**: An agent that formats and structures information into well-organized reports
+
+## Agent Handoff Implementation
+
+The system implements proper handoffs between agents following OpenAI Agent SDK patterns:
+
+1. **Tool-based Handoffs**: Handoffs are implemented as function tools with names like `transfer_to_<agent_name>`
+
+2. **Dynamic Decision-making**: The LLM decides when to initiate a handoff based on the task requirements
+
+3. **Context Preservation**: When a handoff occurs, the entire conversation context is passed to the new agent
+
+4. **Tracing**: Handoffs are tracked using a specialized `handoff_span` to monitor the flow between agents
+
+5. **Streaming Support**: The system supports streaming responses during handoffs, with appropriate callbacks
+
+## How Handoffs Work
+
+1. The TriageAgent receives the initial user query and determines which specialized agent should handle it
+2. The LLM can call a handoff tool like `transfer_to_researchagent` to delegate the task
+3. When a handoff is detected, the BaseAgent's `handleToolCalls` method processes it:
+   - It finds the target agent from the handoffs array
+   - It passes the conversation history to maintain context
+   - It creates a tracing span to record the handoff
+   - It executes the target agent's `handleTask` method
+   - It returns the result to the user
+
+4. For combined tasks (research + report), the ResearchAgent can hand off to the ReportAgent once research is complete
+
+## Examples
+
+- **Research Query**: "What are the latest advancements in quantum computing?"
+  - TriageAgent → ResearchAgent
+
+- **Report Query**: "Format this data into a structured report with headings."
+  - TriageAgent → ReportAgent
+
+- **Combined Query**: "Research climate change and create a report with its impacts."
+  - TriageAgent → ResearchAgent → ReportAgent
+
+## Orchestration
+
+The Orchestrator class manages the workflow but does not directly control the flow between agents. Instead, it initiates the process with the TriageAgent and lets the agents decide when to hand off to each other. This creates a more dynamic and flexible system that can adapt to different types of queries.
+
+## Tracing and Monitoring
+
+The system includes a tracing module that records spans for different operations, including handoffs. This allows for monitoring the flow of a conversation and understanding how agents collaborate to complete a task.

@@ -1,194 +1,145 @@
-import { Agent, AgentResponse, AgentContext, StreamCallbacks } from './agent';
-import OpenAI from 'openai';
-import { generation_span, function_span } from './tracing';
+import { z } from 'zod';
+import { AgentContext } from './agent';
+import { BaseAgent } from './BaseAgent';
+import { functionTool, webSearchTool } from './tools';
+import { ReportAgent } from './ReportAgent';
 
-// Initialize OpenAI client
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+/**
+ * A specialized agent that performs research on user queries
+ * Follows OpenAI Agent SDK patterns
+ */
+export class ResearchAgent extends BaseAgent {
+  constructor() {
+    // Create the ReportAgent for handoff
+    const reportAgent = new ReportAgent();
 
-export class ResearchAgent implements Agent {
-  name = 'ResearchAgent';
+    super({
+      name: 'ResearchAgent',
+      instructions: `You are a research assistant with web search capabilities. Your job is to thoroughly research the user's query and provide accurate, up-to-date information with proper citation of sources.
 
-  async handleTask(userQuery: string, context?: AgentContext): Promise<AgentResponse> {
-    try {
-      if (!userQuery || userQuery.trim() === '') {
-        return {
-          success: false,
-          content: '',
-          error: 'Empty query provided. Please provide a valid research query.'
-        };
-      }
-
-      const startTime = Date.now();
+      For each major claim or piece of information, cite the source using a numbered format like [1], [2], etc.
+      At the end of your response, list all the sources you cited in the format:
       
-      // Create a generation span for the OpenAI call
-      const genSpan = generation_span("Research Query", {
-        model: 'gpt-4o',
-        input: userQuery
-      });
+      SOURCES:
+      [1] Source title, URL, and date (if available)
+      [2] Source title, URL, and date (if available)
       
-      genSpan.enter();
+      If you can't find sufficient information to answer the query, be honest about the limitations.
+      Your response should be thorough, accurate, and well-organized.
       
-      // Use OpenAI to perform the research
-      const response = await client.responses.create({
-        model: 'gpt-4o',
-        instructions: `You are a research assistant with web search capabilities. Your job is to thoroughly research the user's query and provide accurate, up-to-date information with proper citation of sources.
-
-        For each major claim or piece of information, cite the source using a numbered format like [1], [2], etc.
-        At the end of your response, list all the sources you cited in the format:
+      If the original request appears to require a formal report format after your research is complete, use the transfer_to_reportagent function to hand off your research findings to the ReportAgent which can format them appropriately. You should do this when:
+      1. The original query explicitly asks for a report, essay, article, or similar formal document
+      2. The research you've gathered would benefit from being organized into a structured report with headings, sections, etc.
+      3. The query is complex and would be better presented as a well-formatted document`,
+      model: 'gpt-4o',
+      modelSettings: {
+        temperature: 0.7,
+      },
+      tools: [
+        // Web search tool for finding information
+        webSearchTool,
         
-        SOURCES:
-        [1] Source title, URL, and date (if available)
-        [2] Source title, URL, and date (if available)
+        // Tool for counting citations in the response
+        functionTool(
+          'count_citations',
+          'Count the number of citations in the text',
+          z.object({
+            text: z.string().describe('The text to analyze for citations')
+          }),
+          async (args) => {
+            const citationCount = countCitations(args.text);
+            return JSON.stringify({ citationCount });
+          }
+        ),
         
-        If you can't find sufficient information to answer the query, be honest about the limitations.
-        Your response should be thorough, accurate, and well-organized.`,
-        input: userQuery,
-      });
-      
-      const outputText = response.output_text;
-      
-      genSpan.exit();
-      
-      // Create a function span for citation counting
-      const countSpan = function_span("Count Citations", {
-        function_name: "countCitations",
-        arguments: { text: outputText }
-      });
-      
-      countSpan.enter();
-      const citationCount = this.countCitations(outputText);
-      countSpan.exit();
+        // Tool for checking source quality
+        functionTool(
+          'verify_sources',
+          'Verify if sources are credible and diverse',
+          z.object({
+            sources: z.array(z.string()).describe('List of sources to verify')
+          }),
+          async (args) => {
+            // This would be a more complex implementation in a real system
+            const sourceDiversity = args.sources.length > 1 ? 'diverse' : 'limited';
+            return JSON.stringify({ 
+              diversity: sourceDiversity,
+              credibilityCheck: 'completed'
+            });
+          }
+        ),
+        
+        // Tool to check if content should be formatted as a report
+        functionTool(
+          'should_format_as_report',
+          'Determine if the research content should be handed off to the ReportAgent',
+          z.object({
+            query: z.string().describe('The original user query'),
+            researchContent: z.string().describe('The research content to evaluate')
+          }),
+          async (args) => {
+            // This is a placeholder implementation - in reality, this would have more complex logic
+            // to determine whether the content should be formatted as a report
+            const needsReport = args.query.toLowerCase().includes('report') || 
+                              args.query.toLowerCase().includes('essay') ||
+                              args.query.toLowerCase().includes('article') ||
+                              args.researchContent.length > 2000;
+            
+            return JSON.stringify({ 
+              needsReport,
+              reason: needsReport ? 
+                'The query requests a formal report format or the research is extensive enough to benefit from structured formatting' : 
+                'The research is concise and does not require formal report formatting'
+            });
+          }
+        )
+      ],
+      // Add handoff to ReportAgent
+      handoffs: [reportAgent]
+    });
+  }
 
-      // Record end time for performance tracking
-      const endTime = Date.now();
-      const responseTime = endTime - startTime;
-
-      // Return the agent response
+  /**
+   * Override handleTask to add citation counting
+   */
+  async handleTask(userQuery: string, context?: AgentContext): Promise<{
+    success: boolean;
+    content: string;
+    error?: string;
+    metadata?: Record<string, any>;
+  }> {
+    // Call the parent handleTask method
+    const response = await super.handleTask(userQuery, context);
+    
+    // If a handoff occurred, the response will contain the result from the target agent
+    // so we can just return it directly
+    if (response.metadata?.handoffOccurred) {
+      return response;
+    }
+    
+    if (response.success) {
+      // Count citations in the final output
+      const citationCount = countCitations(response.content);
+      
+      // Add citation count to metadata
       return {
-        success: true,
-        content: outputText,
+        ...response,
         metadata: {
-          model: 'gpt-4o',
-          responseTime,
-          citationCount,
-          query: userQuery,
-          context
+          ...response.metadata,
+          citationCount
         }
       };
-    } catch (error) {
-      console.error('ResearchAgent error:', error);
-      return {
-        success: false,
-        content: '',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      };
     }
+    
+    return response;
   }
+}
 
-  /**
-   * Stream the research process, returning tokens as they're generated
-   */
-  async streamTask(
-    userQuery: string,
-    callbacks: StreamCallbacks,
-    context?: AgentContext
-  ): Promise<void> {
-    try {
-      // Validate input
-      if (!userQuery || userQuery.trim() === '') {
-        callbacks.onError?.(new Error('Empty query provided. Please provide a valid research query.'));
-        return;
-      }
-
-      // Notify that streaming has started
-      callbacks.onStart?.();
-
-      const startTime = Date.now();
-      let fullContent = '';
-
-      // Use streaming mode of the Responses API
-      const stream = await client.responses.create({
-        model: 'gpt-4o',
-        tools: [{ type: 'web_search_preview' }],
-        instructions: 'You are an AI research assistant. Search the web for current and relevant information and return a summary with citations. Include the source URLs for all information.',
-        input: userQuery,
-        stream: true,
-      });
-
-      try {
-        // Process the stream
-        for await (const chunk of stream) {
-          // Extract content from the chunk based on its structure
-          // This approach avoids relying on specific property names that might change
-          const chunkContent = this.extractContentFromStreamChunk(chunk);
-          
-          if (chunkContent) {
-            fullContent += chunkContent;
-            callbacks.onToken?.(chunkContent);
-          }
-        }
-
-        // Streaming complete, call onComplete with the full response
-        const endTime = Date.now();
-        const responseTime = endTime - startTime;
-
-        const finalResponse: AgentResponse = {
-          success: true,
-          content: fullContent || 'No research data found.',
-          metadata: {
-            model: 'gpt-4o',
-            responseTime,
-            toolsUsed: 'web_search_preview',
-            streaming: true,
-            query: userQuery,
-            context
-          }
-        };
-
-        callbacks.onComplete?.(finalResponse);
-      } catch (streamError) {
-        callbacks.onError?.(streamError instanceof Error ? streamError : new Error('Stream processing error'));
-      }
-    } catch (error) {
-      console.error('ResearchAgent streaming error:', error);
-      callbacks.onError?.(error instanceof Error ? error : new Error('Unknown streaming error'));
-    }
-  }
-
-  /**
-   * Helper method to extract content from a stream chunk, regardless of its structure
-   */
-  private extractContentFromStreamChunk(chunk: any): string | null {
-    try {
-      // Handle different chunk types based on OpenAI's streaming format
-      // If structure changes, only this method needs to be updated
-      if (chunk.type && chunk.type.includes('delta')) {
-        // Handle delta chunks (incremental content)
-        return chunk.delta?.value || '';
-      } else if (chunk.type && chunk.type.includes('searching')) {
-        // Handle searching status
-        return '[Searching the web...]';
-      } else if (chunk.output_text) {
-        // Handle complete output chunks
-        return chunk.output_text;
-      } else if (typeof chunk === 'string') {
-        // Handle simple string chunks
-        return chunk;
-      }
-      
-      // No recognizable content
-      return null;
-    } catch (e) {
-      // If we can't parse the chunk, just return null
-      return null;
-    }
-  }
-
-  private countCitations(text: string): number {
-    // Count citations in formats like [1], [2], etc.
-    const citationMatches = text.match(/\[\d+\]/g);
-    return citationMatches ? citationMatches.length : 0;
-  }
+/**
+ * Helper function to count citations in text
+ */
+function countCitations(text: string): number {
+  const citationPattern = /\[\d+\]/g;
+  const matches = text.match(citationPattern);
+  return matches ? matches.length : 0;
 } 
