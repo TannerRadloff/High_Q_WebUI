@@ -1,7 +1,8 @@
+'use client';
+
 import type { Metadata } from 'next';
 import { Toaster } from 'sonner';
 import Script from 'next/script';
-import { useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
 import { ThemeProvider } from '@/components/theme-provider';
@@ -9,6 +10,7 @@ import { Providers } from './providers';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import ClientLayout from './client-layout';
 
 import './globals.css';
 
@@ -302,31 +304,11 @@ const ANIMATION_INIT_SCRIPT = `\
   });
 })();`;
 
-// Add global error handler for message channel errors
-const initGlobalErrorHandlers = () => {
-  if (typeof window !== 'undefined') {
-    // Capture and log unhandled promise rejections
-    window.addEventListener('unhandledrejection', (event) => {
-      if (event.reason && 
-          event.reason.message && 
-          event.reason.message.includes('message channel closed')) {
-        console.error('Global handler: Message channel closed error:', event.reason);
-        // We don't prevent default here to allow error boundaries to catch it
-      }
-    });
-  }
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Initialize global error handlers
-  useEffect(() => {
-    initGlobalErrorHandlers();
-  }, []);
-
   return (
     <html
       lang="en"
@@ -349,22 +331,40 @@ export default function RootLayout({
           src="/_next/static/chunks/webpack.js"
         />
       </head>
-      <body className="antialiased">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {/* Animation elements are now created by the script */}
-          <Script src="/animation-diagnostic.js" strategy="afterInteractive" />
-          <Toaster position="top-center" />
+      <body
+        className={cn(
+          'min-h-screen bg-background font-sans antialiased',
+          // Light mode radial gradient for subtle depth effect
+          'bg-gradient-to-tr from-background via-background to-muted/30',
+          // Dark mode cosmic effect background
+          'dark:bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.2),rgba(2,0,15,0))]'
+        )}
+      >
+        <ErrorBoundary>
           <Providers>
-            <ErrorBoundary>
-              {children}
-            </ErrorBoundary>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <ClientLayout>
+                {children}
+              </ClientLayout>
+              <Toaster
+                position="top-center"
+                toastOptions={{
+                  className: 'border rounded-lg shadow-md',
+                  classNames: {
+                    toast: 'group',
+                    title: 'group-[.toast]:text-foreground',
+                    description: 'group-[.toast]:text-muted-foreground',
+                  },
+                }}
+              />
+            </ThemeProvider>
           </Providers>
-        </ThemeProvider>
+        </ErrorBoundary>
         <Analytics />
         <SpeedInsights />
       </body>
