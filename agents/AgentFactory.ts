@@ -1,5 +1,5 @@
 import { BaseAgent } from './BaseAgent';
-import { DelegationAgent } from '../orchestrator';
+import { AgentRunner } from '../runner';
 import { TriageAgent } from './TriageAgent';
 import { ResearchAgent } from './ResearchAgent';
 import { ReportAgent } from './ReportAgent';
@@ -26,6 +26,22 @@ export class AgentFactory {
   private defaultTemperature: number = 0.7;
   
   /**
+   * Set default settings for all agents created by this factory
+   */
+  setDefaults({ model, temperature }: { model?: string; temperature?: number } = {}): void {
+    if (model) this.defaultModel = model;
+    if (temperature !== undefined) this.defaultTemperature = temperature;
+  }
+  
+  /**
+   * Clear any cached resources (placeholder for backwards compatibility)
+   */
+  clearCache(): void {
+    // No caching in this implementation
+    // Method exists for backwards compatibility
+  }
+
+  /**
    * Create an agent of the specified type
    */
   createAgent<T = string>(
@@ -36,7 +52,15 @@ export class AgentFactory {
     
     switch (type) {
       case AgentType.DELEGATION:
-        agent = new DelegationAgent() as unknown as BaseAgent<T>;
+        // Create a basic delegation agent with default settings
+        agent = new BaseAgent({
+          name: 'DelegationAgent',
+          instructions: 'You are an agent that delegates tasks to specialized agents.',
+          model: this.defaultModel,
+          modelSettings: {
+            temperature: this.defaultTemperature
+          }
+        }) as unknown as BaseAgent<T>;
         break;
         
       case AgentType.TRIAGE:
@@ -104,7 +128,7 @@ export class AgentFactory {
     
     // Create a delegation agent that can coordinate between them
     return this.createAgent(AgentType.CUSTOM, {
-      name: 'WorkflowOrchestrator',
+      name: 'WorkflowRunner',
       instructions: (context: AgentContext) => {
         const userName = context.userName || 'user';
         

@@ -459,8 +459,8 @@ french_agent = Agent(
     instructions="You translate the user's message to French",
 )
 
-orchestrator_agent = Agent(
-    name="orchestrator_agent",
+runner_agent = Agent(
+    name="runner_agent",
     instructions=(
         "You are a translation agent. You use the tools given to you to translate."
         "If asked for multiple translations, you call the relevant tools."
@@ -478,7 +478,7 @@ orchestrator_agent = Agent(
 )
 
 async def main():
-    result = await Runner.run(orchestrator_agent, input="Say 'Hello, how are you?' in Spanish.")
+    result = await Runner.run(runner_agent, input="Say 'Hello, how are you?' in Spanish.")
     print(result.final_output)
 Handling errors in function tools
 When you create a function tool via @function_tool, you can pass a failure_error_function. This is a function that provides an error response to the LLM in case the tool call crashes.
@@ -888,4 +888,15 @@ To disable logging tool inputs and outputs:
 
 
 export OPENAI_AGENTS_DONT_LOG_TOOL_DATA=1
+
+runner_agent = Agent(
+name="runner_agent",
+description="An agent that helps coordinate work between specialized agents.",
+agent_type=AgentType.FLOW_COORDINATOR,
+delegations=[
+Agent(name="specialized_agent_1", description="An agent with specialized knowledge A."),
+Agent(name="specialized_agent_2", description="An agent with specialized knowledge B.")
+])
+
+result = await Runner.run(runner_agent, input="Say 'Hello, how are you?' in Spanish.")
 

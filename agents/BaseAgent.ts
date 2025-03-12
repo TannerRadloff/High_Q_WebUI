@@ -5,14 +5,15 @@ import { generation_span, handoff_span, agent_span, SpanType, TraceMetadata } fr
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { MemoryManager, InMemoryStorage, MemoryType } from './memory';
-
-// Initialize OpenAI client
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// Whether to include sensitive data in traces, defaults to true unless configured otherwise
-const includeSensitiveData = process.env.OPENAI_AGENTS_DONT_LOG_TOOL_DATA !== '1';
+import { 
+  openaiClient, 
+  includeSensitiveData, 
+  prepareToolsForAPI, 
+  prepareCompletionParams, 
+  prepareStreamingParams,
+  callOpenAI,
+  streamOpenAI
+} from './api-utils';
 
 // Type for OpenAI API response
 type OpenAIResponse = {
@@ -78,76 +79,6 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
       return this.instructions(context || {});
     }
     return this.instructions;
-  }
-
-  /**
-   * Prepare tools for the OpenAI API
-   */
-  prepareToolsForAPI(): any[] {
-    // Convert our tools to OpenAI's format
-    const apiTools = this.tools.map(tool => ({
-      type: 'function',
-      name: tool.name,
-      function: {
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.parametersSchema
-      }
-    }));
-
-    // Convert handoffs to tools
-    const handoffTools = this.handoffs.map(agent => {
-      const name = `transfer_to_${agent.name.toLowerCase().replace(/\s+/g, '_')}`;
-      return {
-        type: 'function',
-        name: name,
-        function: {
-          name: name,
-          description: `Transfer the conversation to the ${agent.name}`,
-          parameters: {
-            type: 'object',
-            properties: {
-              reason: {
-                type: 'string',
-                description: 'Optional reason for the handoff'
-              }
-            },
-            required: []
-          }
-        }
-      };
-    });
-    
-    // Log the tools before returning to help debug
-    const allTools = [...apiTools, ...handoffTools];
-    
-    // Ensure every tool has the required fields according to OpenAI API
-    for (const tool of allTools) {
-      if (!tool.type) {
-        console.error('Tool missing type field:', tool);
-        tool.type = 'function'; // Set default type
-      }
-      
-      if (!tool.name) {
-        console.error('Tool missing name field:', tool);
-        // If missing name, try to get it from function.name
-        if (tool.function && tool.function.name) {
-          tool.name = tool.function.name;
-        } else {
-          tool.name = 'unnamed_tool';
-        }
-      }
-      
-      if (!tool.function || !tool.function.name) {
-        console.error('Tool missing function.name field:', tool);
-        if (tool.function && !tool.function.name && tool.name) {
-          // Copy the name from the tool to the function if missing
-          tool.function.name = tool.name;
-        }
-      }
-    }
-
-    return allTools;
   }
 
   /**
@@ -400,16 +331,20 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
           try {
             generationSpanWrapper.enter();
             
-            // Call the OpenAI API
-            const response = await client.chat.completions.create({
+            // Get prepared tools
+            const formattedTools = prepareToolsForAPI(this.tools, this.handoffs);
+            
+            // Prepare API parameters
+            const requestParams = prepareCompletionParams({
               model: this.model,
-              messages: conversationHistory as any,
-              temperature: this.modelSettings?.temperature || 0.7,
-              top_p: this.modelSettings?.topP || 1,
+              messages: conversationHistory,
+              temperature: this.modelSettings?.temperature,
+              top_p: this.modelSettings?.topP,
               max_tokens: this.modelSettings?.maxTokens,
-              tools: this.prepareToolsForAPI(),
-              tool_choice: this.tools.length > 0 || this.handoffs.length > 0 ? 'auto' : 'none'
-            });
+            }, formattedTools);
+            
+            // Call the OpenAI API
+            const response = await callOpenAI(requestParams);
             
             // Update the generation span with token usage if available
             if (response.usage) {
@@ -559,40 +494,18 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
       callbacks.onStart?.();
       const instructions = this.resolveInstructions(context);
       
-      // Prepare the API request
-      const apiTools = this.prepareToolsForAPI();
-      const hasTools = apiTools.length > 0;
+      // Get prepared tools
+      const formattedTools = prepareToolsForAPI(this.tools, this.handoffs);
       
       // Prepare streaming parameters
-      const streamParams: any = {
+      const streamParams = prepareStreamingParams({
         model: this.model,
-        instructions,
+        instructions: instructions,
         input: userQuery,
-        stream: true
-      };
-      
-      // Add temperature if defined
-      if (this.modelSettings?.temperature !== undefined) {
-        streamParams.temperature = this.modelSettings.temperature;
-      }
-      
-      // Add top_p if defined
-      if (this.modelSettings?.topP !== undefined) {
-        streamParams.top_p = this.modelSettings.topP;
-      }
-      
-      // Add max tokens if defined
-      if (this.modelSettings?.maxTokens !== undefined) {
-        streamParams.max_tokens = this.modelSettings.maxTokens;
-      }
-      
-      // Add tools if we have any
-      if (hasTools) {
-        streamParams.tools = apiTools;
-        
-        // Add debug logging
-        console.log('Sending tools to OpenAI streaming API:', JSON.stringify(apiTools, null, 2));
-      }
+        temperature: this.modelSettings?.temperature,
+        top_p: this.modelSettings?.topP,
+        max_tokens: this.modelSettings?.maxTokens,
+      }, formattedTools);
       
       // Extract conversation history from context if available
       const conversationHistory = context?.conversationHistory || [];
@@ -600,45 +513,8 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
       // Log full params for debugging
       console.log('Creating streaming response with params:', JSON.stringify(streamParams, null, 2));
       
-      // Ensure tools format is correct for OpenAI API
-      if (streamParams.tools && streamParams.tools.length > 0) {
-        // Double check that all tools have the required format
-        streamParams.tools = streamParams.tools.map((tool: any) => {
-          // Make sure each tool has a 'type' field and a 'name' field
-          if (!tool.type) {
-            tool.type = 'function';
-          }
-          
-          if (!tool.name) {
-            console.error('Tool missing name field for streaming:', tool);
-            // Try to get name from function.name if available
-            if (tool.function && tool.function.name) {
-              tool.name = tool.function.name;
-            } else {
-              tool.name = 'unnamed_tool';
-            }
-          }
-          
-          // Make sure the function property has the right structure
-          if (tool.type === 'function' && (!tool.function || !tool.function.name)) {
-            console.error('Tool missing required function fields for streaming:', tool);
-            // Try to fix it
-            if (!tool.function) {
-              tool.function = {
-                name: tool.name || 'unnamed_function',
-                description: 'No description provided',
-                parameters: { type: 'object', properties: {} }
-              };
-            } else if (!tool.function.name) {
-              tool.function.name = tool.name || 'unnamed_function';
-            }
-          }
-          return tool;
-        });
-      }
-      
       // Stream the response
-      const stream = await client.responses.create(streamParams);
+      const stream = await streamOpenAI(streamParams);
       
       let content = '';
       let toolCalls: any[] = [];
@@ -713,13 +589,18 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
             // This would be handled by calling the API again with tool results in a real implementation
             callbacks.onToken?.("\n\nProcessing tool results...\n\n");
             
-            // Here we would stream the follow-up response with tool results
-            // This is a simplified implementation
-            const followUpResponse = await client.responses.create({
-              ...streamParams,
+            // Prepare streaming parameters with tool results
+            const followUpParams = prepareStreamingParams({
+              model: this.model,
+              instructions: instructions,
+              input: userQuery, 
               tool_results: toolResults,
               stream: false
-            }) as unknown as OpenAIResponse;
+            });
+            
+            // Here we would stream the follow-up response with tool results
+            // This is a simplified implementation
+            const followUpResponse = await streamOpenAI(followUpParams) as unknown as OpenAIResponse;
             
             callbacks.onToken?.(followUpResponse.output_text);
             content += followUpResponse.output_text;

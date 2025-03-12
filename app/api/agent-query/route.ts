@@ -9,6 +9,7 @@ import AgentStateService from '../../../services/agentStateService';
 import { v4 as uuidv4 } from 'uuid';
 import { AgentType } from '../../../agents/AgentFactory';
 import { BaseAgent } from '../../../agents/BaseAgent';
+import { includeSensitiveData } from '../../../agents/api-utils';
 
 // Define the AgentRequest type with properly typed properties
 type AgentRequest = {
@@ -248,243 +249,310 @@ async function handleStreamingResponse(
   
   // Variables to keep track of the response
   let controller: ReadableStreamDefaultController | null = null;
-  let lastResponseTime = Date.now();
+  let currentResponse = '';
   let heartbeatInterval: NodeJS.Timeout | null = null;
+  let requestTimeout: NodeJS.Timeout | null = null;
   
-  // Create a stream
+  // Create a ReadableStream for SSE
   const stream = new ReadableStream({
-    start(c) {
-      controller = c;
+    start(controller_) {
+      controller = controller_;
       
-      // Start a heartbeat to prevent timeouts
+      // Set up a heartbeat to keep the connection alive
       heartbeatInterval = setInterval(() => {
-        const timeElapsed = Date.now() - lastResponseTime;
-        
-        // If no response for a while, send a heartbeat
-        if (timeElapsed > HEARTBEAT_INTERVAL / 2) {
-          try {
-            controller?.enqueue(encoder.encode('data: {"type": "heartbeat"}\n\n'));
-          } catch (err) {
-            console.error('Error sending heartbeat:', err);
-          }
-        }
-        
-        // If no response for too long, timeout
-        if (timeElapsed > REQUEST_TIMEOUT) {
-          try {
-            controller?.enqueue(encoder.encode('data: {"type": "error", "value": "Request timed out"}\n\n'));
-            controller?.close();
-          } catch (err) {
-            console.error('Error closing stream on timeout:', err);
-          } finally {
-            if (heartbeatInterval) {
-              clearInterval(heartbeatInterval);
-            }
-          }
-        }
+        const heartbeatEvent = {
+          event: 'heartbeat', 
+          data: JSON.stringify({ 
+            timestamp: new Date().toISOString() 
+          })
+        };
+        controller?.enqueue(encoder.encode(`event: ${heartbeatEvent.event}\ndata: ${heartbeatEvent.data}\n\n`));
       }, HEARTBEAT_INTERVAL);
+      
+      // Safety timeout to end abandoned requests
+      requestTimeout = setTimeout(() => {
+        endStreamWithError('Request timed out. Please try again.');
+      }, REQUEST_TIMEOUT);
     },
     
     cancel() {
-      if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-      }
+      // Clean up on client disconnect
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      if (requestTimeout) clearTimeout(requestTimeout);
+      
+      console.log(`Stream for ${requestId} was cancelled by the client`);
+      
+      // Update agent state to idle
+      AgentStateService.updateAgentState(
+        getAgentTypeEnum(agentType),
+        'idle',
+        ''
+      );
+      
+      // Update request status if not already completed
+      AgentStateService.updateRequest(requestId, {
+        status: 'failed',
+        error: 'Request cancelled by client'
+      });
     }
   });
   
-  // Update request status
-  AgentStateService.updateRequest(requestId, { status: 'in-progress' });
+  // Function to end the stream with an error
+  function endStreamWithError(errorMessage: string) {
+    // Only proceed if controller exists
+    if (!controller) return;
+    
+    // Create an error event
+    const errorEvent = {
+      event: 'error',
+      data: JSON.stringify({ error: errorMessage })
+    };
+    
+    // Send the error message
+    controller.enqueue(encoder.encode(`event: ${errorEvent.event}\ndata: ${errorEvent.data}\n\n`));
+    
+    // End the stream
+    controller.close();
+    
+    // Clean up intervals
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    if (requestTimeout) clearTimeout(requestTimeout);
+    
+    // Update agent state to idle
+    AgentStateService.updateAgentState(
+      getAgentTypeEnum(agentType),
+      'idle',
+      ''
+    );
+    
+    // Update request status
+    AgentStateService.updateRequest(requestId, {
+      status: 'failed',
+      error: errorMessage
+    });
+  }
   
-  // Create a runner with the appropriate agent based on the requested type
-  const runner = createRunnerForAgentType(agentType);
-  
-  // Create streaming callbacks
-  const callbacks: StreamRunCallbacks = {
-    onStart: () => {
-      lastResponseTime = Date.now();
-      try {
-        controller?.enqueue(encoder.encode('data: {"type": "start"}\n\n'));
-      } catch (err) {
-        console.error('Error sending start event:', err);
-      }
-    },
-    
-    onToken: (token: string) => {
-      lastResponseTime = Date.now();
-      try {
-        controller?.enqueue(encoder.encode(`data: {"type": "token", "value": ${JSON.stringify(token)}}\n\n`));
-      } catch (err) {
-        console.error('Error sending token:', err);
-      }
-    },
-    
-    onTriageComplete: (result: TriageResult) => {
-      lastResponseTime = Date.now();
-      try {
-        controller?.enqueue(encoder.encode(`data: {"type": "triage", "value": ${JSON.stringify(result)}}\n\n`));
-      } catch (err) {
-        console.error('Error sending triage result:', err);
-      }
-    },
-    
-    onResearchStart: () => {
-      lastResponseTime = Date.now();
-      try {
-        controller?.enqueue(encoder.encode('data: {"type": "research_start"}\n\n'));
-      } catch (err) {
-        console.error('Error sending research start event:', err);
-      }
-    },
-    
-    onResearchComplete: (researchData: string) => {
-      lastResponseTime = Date.now();
-      try {
-        controller?.enqueue(encoder.encode(`data: {"type": "research_complete", "value": ${JSON.stringify(researchData)}}\n\n`));
-      } catch (err) {
-        console.error('Error sending research complete event:', err);
-      }
-    },
-    
-    onReportStart: () => {
-      lastResponseTime = Date.now();
-      try {
-        controller?.enqueue(encoder.encode('data: {"type": "report_start"}\n\n'));
-      } catch (err) {
-        console.error('Error sending report start event:', err);
-      }
-    },
-    
-    onHandoff: (from: string, to: string) => {
-      lastResponseTime = Date.now();
-      try {
-        controller?.enqueue(encoder.encode(`data: {"type": "handoff", "from": ${JSON.stringify(from)}, "to": ${JSON.stringify(to)}}\n\n`));
-      } catch (err) {
-        console.error('Error sending handoff event:', err);
-      }
-    },
-    
-    onComplete: (finalResponse: AgentResponse) => {
-      lastResponseTime = Date.now();
-      try {
-        // Extract content from the agent response
-        const content = finalResponse.content;
-        
-        controller?.enqueue(encoder.encode(`data: {"type": "complete", "value": ${JSON.stringify(content)}}\n\n`));
-        controller?.enqueue(encoder.encode('data: [DONE]\n\n'));
-        controller?.close();
-        
-        // Update request status
-        AgentStateService.updateRequest(requestId, { 
-          status: 'completed',
-          response: content // Using response instead of result
-        });
-        
-        // Update agent state to idle
-        AgentStateService.updateAgentState(
-          getAgentTypeEnum(agentType),
-          'idle',
-          ''
-        );
-      } catch (err) {
-        console.error('Error sending complete event:', err);
-      } finally {
-        if (heartbeatInterval) {
-          clearInterval(heartbeatInterval);
-        }
-      }
-    },
-    
-    onError: (error: Error) => {
-      lastResponseTime = Date.now();
-      console.error('Streaming error:', error);
-      
-      try {
-        controller?.enqueue(encoder.encode(`data: {"type": "error", "value": ${JSON.stringify(error.message)}}\n\n`));
-        controller?.enqueue(encoder.encode('data: [DONE]\n\n'));
-        controller?.close();
-        
-        // Update request status
-        AgentStateService.updateRequest(requestId, { 
-          status: 'failed',
-          error: error.message
-        });
-        
-        // Update agent state to idle
-        AgentStateService.updateAgentState(
-          getAgentTypeEnum(agentType),
-          'idle',
-          ''
-        );
-      } catch (err) {
-        console.error('Error sending error event:', err);
-      } finally {
-        if (heartbeatInterval) {
-          clearInterval(heartbeatInterval);
-        }
-      }
-    }
-  };
-  
-  // Start the streaming run process
-  // We do this in a separate task to not block the response
-  Promise.resolve().then(async () => {
+  // Start a background process to handle the actual agent call
+  (async () => {
     try {
-      await runner.streamRun(query, callbacks, runConfig);
-    } catch (error) {
-      console.error('Error starting agent stream:', error);
+      // Update request status
+      AgentStateService.updateRequest(requestId, {
+        status: 'in-progress'
+      });
       
-      try {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error starting agent stream';
-        controller?.enqueue(encoder.encode(`data: {"type": "error", "value": ${JSON.stringify(errorMessage)}}\n\n`));
-        controller?.enqueue(encoder.encode('data: [DONE]\n\n'));
-        controller?.close();
+      // Create the appropriate runner
+      const runner = createRunnerForAgentType(agentType);
+      
+      // Define streaming callbacks
+      const callbacks: StreamRunCallbacks = {
+        onStart: () => {
+          if (!controller) return;
+          
+          // Reset timeout since we've started
+          if (requestTimeout) {
+            clearTimeout(requestTimeout);
+            requestTimeout = null;
+          }
+          
+          // Send a start event
+          const startEvent = {
+            event: 'start',
+            data: JSON.stringify({
+              requestId,
+              timestamp: new Date().toISOString()
+            })
+          };
+          
+          controller.enqueue(encoder.encode(`event: ${startEvent.event}\ndata: ${startEvent.data}\n\n`));
+        },
         
-        // Update request status
-        AgentStateService.updateRequest(requestId, { 
-          status: 'failed',
-          error: errorMessage
-        });
+        onToken: (token) => {
+          if (!controller) return;
+          
+          // Append to current response
+          currentResponse += token;
+          
+          // Create a token event
+          const tokenEvent = {
+            event: 'token',
+            data: JSON.stringify({
+              token,
+              // Only include full response if not sensitive
+              fullResponse: includeSensitiveData ? currentResponse : undefined
+            })
+          };
+          
+          // Send the token event
+          controller.enqueue(encoder.encode(`event: ${tokenEvent.event}\ndata: ${tokenEvent.data}\n\n`));
+        },
         
-        // Update agent state to idle
-        AgentStateService.updateAgentState(
-          getAgentTypeEnum(agentType),
-          'idle',
-          ''
-        );
-      } catch (err) {
-        console.error('Error sending stream error:', err);
-      } finally {
-        if (heartbeatInterval) {
-          clearInterval(heartbeatInterval);
+        onTriageComplete: (result) => {
+          if (!controller) return;
+          
+          // Create a triage event
+          const triageEvent = {
+            event: 'triage',
+            data: JSON.stringify({ result })
+          };
+          
+          // Send the triage event
+          controller.enqueue(encoder.encode(`event: ${triageEvent.event}\ndata: ${triageEvent.data}\n\n`));
+        },
+        
+        onResearchStart: () => {
+          if (!controller) return;
+          
+          // Create a research start event
+          const researchEvent = {
+            event: 'research_start',
+            data: JSON.stringify({
+              timestamp: new Date().toISOString()
+            })
+          };
+          
+          // Send the research start event
+          controller.enqueue(encoder.encode(`event: ${researchEvent.event}\ndata: ${researchEvent.data}\n\n`));
+        },
+        
+        onResearchComplete: (researchData) => {
+          if (!controller) return;
+          
+          // Create a research complete event
+          const researchEvent = {
+            event: 'research_complete',
+            data: JSON.stringify({
+              data: researchData,
+              timestamp: new Date().toISOString()
+            })
+          };
+          
+          // Send the research complete event
+          controller.enqueue(encoder.encode(`event: ${researchEvent.event}\ndata: ${researchEvent.data}\n\n`));
+        },
+        
+        onReportStart: () => {
+          if (!controller) return;
+          
+          // Create a report start event
+          const reportEvent = {
+            event: 'report_start',
+            data: JSON.stringify({
+              timestamp: new Date().toISOString()
+            })
+          };
+          
+          // Send the report start event
+          controller.enqueue(encoder.encode(`event: ${reportEvent.event}\ndata: ${reportEvent.data}\n\n`));
+        },
+        
+        onHandoff: (fromAgent, toAgent) => {
+          if (!controller) return;
+          
+          // Create a handoff event
+          const handoffEvent = {
+            event: 'handoff',
+            data: JSON.stringify({
+              from: fromAgent,
+              to: toAgent,
+              timestamp: new Date().toISOString()
+            })
+          };
+          
+          // Send the handoff event
+          controller.enqueue(encoder.encode(`event: ${handoffEvent.event}\ndata: ${handoffEvent.data}\n\n`));
+        },
+        
+        onComplete: (result: AgentResponse | RunResult) => {
+          if (!controller) return;
+          
+          // Clean up intervals
+          if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+            heartbeatInterval = null;
+          }
+          
+          if (requestTimeout) {
+            clearTimeout(requestTimeout);
+            requestTimeout = null;
+          }
+          
+          // Get content from the result
+          const content = 'content' in result 
+            ? result.content 
+            : ('output' in result ? result.output : '');
+          
+          // Create a complete event
+          const completeEvent = {
+            event: 'complete',
+            data: JSON.stringify({
+              success: result.success === false ? false : true,
+              content,
+              error: result.error,
+              metadata: result.metadata,
+              timestamp: new Date().toISOString()
+            })
+          };
+          
+          // Send the complete event
+          controller.enqueue(encoder.encode(`event: ${completeEvent.event}\ndata: ${completeEvent.data}\n\n`));
+          
+          // End the stream
+          controller.close();
+          
+          // Update agent state to idle
+          AgentStateService.updateAgentState(
+            getAgentTypeEnum(agentType),
+            'idle',
+            ''
+          );
+          
+          // Update request status
+          AgentStateService.updateRequest(requestId, {
+            status: result.success === false ? 'failed' : 'completed',
+            response: content,
+            error: result.error
+          });
+        },
+        
+        onError: (error) => {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          endStreamWithError(errorMessage);
         }
-      }
+      };
+      
+      // Run the agent with streaming
+      await runner.streamRun(query, callbacks, runConfig);
+      
+    } catch (error) {
+      console.error(`Error in agent stream for ${requestId}:`, error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error in agent stream';
+      endStreamWithError(errorMessage);
     }
-  });
+  })();
   
-  // Return the response with the stream
+  // Set response headers for SSE
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
       'Connection': 'keep-alive',
+      'Content-Encoding': 'none',
+      'X-Request-ID': requestId
     }
   });
 }
 
 /**
- * Convert string agent type to enum
+ * Map string agent type to enum
  */
-function getAgentTypeEnum(agentType: string): AgentType {
-  switch (agentType) {
-    case 'triage':
-      return AgentType.TRIAGE;
-    case 'research':
-      return AgentType.RESEARCH;
-    case 'report':
-      return AgentType.REPORT;
-    case 'delegation':
+function getAgentTypeEnum(type: string): AgentType {
+  switch (type) {
+    case 'research': return AgentType.RESEARCH;
+    case 'report': return AgentType.REPORT;
+    case 'triage': return AgentType.TRIAGE;
+    case 'auto': 
+    case 'delegation': 
       return AgentType.DELEGATION;
-    default:
-      return AgentType.DELEGATION;
+    default: return AgentType.DELEGATION;
   }
 } 

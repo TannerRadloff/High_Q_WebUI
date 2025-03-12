@@ -101,82 +101,21 @@ const triageAgent = factory.createAgent(AgentType.TRIAGE);
 const researchAgent = factory.createAgent(AgentType.RESEARCH);
 
 // Create an orchestration agent that uses the others as tools
-const orchestrator = factory.createAgent(AgentType.CUSTOM, {
-  name: 'Orchestrator',
-  instructions: 'You coordinate between specialized agents to solve tasks.',
+const runner = factory.createAgent(AgentType.CUSTOM, {
+  name: 'Runner',
+  instructions: 'You coordinate between specialized agents to complete tasks',
   tools: [
     triageAgent.asTool('triage', 'Analyze and categorize the user query'),
     researchAgent.asTool('research', 'Search for information')
   ]
 });
 
-// Process a user query through the orchestrator
-const response = await orchestrator.handleTask(
+// Process a user query through the runner
+const response = await runner.handleTask(
   "I need to learn about quantum computing for a presentation"
 );
 ```
 
 ### Using Memory
 
-```typescript
-import { AgentFactory, AgentType } from './agents/AgentFactory';
-import { InMemoryStorage, MemoryManager } from './agents/memory';
-
-const factory = new AgentFactory();
-const storage = new InMemoryStorage();
-
-const agent = factory.createAgent(AgentType.CUSTOM, {
-  name: 'AssistantWithMemory',
-  instructions: context => {
-    // Use context.conversationHistory and context.relevantMemories
-    return `You are an assistant that remembers past interactions.`;
-  }
-});
-
-// Replace the default memory with our custom storage
-(agent as any).memory = new MemoryManager(storage, agent.name);
-
-// The agent will now store interactions and retrieve relevant context
 ```
-
-## Best Practices
-
-1. **Use the Factory**: Always create agents through the `AgentFactory` for consistent configuration and caching.
-
-2. **Specialized Agents**: Create specialized agents for specific tasks rather than one-size-fits-all agents.
-
-3. **Composition**: Use the agent-as-tool pattern to compose capabilities rather than building monolithic agents.
-
-4. **Dynamic Instructions**: Use functions for agent instructions that can adapt based on context.
-
-5. **Memory Management**: Use the memory system to maintain context across interactions.
-
-6. **Tracing**: Use the tracing system for debugging and monitoring agent behavior.
-
-7. **Error Handling**: Implement proper error handling at both the agent and orchestration levels.
-
-## Extending the System
-
-To create a new specialized agent type:
-
-1. Create a new class that extends `BaseAgent`
-2. Override the `handleTask` method with specialized logic
-3. Add the agent type to the `AgentType` enum in `AgentFactory.ts`
-4. Add a case in the factory's `createAgent` method to instantiate your agent
-
-Example:
-
-```typescript
-export class MySpecializedAgent extends BaseAgent {
-  async handleTask(userQuery: string, context?: AgentContext): Promise<AgentResponse> {
-    // Specialized pre-processing
-    
-    // Call the base implementation
-    const response = await super.handleTask(userQuery, context);
-    
-    // Specialized post-processing
-    
-    return response;
-  }
-}
-``` 

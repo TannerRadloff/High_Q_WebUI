@@ -27,9 +27,9 @@ async function main() {
     instructions: 'You specialize in creating well-formatted reports from research data.',
   });
   
-  // Create an orchestration agent that uses the other agents as tools
-  const orchestrator = factory.createAgent(AgentType.CUSTOM, {
-    name: 'Orchestrator',
+  // Create a runner agent that uses the other agents as tools
+  const runner = factory.createAgent(AgentType.CUSTOM, {
+    name: 'Runner',
     instructions: 'You determine the best approach to answer the user\'s question and delegate to specialized agents.',
     tools: [
       researchAgent.asTool(
@@ -43,7 +43,7 @@ async function main() {
     ]
   });
   
-  // Handle a user query using the orchestrator
+  // Handle a user query using the runner
   try {
     // Define our callbacks to handle streaming
     const callbacks = {
@@ -59,15 +59,15 @@ async function main() {
     console.log(`\n\nUSER QUERY: ${userQuery}\n`);
     
     // Process the query with streaming
-    if (orchestrator.streamTask) {
-      await orchestrator.streamTask(userQuery, callbacks, {
+    if (runner.streamTask) {
+      await runner.streamTask(userQuery, callbacks, {
         // Additional context data
         source: 'example',
         timestamp: new Date().toISOString()
       });
     } else {
       // Fallback to non-streaming API
-      const result = await orchestrator.handleTask(userQuery, {
+      const result = await runner.handleTask(userQuery, {
         // Additional context data
         source: 'example',
         timestamp: new Date().toISOString()

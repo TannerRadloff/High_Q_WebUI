@@ -215,7 +215,7 @@ The system implements proper handoffs between agents following OpenAI Agent SDK 
 
 ## Orchestration
 
-The Orchestrator class manages the workflow but does not directly control the flow between agents. Instead, it initiates the process with the TriageAgent and lets the agents decide when to hand off to each other. This creates a more dynamic and flexible system that can adapt to different types of queries.
+The Runner class manages the workflow but does not directly control the flow between agents. Instead, it initiates the process with the TriageAgent and lets the agents decide when to hand off to each other using their specialized knowledge.
 
 ## Tracing and Monitoring
 
