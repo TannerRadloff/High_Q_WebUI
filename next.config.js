@@ -18,6 +18,13 @@ const nextConfig = {
         config.output.publicPath = '/_next/';
       }
     }
+    
+    // Explicitly add alias configuration
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': require('path').resolve(__dirname, './'),
+    };
+    
     return config;
   },
   // Ensure pdf-parse is only used on the server

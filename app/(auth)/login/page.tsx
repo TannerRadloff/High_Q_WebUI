@@ -7,10 +7,10 @@ import { toast } from 'sonner';
 import Form from 'next/form';
 import { signIn as nextAuthSignIn } from 'next-auth/react';
 
-import { AuthForm } from '@/components/auth-form';
-import { SubmitButton } from '@/components/submit-button';
-import { Button } from '@/components/ui/button';
-import { LogoGoogle } from '@/components/icons';
+import { AuthForm } from '../../../components/auth-form';
+import { SubmitButton } from '../../../components/submit-button';
+import { Button } from '../../../components/ui/button';
+import { LogoGoogle } from '../../../components/icons';
 
 import { login, type LoginActionState } from '../actions';
 
