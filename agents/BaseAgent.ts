@@ -48,6 +48,16 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
   }
 
   /**
+   * Utility method to count citations in text
+   * This makes citation counting available to all agents
+   */
+  countCitations(text: string): number {
+    const citationPattern = /\[\d+\]/g;
+    const matches = text.match(citationPattern);
+    return matches ? matches.length : 0;
+  }
+
+  /**
    * Get the resolved instructions string, handling dynamic instructions
    */
   resolveInstructions(context?: AgentContext): string {

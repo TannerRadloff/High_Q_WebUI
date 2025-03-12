@@ -47,7 +47,7 @@ export class ResearchAgent extends BaseAgent {
             text: z.string().describe('The text to analyze for citations')
           }),
           async (args) => {
-            const citationCount = countCitations(args.text);
+            const citationCount = this.countCitations(args.text);
             return JSON.stringify({ citationCount });
           }
         ),
@@ -119,7 +119,7 @@ export class ResearchAgent extends BaseAgent {
     
     if (response.success) {
       // Count citations in the final output
-      const citationCount = countCitations(response.content);
+      const citationCount = this.countCitations(response.content);
       
       // Add citation count to metadata
       return {
@@ -133,13 +133,4 @@ export class ResearchAgent extends BaseAgent {
     
     return response;
   }
-}
-
-/**
- * Helper function to count citations in text
- */
-function countCitations(text: string): number {
-  const citationPattern = /\[\d+\]/g;
-  const matches = text.match(citationPattern);
-  return matches ? matches.length : 0;
 } 

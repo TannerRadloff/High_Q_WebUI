@@ -32,11 +32,20 @@ export interface StreamOrchestrationCallbacks extends StreamCallbacks {
  */
 export class Orchestrator {
   private triageAgent: TriageAgent;
+  private researchAgent: ResearchAgent;
 
   constructor() {
-    // We only need to create the TriageAgent directly
-    // Other agents will be created and accessed via handoffs
+    // We need TriageAgent for the main entry point
     this.triageAgent = new TriageAgent();
+    // We create ResearchAgent directly for access to its methods like countCitations
+    this.researchAgent = new ResearchAgent();
+  }
+
+  /**
+   * Counts citations in the provided text by delegating to the ResearchAgent
+   */
+  countCitations(text: string): number {
+    return this.researchAgent.countCitations(text);
   }
 
   /**
