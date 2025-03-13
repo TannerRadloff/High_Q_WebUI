@@ -10,14 +10,20 @@ export default function LoginPage() {
   const router = useRouter()
 
   useEffect(() => {
-    if (!isLoading && user) {
-      // If user is already authenticated, redirect to main interface
-      router.replace('/')
+    if (!isLoading) {
+      console.log('[LoginPage] Auth state loaded:', { hasUser: !!user })
+      
+      if (user) {
+        console.log('[LoginPage] User is authenticated, redirecting to home')
+        // Force a hard navigation to the home page
+        window.location.href = '/'
+      }
     }
-  }, [user, isLoading, router])
+  }, [user, isLoading])
 
   // Show loading state while checking auth
   if (isLoading) {
+    console.log('[LoginPage] Loading auth state...')
     return (
       <div className="flex h-dvh w-screen items-center justify-center bg-background">
         <div className="text-center">
@@ -30,6 +36,7 @@ export default function LoginPage() {
 
   // Only show login form if user is not authenticated
   if (!user) {
+    console.log('[LoginPage] User not authenticated, showing login form')
     return (
       <div className="flex h-dvh w-screen items-start pt-12 md:pt-0 md:items-center justify-center bg-background">
         <LoginForm />

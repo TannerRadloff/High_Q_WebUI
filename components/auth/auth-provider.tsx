@@ -25,52 +25,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const supabase = createClient()
 
-  // Log Supabase env variables availability for debugging
   useEffect(() => {
-    console.log('Auth Provider initialized')
-    console.log('Supabase URL available:', !!process.env.NEXT_PUBLIC_SUPABASE_URL)
-    console.log('Supabase Key available:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
-  }, [])
-
-  useEffect(() => {
+    console.log('[AuthProvider] Initializing')
     const setupUser = async () => {
       setIsLoading(true)
       
       try {
-        console.log('Getting current session...')
+        console.log('[AuthProvider] Getting current session...')
         // Get current session
         const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession()
         
         if (sessionError) {
-          console.error('Error getting session:', sessionError)
+          console.error('[AuthProvider] Error getting session:', sessionError)
           return
         }
         
-        console.log('Session retrieved:', !!currentSession)
+        console.log('[AuthProvider] Session retrieved:', { 
+          hasSession: !!currentSession,
+          user: currentSession?.user?.email
+        })
+        
         setSession(currentSession)
         setUser(currentSession?.user ?? null)
         
         // Set up auth state listener
-        console.log('Setting up auth state change listener...')
-        try {
-          const { data: { subscription } } = await supabase.auth.onAuthStateChange(
-            (event: AuthChangeEvent, updatedSession: Session | null) => {
-              console.log('Auth state changed:', event)
-              setSession(updatedSession)
-              setUser(updatedSession?.user ?? null)
-              router.refresh()
+        console.log('[AuthProvider] Setting up auth state change listener...')
+        const { data: { subscription } } = await supabase.auth.onAuthStateChange(
+          async (event: AuthChangeEvent, updatedSession: Session | null) => {
+            console.log('[AuthProvider] Auth state changed:', { 
+              event, 
+              hasSession: !!updatedSession,
+              user: updatedSession?.user?.email
+            })
+            
+            setSession(updatedSession)
+            setUser(updatedSession?.user ?? null)
+            
+            // Handle specific auth events
+            switch (event) {
+              case 'SIGNED_IN':
+                // Force refresh and redirect to home
+                router.refresh()
+                window.location.href = '/'
+                break
+              case 'SIGNED_OUT':
+                // Clear state and redirect to login
+                setUser(null)
+                setSession(null)
+                router.refresh()
+                window.location.href = '/login'
+                break
+              default:
+                router.refresh()
             }
-          )
-          
-          return () => {
-            console.log('Unsubscribing from auth changes')
-            subscription.unsubscribe()
           }
-        } catch (subscriptionError) {
-          console.error('Error setting up auth subscription:', subscriptionError)
+        )
+        
+        return () => {
+          console.log('[AuthProvider] Cleaning up auth subscription')
+          subscription.unsubscribe()
         }
       } catch (error) {
-        console.error('Error setting up auth:', error)
+        console.error('[AuthProvider] Error setting up auth:', error)
       } finally {
         setIsLoading(false)
       }
@@ -81,25 +97,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      console.log('Attempting sign in with email:', email)
+      console.log('[AuthProvider] Attempting sign in:', { email })
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
-        console.error('Sign in error:', error)
+        console.error('[AuthProvider] Sign in error:', error)
         toast.error(error.message || 'Failed to sign in')
         throw error
       }
 
-      console.log('Sign in successful, session:', !!data.session)
-      setUser(data.user)
-      setSession(data.session)
-      router.refresh()
-      router.push('/')
+      console.log('[AuthProvider] Sign in successful:', {
+        hasSession: !!data.session,
+        user: data.user?.email
+      })
+      
+      // The onAuthStateChange handler will handle the redirect
     } catch (error: any) {
-      console.error('Sign in exception:', error)
+      console.error('[AuthProvider] Sign in exception:', error)
       toast.error(error.message || 'Failed to sign in')
       throw error
     }
@@ -107,42 +124,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
-      console.log('Signing out...')
+      console.log('[AuthProvider] Signing out...')
       const { error } = await supabase.auth.signOut()
       
       if (error) {
-        console.error('Sign out error:', error)
+        console.error('[AuthProvider] Sign out error:', error)
         toast.error(error.message || 'Failed to sign out')
         return
       }
       
-      console.log('Sign out successful')
-      setUser(null)
-      setSession(null)
-      router.refresh()
-      router.push('/login')
+      // The onAuthStateChange handler will handle the redirect and state cleanup
     } catch (error: any) {
-      console.error('Sign out exception:', error)
+      console.error('[AuthProvider] Sign out exception:', error)
       toast.error(error.message || 'Failed to sign out')
     }
   }
 
   const refreshSession = async () => {
     try {
-      console.log('Refreshing session...')
+      console.log('[AuthProvider] Refreshing session...')
       const { data, error } = await supabase.auth.refreshSession()
       
       if (error) {
-        console.error('Session refresh error:', error)
+        console.error('[AuthProvider] Session refresh error:', error)
         throw error
       }
       
-      console.log('Session refreshed:', !!data.session)
+      console.log('[AuthProvider] Session refreshed:', {
+        hasSession: !!data.session,
+        user: data.session?.user?.email
+      })
+      
       setSession(data.session)
       setUser(data.session?.user ?? null)
       router.refresh()
     } catch (error: any) {
-      console.error('Error refreshing session:', error)
+      console.error('[AuthProvider] Error refreshing session:', error)
       if (error.message?.includes('expired')) {
         toast.error('Your session has expired. Please sign in again.')
         await signOut()
