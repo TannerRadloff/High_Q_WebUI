@@ -16,7 +16,19 @@ export const createClient = () => {
   }
   
   try {
-    return createClientComponentClient<Database>()
+    // Create the client with default settings which will enable cookies
+    const client = createClientComponentClient<Database>()
+    
+    // Log the session status on client creation
+    client.auth.getSession().then(({ data, error }) => {
+      if (error) {
+        console.error('Error checking session:', error)
+      } else {
+        console.log('Session available on client creation:', !!data.session)
+      }
+    })
+    
+    return client
   } catch (error) {
     console.error('Error creating Supabase client:', error)
     throw error

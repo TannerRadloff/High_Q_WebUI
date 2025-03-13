@@ -7,25 +7,46 @@ export async function middleware(request: NextRequest) {
   const sessionCookie = request.cookies.get('sb-access-token')
   const isAuthenticated = sessionCookie !== undefined
 
-  // Check auth status for protected routes
+  // Get the current URL path
   const url = new URL(request.url)
-  const isAuthRoute = url.pathname.startsWith('/login') || 
-                       url.pathname.startsWith('/register') || 
-                       url.pathname.startsWith('/forgot-password') || 
-                       url.pathname.startsWith('/reset-password')
-                       
-  const isProtectedRoute = url.pathname.startsWith('/') && 
-                          !url.pathname.startsWith('/api') && 
-                          !url.pathname.startsWith('/auth') &&
-                          !isAuthRoute
+  const pathname = url.pathname
+
+  // Define route categories
+  const isAuthRoute = pathname.startsWith('/login') || 
+                     pathname.startsWith('/register') || 
+                     pathname.startsWith('/forgot-password') || 
+                     pathname.startsWith('/reset-password')
+                     
+  const isCallbackRoute = pathname.startsWith('/auth/callback')
+  
+  const isApiRoute = pathname.startsWith('/api')
+  
+  const isPublicRoute = isAuthRoute || 
+                        isCallbackRoute || 
+                        isApiRoute || 
+                        pathname.startsWith('/_next') || 
+                        pathname.includes('.') // Static files
+
+  const isProtectedRoute = pathname.startsWith('/') && !isPublicRoute
+
+  // Debug middleware execution
+  console.log(`[Middleware] Path: ${pathname}, Authenticated: ${isAuthenticated}`)
+  
+  // Always allow callback routes - critical for OAuth flows
+  if (isCallbackRoute) {
+    console.log('[Middleware] Allowing OAuth callback')
+    return NextResponse.next()
+  }
 
   // Redirect unauthenticated users trying to access protected routes
   if (isProtectedRoute && !isAuthenticated) {
+    console.log('[Middleware] Redirecting unauthenticated user to login')
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
   // Redirect authenticated users trying to access auth routes
   if (isAuthRoute && isAuthenticated) {
+    console.log('[Middleware] Redirecting authenticated user to home')
     return NextResponse.redirect(new URL('/', request.url))
   }
 
@@ -33,5 +54,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/:path*', '/api/:path*', '/login', '/register', '/forgot-password', '/reset-password'],
+  matcher: ['/', '/:path*'],
 } 

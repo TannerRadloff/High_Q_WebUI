@@ -25,6 +25,7 @@ export function LoginForm() {
 
   // Debug function to check environment variables
   useEffect(() => {
+    console.log('Login form initialized')
     console.log('Supabase URL available:', !!process.env.NEXT_PUBLIC_SUPABASE_URL)
     console.log('Supabase Key available:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
   }, [])
@@ -47,35 +48,50 @@ export function LoginForm() {
 
   const handleGoogleLogin = async (e: React.MouseEvent) => {
     e.preventDefault()
+    console.log('Google login button clicked')
+    
     try {
       setIsGoogleLoading(true)
-      console.log('Starting Google login...')
       
+      // Get the current origin for the redirect URL
+      const redirectUrl = `${window.location.origin}/auth/callback`
+      console.log('Redirect URL:', redirectUrl)
+      
+      // Start the OAuth flow
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
         },
       })
 
       if (error) {
         console.error('Google OAuth error:', error)
-        toast.error('Failed to login with Google. Please try again.')
+        toast.error(`Failed to login with Google: ${error.message}`)
         return
       }
 
       if (!data.url) {
-        console.error('Missing OAuth URL')
+        console.error('Missing OAuth URL from Supabase response')
         toast.error('Failed to get authorization URL. Please try again.')
         return
       }
 
-      // Redirect to the OAuth provider
-      console.log('Redirecting to:', data.url)
-      window.location.href = data.url
-    } catch (error) {
+      // Log the URL we're redirecting to
+      console.log('Redirecting to OAuth URL:', data.url)
+      
+      // Add a slight delay before redirecting
+      setTimeout(() => {
+        window.location.href = data.url
+      }, 100)
+      
+    } catch (error: any) {
       console.error('Unexpected Google login error:', error)
-      toast.error('An unexpected error occurred. Please try again.')
+      toast.error(`Error: ${error?.message || 'An unexpected error occurred'}`)
     } finally {
       setIsGoogleLoading(false)
     }
@@ -99,7 +115,7 @@ export function LoginForm() {
             Email
           </Label>
           <div className="relative">
-            <EnvelopeIcon className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-zinc-400" />
+            <EnvelopeIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
             <Input
               id="email"
               type="email"
@@ -128,7 +144,7 @@ export function LoginForm() {
             </Link>
           </div>
           <div className="relative">
-            <LockClosedIcon className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-zinc-400" />
+            <LockClosedIcon className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
             <Input
               id="password"
               type="password"
@@ -189,7 +205,7 @@ export function LoginForm() {
           </span>
         ) : (
           <span className="flex items-center justify-center">
-            <FcGoogle className="mr-2 size-5" />
+            <FcGoogle className="mr-2 size-4" />
             Sign in with Google
           </span>
         )}

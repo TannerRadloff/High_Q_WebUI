@@ -28,8 +28,6 @@ const nextConfig = {
   images: {
     domains: ['avatar.vercel.sh'],
   },
-  // Remove the assetPrefix configuration as it's causing issues
-  // assetPrefix: process.env.NODE_ENV === 'development' ? '' : undefined,
   // Add proper output configurations
   output: 'standalone',
   poweredByHeader: false,
@@ -42,6 +40,13 @@ const nextConfig = {
   typescript: {
     // Don't run TypeScript type checking during build to avoid failures
     ignoreBuildErrors: true,
+  },
+  // Fix browser-side JS loading errors
+  swcMinify: true,
+  // Ensure public path is correctly set
+  experimental: {
+    // Help ensure proper bundling
+    optimizeCss: true,
   },
 };
 
