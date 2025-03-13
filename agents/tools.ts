@@ -144,19 +144,60 @@ export const webSearchTool = functionTool(
 
 /**
  * Retrieval tool - similar to FileSearchTool in the OpenAI Agent SDK
+ * Updated to match OpenAI's parameter naming
  */
-export const retrievalTool = functionTool(
-  'retrieval',
+export const fileSearchTool = functionTool(
+  'file_search',
   'Search through documents for relevant information',
   z.object({
     query: z.string().describe('The query to search for in the documents'),
-    max_results: z.number().optional().describe('Maximum number of results to return'),
+    max_num_results: z.number().optional().describe('Maximum number of results to return'),
+    vector_store_ids: z.array(z.string()).optional().describe('IDs of the vector stores to search in'),
   }),
   async (args) => {
-    // In a real implementation, this would search through a vector store
+    // In a real implementation, this would search through vector stores
     console.log(`Searching documents for: ${args.query}`);
-    const maxResults = args.max_results || 3;
-    return `Retrieved ${maxResults} results for "${args.query}"`;
+    console.log(`Vector store IDs: ${args.vector_store_ids?.join(', ') || 'default'}`);
+    const maxResults = args.max_num_results || 3;
+    return `Retrieved ${maxResults} results for "${args.query}" from vector stores`;
+  }
+);
+
+// Legacy name for backward compatibility
+export const retrievalTool = fileSearchTool;
+
+/**
+ * Computer tool - similar to ComputerTool in the OpenAI Agent SDK
+ * Allows agents to automate computer use tasks
+ */
+export const computerTool = functionTool(
+  'computer',
+  'Perform tasks on the computer such as file operations, browser automation, etc.',
+  z.object({
+    action: z.enum(['read_file', 'write_file', 'list_directory', 'execute_command', 'browser_action']).describe('The action to perform'),
+    parameters: z.record(z.any()).describe('Parameters for the specified action'),
+  }),
+  async (args) => {
+    console.log(`Computer action requested: ${args.action}`);
+    console.log(`Parameters:`, args.parameters);
+    
+    // In a real implementation, this would perform the actual computer operation
+    // through appropriate system APIs or libraries
+    
+    switch (args.action) {
+      case 'read_file':
+        return `Content of file ${args.parameters.path}: [simulated file content]`;
+      case 'write_file':
+        return `File ${args.parameters.path} written successfully`;
+      case 'list_directory':
+        return `Directory ${args.parameters.path} contents: [simulated directory listing]`;
+      case 'execute_command':
+        return `Command executed: ${args.parameters.command}\nOutput: [simulated command output]`;
+      case 'browser_action':
+        return `Browser action ${args.parameters.action} performed on ${args.parameters.url || 'current page'}`;
+      default:
+        return `Unknown action: ${args.action}`;
+    }
   }
 );
 

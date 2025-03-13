@@ -864,21 +864,21 @@ export class AgentRunner {
   }
 
   /**
-   * Static version of run
+   * Static method to run an agent on a query
+   * Simplified to match OpenAI's Agent SDK pattern: Runner.run(agent, "query")
    * @param agent The agent to run
-   * @param query The user's query
-   * @param config Configuration for this run
-   * @param max_turns Maximum number of turns before raising MaxTurnsExceededError
-   * @returns The result of running the agent
+   * @param query The user's query as a string
+   * @param config Optional configuration for this run
+   * @returns Promise that resolves with the result
    */
   static async run(
     agent: BaseAgent, 
-    query: string | any[], 
-    config?: RunConfig, 
-    max_turns: number = 25
+    query: string,
+    config?: RunConfig
   ): Promise<RunResult> {
     const runner = new AgentRunner(agent);
-    return runner.run(query, config, max_turns);
+    // Use default max_turns of 25
+    return runner.run(query, config, 25);
   }
   
   /**

@@ -392,172 +392,178 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
   }
 
   /**
-   * Handles a task with the agent
+   * Record memory from the interaction
+   * @param userQuery The user's original query
+   * @param agentResponse The agent's response
+   * @param context The context for this execution
    */
-  async handleTask(userQuery: string, context?: AgentContext): Promise<AgentResponse> {
-    // Extract the original query and run configuration if provided
-    const originalQuery = typeof userQuery === 'string' ? userQuery : '';
-    const runConfig = context?.runConfig as RunConfig | undefined;
-    const startTime = Date.now();
-    
-    // Set up context with original query
-    const enhancedContext = await this.getMemoryEnhancedContext(userQuery, {
-      ...(context || {}),
-      originalQuery
-    });
-    
-    // Track turns to prevent infinite loops
-    const maxTurns = enhancedContext.maxTurns || 25;
-    let currentTurn = 0;
-    let conversationHistory: any[] = [{ role: 'user', content: userQuery }];
-    let rawResponses: any[] = [];
+  protected async recordMemory(userQuery: string, agentResponse: string, context: AgentContext): Promise<void> {
+    if (!this.memory) return;
     
     try {
-      let finalResponse: AgentResponse | undefined = undefined;
-      let typedOutput: any = undefined;
-      
-      while (currentTurn < maxTurns) {
-        currentTurn++;
-        
-        // Prepare the LLM call with the conversation history
-        const formattedTools = this.prepareTools(enhancedContext);
-        
-        // Prepare API parameters for LLM call
-        const requestParams = prepareCompletionParams({
-          model: this.model,
-          messages: conversationHistory,
-          temperature: this.modelSettings?.temperature,
-          top_p: this.modelSettings?.topP,
-          max_tokens: this.modelSettings?.maxTokens,
-        }, formattedTools);
-        
-        // Call the OpenAI API
-        const response = await callOpenAI(requestParams);
-        rawResponses.push(response);
-        
-        // Extract the response message
-        const aiOutput = {
-          output_text: response.choices[0].message.content || '',
-          tool_calls: response.choices[0].message.tool_calls
-        };
-        
-        // Check if there are tool calls to process
-        if (aiOutput.tool_calls && aiOutput.tool_calls.length > 0) {
-          const { toolResults, handoffResult } = await this.handleToolCalls(
-            aiOutput.tool_calls, 
-            enhancedContext, 
-            conversationHistory,
-            runConfig
-          );
-          
-          // If we got a handoff result, use that as the final output
-          if (handoffResult) {
-            finalResponse = handoffResult;
-            
-            // Capture handoff's raw responses if available
-            if (handoffResult.rawResponses) {
-              rawResponses = [...rawResponses, ...handoffResult.rawResponses];
-            }
-            
-            // Capture typed output from handoff if available
-            if (handoffResult.typedOutput !== undefined) {
-              typedOutput = handoffResult.typedOutput;
-            }
-            
-            break;
-          }
-          
-          // Add the tool results to the conversation history
-          conversationHistory = [...conversationHistory, ...toolResults];
-        } else if (aiOutput.output_text) {
-          // No tool calls - we have a final response
-          const content = aiOutput.output_text;
-          
-          // Convert to typed output if output type is defined
-          if (this.outputType) {
-            try {
-              // If zod schema is provided, validate and parse the output
-              if (this.outputType instanceof z.ZodType) {
-                // Try to parse JSON from the model's response
-                try {
-                  const jsonOutput = JSON.parse(content);
-                  typedOutput = this.outputType.parse(jsonOutput);
-                } catch (e) {
-                  // If JSON parsing fails, try to parse the string directly
-                  typedOutput = this.outputType.parse(content);
-                }
-              } 
-              // Otherwise, try a basic JSON parse if the output looks like JSON
-              else if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
-                try {
-                  typedOutput = JSON.parse(content);
-                } catch (e) {
-                  console.warn('Failed to parse output as JSON despite JSON-like format');
-                  typedOutput = content;
-                }
-              } else {
-                typedOutput = content;
-              }
-            } catch (e) {
-              console.error('Failed to convert output to specified type:', e);
-              typedOutput = content; // Fallback to string
-            }
-          }
-          
-          finalResponse = {
-            content,
-            success: true,
-            typedOutput
-          };
-          break;
-        } else {
-          // Unexpected response format
-          finalResponse = {
-            content: 'Error: Unable to parse AI response',
-            success: false,
-            error: 'Invalid response format from OpenAI API'
-          };
-          break;
+      // Store the interaction in memory
+      await this.memory.store(
+        `User: ${userQuery}\nAgent: ${agentResponse}`,
+        MemoryType.CONVERSATION,
+        {
+          timestamp: new Date().toISOString(),
+          userQuery,
+          agentResponse,
+          ...context
         }
-      }
+      );
+    } catch (e) {
+      console.error('Failed to record memory:', e);
+    }
+  }
+
+  /**
+   * Core method to handle a task with the agent
+   * @param userQuery The query or task from the user
+   * @param context Additional context for this execution
+   * @returns A promise that resolves to the agent's response
+   */
+  async handleTask(userQuery: string, context: AgentContext = {}): Promise<AgentResponse> {
+    // Create unique ID for this execution
+    const executionId = uuidv4();
+    
+    // Merge context with defaults
+    context = {
+      handoffTracker: [],
+      ...context,
+    };
+    
+    // Process the query through any input filters
+    // For example, safety filters, etc.
+    
+    try {
+      // Prepare the prompt with instructions
+      const resolvedInstructions = typeof this.instructions === 'function'
+        ? this.instructions(context)
+        : this.instructions;
       
-      // Check if we hit the max turns limit
-      if (currentTurn >= maxTurns && !finalResponse) {
-        throw new MaxTurnsExceededError(`Maximum number of turns (${maxTurns}) exceeded in agent execution`);
-      }
+      // Prepare tools for the API
+      const tools = prepareToolsForAPI(this.tools);
       
-      // Return the final response
-      const result: AgentResponse = finalResponse || {
-        content: 'Error: No response generated',
-        success: false,
-        error: 'No response generated after multiple turns'
+      // Create a record of this execution
+      console.log(`Agent ${this.name} handling task: ${userQuery.substring(0, 100)}${userQuery.length > 100 ? '...' : ''}`);
+      
+      // Call the OpenAI API
+      const requestParams = prepareCompletionParams({
+        model: this.model,
+        messages: [{ role: 'system', content: resolvedInstructions }, { role: 'user', content: userQuery }],
+        temperature: this.modelSettings?.temperature,
+        top_p: this.modelSettings?.topP,
+        max_tokens: this.modelSettings?.maxTokens,
+      }, tools);
+      
+      const result = await callOpenAI(requestParams);
+      
+      // Process any tool calls in the response
+      const processedResult = await this.processToolCalls(result, context);
+      
+      // Apply any output processing/filters
+      const finalContent = this.processOutput(processedResult.content);
+      
+      // Create the final response
+      const response: AgentResponse = {
+        content: finalContent,
+        success: true,
+        metadata: {
+          ...context,
+          executionId
+        },
+        rawResponses: [result],
+        final_output: finalContent  // Add final_output to match OpenAI's Agent SDK
       };
       
-      // Add raw responses
-      if (!result.rawResponses) {
-        result.rawResponses = rawResponses;
+      // Save to memory if available
+      if (this.memory) {
+        await this.recordMemory(userQuery, finalContent, context);
       }
       
-      // Add metadata about execution time
-      if (!result.metadata) {
-        result.metadata = {};
-      }
-      result.metadata.executionTimeMs = Date.now() - startTime;
+      return response;
       
-      return result;
     } catch (error) {
-      console.error(`Error in ${this.name} agent:`, error);
-      
+      console.error(`Error in ${this.name}:`, error);
       return {
-        content: '',
+        content: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-        metadata: { executionTimeMs: Date.now() - startTime },
-        rawResponses
+        error: error instanceof Error ? error.message : 'Unknown error',
+        metadata: {
+          ...context,
+          executionId
+        },
+        final_output: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`  // Add final_output for error case
       };
     }
   }
 
+  /**
+   * Process tool calls from the OpenAI API response
+   * @param apiResponse The raw response from the OpenAI API
+   * @param context The context for this execution
+   * @returns The processed result with tool outputs included
+   */
+  protected async processToolCalls(apiResponse: any, context: AgentContext): Promise<{content: string}> {
+    // Check if there are tool calls to process
+    if (apiResponse.choices[0].message.tool_calls && 
+        apiResponse.choices[0].message.tool_calls.length > 0) {
+      
+      const toolCalls = apiResponse.choices[0].message.tool_calls;
+      let toolResponses = [];
+      
+      // Process each tool call
+      for (const toolCall of toolCalls) {
+        const toolName = toolCall.function.name;
+        let toolArgs: any = {};
+        
+        try {
+          toolArgs = JSON.parse(toolCall.function.arguments);
+        } catch (e) {
+          console.error(`Failed to parse arguments for tool ${toolName}:`, e);
+          toolResponses.push(`Error: Failed to parse arguments for tool ${toolName}`);
+          continue;
+        }
+        
+        // Find the matching tool
+        const tool = this.tools.find(t => t.name === toolName);
+        
+        if (!tool) {
+          console.error(`Tool not found: ${toolName}`);
+          toolResponses.push(`Error: Tool not found: ${toolName}`);
+          continue;
+        }
+        
+        try {
+          // Execute the tool
+          const toolResult = await tool.execute(toolArgs);
+          toolResponses.push(`Tool ${toolName} returned: ${toolResult}`);
+        } catch (e) {
+          console.error(`Error executing tool ${toolName}:`, e);
+          toolResponses.push(`Error executing tool ${toolName}: ${e instanceof Error ? e.message : 'Unknown error'}`);
+        }
+      }
+      
+      // Compile all tool responses into a single string
+      return { content: toolResponses.join('\n\n') };
+    }
+    
+    // If no tool calls, just return the original message content
+    return { content: apiResponse.choices[0].message.content || '' };
+  }
+  
+  /**
+   * Process the output text through any output filters or transformations
+   * @param outputText The raw output text
+   * @returns The processed output
+   */
+  protected processOutput(outputText: string): string {
+    // Apply any output filters or transformations
+    // This is a placeholder for any actual processing needed
+    return outputText;
+  }
+  
   /**
    * Stream the response from the agent
    */

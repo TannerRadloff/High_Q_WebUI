@@ -1,6 +1,6 @@
 # Agent Architecture
 
-This module implements a flexible and extensible architecture for building AI-powered agents. It follows best practices inspired by the OpenAI Assistants API and Agent SDK, while providing a more customizable foundation.
+This module implements a flexible and extensible architecture for building AI-powered agents. It follows best practices from the OpenAI Agents SDK, providing a compatible implementation that can be used in a similar way.
 
 ## Core Concepts
 
@@ -15,6 +15,41 @@ Agents are the main building blocks of the system. Each agent has:
 - Optional memory for context persistence
 
 The base implementation is in `BaseAgent.ts`, which other specialized agents can extend.
+
+### Tools
+
+Our implementation supports all three classes of tools from the OpenAI Agents SDK:
+
+1. **Hosted tools**: We provide equivalents to OpenAI's hosted tools:
+   - `webSearchTool`: Similar to OpenAI's `WebSearchTool`
+   - `fileSearchTool`: Similar to OpenAI's `FileSearchTool`
+   - `computerTool`: Similar to OpenAI's `ComputerTool`
+
+2. **Function calling**: The `functionTool` creator allows you to create custom tools from functions.
+
+3. **Agents as tools**: The `agentAsTool` function and `asTool` method on agents allow using agents as tools.
+
+### Runner
+
+The `AgentRunner` class provides a way to run agents, with a static `run` method that matches OpenAI's pattern:
+
+```typescript
+// Create an agent with tools
+const agent = new BaseAgent({
+  name: "Assistant",
+  instructions: "You are a helpful assistant.",
+  tools: [webSearchTool, fileSearchTool]
+});
+
+// Run the agent
+const result = await AgentRunner.run(
+  agent, 
+  "Which coffee shop should I go to, taking into account my preferences and the weather today in SF?"
+);
+
+// Access the final output
+console.log(result.final_output);
+```
 
 ### Factory Pattern
 

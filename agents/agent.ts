@@ -20,6 +20,7 @@ export interface AgentResponse {
   rawResponses?: any[]; // Raw LLM responses
   items?: RunItem[]; // Items generated during the agent run
   typedOutput?: any; // Type-specific output if an output_type is defined
+  final_output?: string; // Final output matching OpenAI's Agent SDK pattern
 }
 
 export interface AgentContext {
@@ -65,6 +66,9 @@ export interface AgentConfig<OutputType = any> {
   outputType?: OutputType;
 }
 
+/**
+ * Agent interface matching OpenAI's Agent SDK patterns
+ */
 export interface Agent<OutputType = any> {
   name: string;
   instructions: string | ((context: AgentContext) => string);
