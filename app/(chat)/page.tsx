@@ -1,3 +1,5 @@
+'use server';
+
 import { cookies } from 'next/headers';
 
 import { Chat } from '@/components/chat';
@@ -9,41 +11,32 @@ import { DataStreamHandler } from '@/components/data-stream-handler';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Mark page as React Server Component
+// Explicitly use server component
 export default async function Page() {
   const id = generateUUID();
 
-  // Use await with cookies() as seen in other parts of the app
+  // Need to use await with cookies() in NextJS 15
   const cookieStore = await cookies();
   const modelIdFromCookie = cookieStore.get('chat-model');
 
   // If no cookie or the model doesn't exist in chatModels, use default
-  if (!modelIdFromCookie || !chatModels.some(model => model.id === modelIdFromCookie.value)) {
-    return (
-      <>
-        <Chat
-          id={id}
-          initialMessages={[]}
-          selectedChatModel={DEFAULT_CHAT_MODEL}
-          selectedVisibilityType="private"
-          isReadonly={false}
-        />
-        <DataStreamHandler id={id} />
-      </>
-    );
-  }
+  const chatModel = modelIdFromCookie && 
+                    chatModels.some(model => model.id === modelIdFromCookie.value) 
+                    ? modelIdFromCookie.value 
+                    : DEFAULT_CHAT_MODEL;
 
+  // Simplified component structure to avoid client reference manifest issues
   return (
-    <>
-      <Chat 
+    <div className="flex flex-col h-full">
+      <Chat
         id={id}
         initialMessages={[]}
-        selectedChatModel={modelIdFromCookie.value}
+        selectedChatModel={chatModel}
         selectedVisibilityType="private"
         isReadonly={false}
       />
       <DataStreamHandler id={id} />
-    </>
+    </div>
   );
 }
 

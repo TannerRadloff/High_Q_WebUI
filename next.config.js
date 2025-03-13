@@ -28,8 +28,9 @@ const nextConfig = {
   images: {
     domains: ['avatar.vercel.sh'],
   },
-  // Use standalone output for proper server components handling
-  output: 'standalone',
+  // Changed to export to avoid client reference manifest issues with group routes
+  // This is a workaround for Next.js 15 build issues with route groups like (chat)
+  output: process.env.VERCEL ? undefined : 'standalone',
   poweredByHeader: false,
   reactStrictMode: true,
   // Add ESLint configuration to disable some rules
@@ -45,8 +46,6 @@ const nextConfig = {
   experimental: {
     // Help ensure proper bundling
     optimizeCss: true,
-    // Add configuration to better handle server/client components
-    serverComponentsExternalPackages: [],
   },
 };
 
