@@ -99,7 +99,7 @@ export function LoginForm() {
             Email
           </Label>
           <div className="relative">
-            <EnvelopeIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-400" />
+            <EnvelopeIcon className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-zinc-400" />
             <Input
               id="email"
               type="email"
@@ -128,7 +128,7 @@ export function LoginForm() {
             </Link>
           </div>
           <div className="relative">
-            <LockClosedIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-400" />
+            <LockClosedIcon className="absolute left-3 top-1/2 size-5 -translate-y-1/2 text-zinc-400" />
             <Input
               id="password"
               type="password"
@@ -148,7 +148,7 @@ export function LoginForm() {
         >
           {isLoading ? (
             <span className="flex items-center justify-center">
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin -ml-1 mr-2 size-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
@@ -156,7 +156,7 @@ export function LoginForm() {
             </span>
           ) : (
             <span className="flex items-center justify-center">
-              Sign In <ArrowRightIcon className="ml-2 h-4 w-4" />
+              Sign In <ArrowRightIcon className="ml-2 size-4" />
             </span>
           )}
         </Button>
@@ -181,7 +181,7 @@ export function LoginForm() {
       >
         {isGoogleLoading ? (
           <span className="flex items-center justify-center">
-            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-zinc-800 dark:text-zinc-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg className="animate-spin -ml-1 mr-2 size-4 text-zinc-800 dark:text-zinc-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
@@ -189,7 +189,7 @@ export function LoginForm() {
           </span>
         ) : (
           <span className="flex items-center justify-center">
-            <FcGoogle className="mr-2 h-5 w-5" />
+            <FcGoogle className="mr-2 size-5" />
             Sign in with Google
           </span>
         )}
@@ -197,7 +197,7 @@ export function LoginForm() {
 
       <div className="text-center mt-6">
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Don't have an account?{' '}
+          Don&apos;t have an account?{' '}
           <Link
             href="/register"
             className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
