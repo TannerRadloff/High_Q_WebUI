@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "next dev --turbo",
     "dev:clean": "rimraf .next && next dev --turbo",
-    "build": "node scripts/fix-build.js && next build",
-    "build:with-migrate": "tsx lib/db/migrate && node scripts/fix-build.js && next build",
+    "build": "node scripts/fix-build.js && next build && node scripts/post-build.js",
+    "build:with-migrate": "tsx lib/db/migrate && node scripts/fix-build.js && next build && node scripts/post-build.js",
     "start": "next start",
     "lint": "next lint && biome lint --write --unsafe",
     "lint:fix": "next lint --fix && biome lint --write --unsafe",

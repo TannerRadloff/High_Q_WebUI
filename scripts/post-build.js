@@ -1,26 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 
-// Paths
-const sourceManifestPath = path.join(process.cwd(), 'app', '(chat)', 'page_client-reference-manifest.js');
-const targetDir = path.join(process.cwd(), '.next', 'standalone', '.next', 'server', 'app', '(chat)');
-const targetManifestPath = path.join(targetDir, 'page_client-reference-manifest.js');
+// Paths for server and standalone manifest
+const serverManifestDir = path.join(process.cwd(), '.next', 'server', 'app', '(chat)');
+const standaloneManifestDir = path.join(process.cwd(), '.next', 'standalone', '.next', 'server', 'app', '(chat)');
+const serverManifestPath = path.join(serverManifestDir, 'page_client-reference-manifest.js');
+const standaloneManifestPath = path.join(standaloneManifestDir, 'page_client-reference-manifest.js');
 
-// Create the target directory if it doesn't exist
-if (!fs.existsSync(targetDir)) {
-  fs.mkdirSync(targetDir, { recursive: true });
-  console.log(`Created directory: ${targetDir}`);
-}
-
-// Copy the manifest file
-if (fs.existsSync(sourceManifestPath)) {
-  fs.copyFileSync(sourceManifestPath, targetManifestPath);
-  console.log(`Copied manifest from ${sourceManifestPath} to ${targetManifestPath}`);
-} else {
-  console.error(`Source manifest not found at ${sourceManifestPath}`);
-  
-  // Create the manifest file if it doesn't exist
-  const manifestContent = `
+// Create the client reference manifest content
+const manifestContent = `
 // This file is needed for Next.js build process
 // It provides client reference information for the page
 export const clientReferenceManifest = {
@@ -30,9 +18,60 @@ export const clientReferenceManifest = {
   entryCSSFiles: {}
 };
 `;
+
+// Function to ensure directory exists
+function ensureDirectoryExists(dir) {
+  if (!fs.existsSync(dir)) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      console.log(`Created directory: ${dir}`);
+    } catch (error) {
+      console.log(`Warning: Could not create directory ${dir}: ${error.message}`);
+    }
+  }
+}
+
+// Function to write manifest file
+function writeManifestFile(filePath, content) {
+  try {
+    fs.writeFileSync(filePath, content);
+    console.log(`Created manifest at: ${filePath}`);
+  } catch (error) {
+    console.log(`Warning: Could not write to ${filePath}: ${error.message}`);
+  }
+}
+
+// Create both directories if they don't exist
+ensureDirectoryExists(serverManifestDir);
+ensureDirectoryExists(standaloneManifestDir);
+
+// Write manifest files to both locations
+writeManifestFile(serverManifestPath, manifestContent);
+writeManifestFile(standaloneManifestPath, manifestContent);
+
+// Copy any other necessary build artifacts
+const chatAppDir = path.join(process.cwd(), '.next', 'server', 'app', '(chat)');
+const standaloneChatAppDir = path.join(process.cwd(), '.next', 'standalone', '.next', 'server', 'app', '(chat)');
+
+if (fs.existsSync(chatAppDir)) {
+  const files = fs.readdirSync(chatAppDir);
   
-  fs.writeFileSync(targetManifestPath, manifestContent);
-  console.log(`Created manifest at ${targetManifestPath}`);
+  for (const file of files) {
+    // Skip the manifest file as we already handled it
+    if (file === 'page_client-reference-manifest.js') continue;
+    
+    const sourcePath = path.join(chatAppDir, file);
+    const destPath = path.join(standaloneChatAppDir, file);
+    
+    if (fs.statSync(sourcePath).isFile()) {
+      try {
+        fs.copyFileSync(sourcePath, destPath);
+        console.log(`Copied: ${sourcePath} to ${destPath}`);
+      } catch (error) {
+        console.log(`Warning: Could not copy ${sourcePath} to ${destPath}: ${error.message}`);
+      }
+    }
+  }
 }
 
 console.log('Post-build script completed successfully!'); 
