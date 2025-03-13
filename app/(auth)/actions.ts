@@ -38,7 +38,6 @@ export const login = async (
   formData: FormData,
 ): Promise<LoginActionState> => {
   try {
-    // Check for admin credentials first
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
     

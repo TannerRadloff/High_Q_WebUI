@@ -57,6 +57,9 @@ export function LoginForm() {
       const redirectUrl = `${window.location.origin}/auth/callback`
       console.log('Redirect URL:', redirectUrl)
       
+      // Show the redirect URL in the UI (temporary) - you can remove this after debugging
+      toast.info(`OAuth Redirect URL: ${redirectUrl}`, { duration: 10000 })
+      
       // Start the OAuth flow
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
