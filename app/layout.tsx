@@ -84,10 +84,14 @@ export default function RootLayout({
               disableTransitionOnChange
             >
               <SidebarProvider defaultWidth={280} defaultOpen={false}>
-                <NavBar />
-                <ClientLayout>
-                  {children}
-                </ClientLayout>
+                <div className="flex min-h-screen">
+                  <NavBar />
+                  <main className="flex-1">
+                    <ClientLayout>
+                      {children}
+                    </ClientLayout>
+                  </main>
+                </div>
                 <Toaster
                   position="top-center"
                   toastOptions={{

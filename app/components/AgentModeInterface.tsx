@@ -151,7 +151,7 @@ export default function AgentModeInterface() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full w-full bg-background">
       {/* Agent selection bar */}
       <div className="border-b p-2 flex items-center gap-2 overflow-x-auto">
         {agentConfigs.map(agent => (
@@ -173,7 +173,7 @@ export default function AgentModeInterface() {
       {/* Chat container */}
       <div 
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4"
+        className="flex-1 overflow-y-auto p-4 space-y-4 w-full max-w-5xl mx-auto"
       >
         {/* Welcome message */}
         {agentRequests.length === 0 && (

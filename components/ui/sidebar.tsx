@@ -51,6 +51,7 @@ const SidebarProvider = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<'div'> & {
     defaultOpen?: boolean;
+    defaultWidth?: number;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
   }
@@ -58,6 +59,7 @@ const SidebarProvider = React.forwardRef<
   (
     {
       defaultOpen = true,
+      defaultWidth = 280,
       open: openProp,
       onOpenChange: setOpenProp,
       className,
