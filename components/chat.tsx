@@ -361,7 +361,17 @@ export function Chat({
     console.log(`[CHAT] Submitting chat with model: ${selectedChatModel}`);
     
     try {
-      return handleSubmit(event, chatRequestOptions);
+      // Create a new options object
+      const options: any = chatRequestOptions || {};
+      
+      // Ensure data property exists and contains agentType
+      if (!options.data) {
+        options.data = { agentType: 'default' };
+      } else if (!options.data.agentType) {
+        options.data.agentType = 'default';
+      }
+      
+      return handleSubmit(event, options);
     } catch (error) {
       logError(error, 'Error submitting message');
       return Promise.resolve();
@@ -399,7 +409,7 @@ export function Chat({
             chatId={chatId}
             input={input}
             setInput={setInput}
-            handleSubmit={handleSubmit}
+            handleSubmit={handleSubmitWithLogging}
             isLoading={isLoading}
             stop={stop}
             attachments={attachments}

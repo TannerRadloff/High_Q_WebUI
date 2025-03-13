@@ -27,12 +27,17 @@ export function DataStreamHandler({ id }: { id: string }) {
   const lastProcessedIndex = useRef(-1);
 
   useEffect(() => {
+    console.log('[DataStreamHandler] Data stream updated:', dataStream?.length);
     if (!dataStream?.length) return;
 
     const newDeltas = dataStream.slice(lastProcessedIndex.current + 1);
     lastProcessedIndex.current = dataStream.length - 1;
 
+    console.log('[DataStreamHandler] Processing new deltas:', newDeltas.length);
+
     (newDeltas as DataStreamDelta[]).forEach((delta: DataStreamDelta) => {
+      console.log('[DataStreamHandler] Processing delta:', delta.type);
+
       const artifactDefinition = artifactDefinitions.find(
         (artifactDefinition) => artifactDefinition.kind === artifact.kind,
       );

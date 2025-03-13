@@ -221,11 +221,21 @@ function PureMultimodalInput({
         return;
       }
       
-      // Handle the submission with attachments
-      handleSubmit(event, {
-        ...chatRequestOptions,
-        experimental_attachments: attachments,
-      });
+      console.log(`[MultimodalInput] Submitting with agent: ${selectedAgent}`);
+      
+      // Create a new options object with agent type and attachments
+      const options: ChatRequestOptions = {};
+      
+      // Add experimental attachments
+      if (attachments.length > 0) {
+        options.experimental_attachments = attachments;
+      }
+      
+      // Add agent type to data
+      options.data = { agentType: selectedAgent };
+      
+      // Handle the submission
+      handleSubmit(event, options);
       
       // Clear attachments after submission
       setAttachments([]);
@@ -236,7 +246,7 @@ function PureMultimodalInput({
         textareaRef.current?.focus();
       }
     },
-    [handleSubmit, attachments, setAttachments, uploadQueue, input, setLocalStorageInput, resetHeight, width]
+    [handleSubmit, attachments, setAttachments, uploadQueue, input, setLocalStorageInput, resetHeight, width, selectedAgent]
   );
   
   // Function to handle agent submission

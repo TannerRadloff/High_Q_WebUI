@@ -15,61 +15,25 @@ const logModelError = (modelId: string, error: any) => {
   });
 };
 
-// Helper function to try multiple models in sequence
-const tryMultipleModels = (modelId: string, openAiIds: string[], fallbackId: string = 'gpt-4o-mini') => {
-  console.log(`[MODEL] Trying multiple IDs for ${modelId}:`, openAiIds);
-  
-  // Try each model ID in sequence
-  for (const openAiId of openAiIds) {
-    try {
-      console.log(`[MODEL] Trying ${modelId} with ID: ${openAiId}`);
-      // Use responses API instead of chat completions
-      return openai.responses(openAiId);
-    } catch (error) {
-      logModelError(`${modelId}:${openAiId}`, error);
-      // Continue to the next ID
-      console.log(`[MODEL] Failed with ${openAiId}, trying next option`);
-    }
-  }
-  
-  // If all fail, use fallback
-  console.log(`[MODEL] All IDs failed for ${modelId}, using fallback: ${fallbackId}`);
-  // Use responses API instead of chat completions
-  return openai.responses(fallbackId);
-};
-
-// Helper function to safely create a model with error logging and fallback
-const createSafeModel = (modelId: string, openAiId: string, fallbackId: string = 'gpt-4o-mini') => {
+// Helper function to create a model with proper error handling
+const createModel = (modelId: string) => {
   try {
-    // For gpt-o1, try multiple potential IDs
-    if (modelId === 'gpt-o1') {
-      return tryMultipleModels(modelId, [
-        'o1',                     // Current official model ID
-        'o1-preview',             // Alternate name
-        'gpt-4o-2024-08-preview', // Latest preview model ID
-        'gpt-4o',                 // Fallback to gpt-4o if o1 not available
-        openAiId                  // Passed parameter
-      ], fallbackId);
-    }
-    
-    // For other models, just use the specified ID
-    // Use responses API instead of chat completions
-    return openai.responses(openAiId);
+    console.log(`[MODEL] Creating model: ${modelId}`);
+    return openai(modelId);
   } catch (error) {
     logModelError(modelId, error);
-    // Return default model as fallback
-    // Use responses API instead of chat completions
-    return openai.responses(fallbackId);
+    console.log(`[MODEL] Falling back to gpt-4o-mini for ${modelId}`);
+    return openai('gpt-4o-mini');
   }
 };
 
 export const myProvider = customProvider({
   languageModels: {
-    'gpt-40': createSafeModel('gpt-40', 'gpt-4o'),
-    'gpt-o1': createSafeModel('gpt-o1', 'o1', 'gpt-4o'), // Updated to use 'o1' as primary ID with gpt-4o fallback
-    'gpt-o3-mini': createSafeModel('gpt-o3-mini', 'gpt-4o-mini'),
-    'title-model': createSafeModel('title-model', 'gpt-4o'),
-    'artifact-model': createSafeModel('artifact-model', 'gpt-4o-mini'),
+    'gpt-40': createModel('gpt-4o'),
+    'gpt-o1': createModel('gpt-4o'), // Use gpt-4o as a fallback if o1 is not available
+    'gpt-o3-mini': createModel('gpt-4o-mini'),
+    'title-model': createModel('gpt-4o'),
+    'artifact-model': createModel('gpt-4o-mini'),
   },
   imageModels: {
     'small-model': openai.image('dall-e-2'),
