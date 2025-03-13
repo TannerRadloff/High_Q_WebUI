@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LoginForm } from '@/components/auth/login-form'
 import { useAuth } from '@/components/auth/auth-provider'
-import { getEnvErrorMessage } from '@/lib/env-check'
 
 export default function LoginPage() {
   const { user, isLoading } = useAuth()
@@ -12,12 +11,19 @@ export default function LoginPage() {
   const [envError, setEnvError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Check for environment configuration issues
-    const error = getEnvErrorMessage()
-    if (error) {
-      console.error('[LoginPage] Environment configuration error:', error)
-      setEnvError(error)
-    }
+    // Check for environment configuration issues through API
+    fetch('/api/check-env')
+      .then(response => response.json())
+      .then(data => {
+        if (!data.isValid) {
+          const errorMessage = `The application is misconfigured. Missing required environment variables. Please check the server logs for more details.`;
+          console.error('[LoginPage] Environment configuration error:', errorMessage);
+          setEnvError(errorMessage);
+        }
+      })
+      .catch(error => {
+        console.error('[LoginPage] Error checking environment configuration:', error);
+      });
 
     if (!isLoading) {
       console.log('[LoginPage] Auth state loaded:', { hasUser: !!user })

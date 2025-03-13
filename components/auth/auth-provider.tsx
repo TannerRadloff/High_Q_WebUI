@@ -6,7 +6,6 @@ import { useRouter, usePathname } from 'next/navigation'
 import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
-import { checkRequiredEnvVars } from '@/lib/env-check'
 
 interface AuthContextType {
   user: User | null
@@ -34,14 +33,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log('[AuthProvider] Initializing', { pathname })
     
-    // Check for environment configuration issues
-    const envCheck = checkRequiredEnvVars();
-    if (!envCheck.isValid) {
-      console.error('[AuthProvider] Environment configuration issues detected:', envCheck.message);
-      setHasEnvError(true);
-      setIsLoading(false);
-      return;
-    }
+    // Check for environment configuration issues through API instead of directly
+    fetch('/api/check-env')
+      .then(response => response.json())
+      .then(data => {
+        if (!data.isValid) {
+          console.error('[AuthProvider] Environment configuration issues detected');
+          setHasEnvError(true);
+          setIsLoading(false);
+          return;
+        }
+        // Continue with setupUser if env check passes
+        setupUser();
+      })
+      .catch(error => {
+        console.error('[AuthProvider] Error checking environment:', error);
+        // Continue with setupUser even if env check fails
+        setupUser();
+      });
     
     const setupUser = async () => {
       setIsLoading(true)
@@ -125,11 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false)
       }
     }
-    
-    if (!hasEnvError) {
-      setupUser()
-    }
-  }, [pathname, router, supabase, hasRedirected, hasEnvError])
+  }, [pathname, router, supabase, hasRedirected])
 
   const signIn = async (email: string, password: string) => {
     try {

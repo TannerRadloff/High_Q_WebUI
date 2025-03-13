@@ -41,24 +41,29 @@ export default function ClientLayout({
   children: React.ReactNode;
 }) {
   const { theme } = useTheme();
+  const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
 
+  // Call all useEffect hooks together, before any conditional return
   useEffect(() => {
     setMounted(true);
-  }, []);
-
-  if (!mounted) return null;
-
-  // Initialize global error handlers
-  useEffect(() => {
+    
+    // Initialize global error handlers
     initGlobalErrorHandlers();
+    
+    return () => {
+      // Any cleanup if needed
+    };
   }, []);
 
-  const pathname = usePathname();
+  // Don't render anything until mounted to avoid hydration issues
+  if (!mounted) {
+    return null;
+  }
+
   const isAuth = isAuthPage(pathname);
   const isChat = isChatPage(pathname);
 
-  // Wrap the entire application with the ErrorBoundary to catch OpenAI errors
   return (
     <ErrorBoundary>
       <div className={cn(

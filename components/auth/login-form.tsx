@@ -27,15 +27,31 @@ export function LoginForm() {
   // Debug function to check environment variables
   useEffect(() => {
     console.log('Login form initialized')
+    
+    // For client-side components, we don't directly check for process.env variables 
+    // that aren't prefixed with NEXT_PUBLIC_ as they're not accessible
     console.log('Supabase URL available:', !!process.env.NEXT_PUBLIC_SUPABASE_URL)
     console.log('Supabase Key available:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
     
-    // Check for OpenAI API key
-    const openaiApiKey = process.env.OPENAI_API_KEY
-    if (!openaiApiKey) {
-      console.error('OpenAI API key is missing')
-      setApiKeyError('The application is missing an OpenAI API key. Please add a valid API key to your .env.local file.')
-    }
+    // Instead of checking process.env.OPENAI_API_KEY, we let server components
+    // do validation and pass the result to client
+    // We could also add a simple API endpoint to check if the key is available
+    fetch('/api/check-env')
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('API key validation failed');
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (!data.isValid) {
+          setApiKeyError('The application is missing an OpenAI API key. Please add a valid API key to your .env.local file.');
+        }
+      })
+      .catch(error => {
+        console.error('Error checking environment:', error);
+        // If there's an error checking, we don't know if the API key is missing or not
+      });
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
