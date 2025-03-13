@@ -6,7 +6,7 @@ import {
 } from 'ai';
 
 import { getServerSession } from '@/lib/auth-utils';
-import { myProvider, DEFAULT_CHAT_MODEL, chatModels } from '@/lib/ai/models';
+import { DEFAULT_CHAT_MODEL, chatModels, openaiResponses } from '@/lib/ai/models';
 import { systemPrompt } from '@/lib/ai/prompts';
 import {
   deleteChatById,
@@ -29,52 +29,16 @@ import { getWeather } from '@/lib/ai/tools/get-weather';
 
 export const maxDuration = 60;
 
-// Add detailed logging function
+// Detailed error logging
 const logError = (error: any, context: string) => {
-  console.error(`[API ERROR] ${context}:`, error);
-  
-  if (error instanceof Error) {
-    console.error(`Error name: ${error.name}`);
-    console.error(`Error message: ${error.message}`);
-    console.error(`Error stack: ${error.stack}`);
-    
-    if ('cause' in error) {
-      console.error(`Error cause:`, error.cause);
+  console.error(`[ERROR] ${context}:`, error);
+  if (error.response) {
+    console.error(`Response status: ${error.response.status}`);
+    try {
+      console.error(`Response data:`, error.response.data);
+    } catch (e) {
+      console.error(`Could not log response data:`, e);
     }
-    
-    // Check for specific OpenAI API errors
-    if (error.message && error.message.includes('OpenAI')) {
-      console.error(`OpenAI API error detected`);
-      
-      // Extract status code if available
-      const statusMatch = error.message.match(/status (\d+)/);
-      if (statusMatch) {
-        console.error(`OpenAI API status code: ${statusMatch[1]}`);
-      }
-      
-      // Log if it's a model-specific error
-      if (error.message.includes('model')) {
-        console.error(`Model-specific error detected`);
-        
-        // Check for o1 model errors specifically
-        if (error.message.includes('o1') || 
-            error.message.includes('gpt-4o-2024') || 
-            error.message.includes('does not exist') ||
-            error.message.includes('access')) {
-          console.error(`O1 model access error detected. Please check your API key permissions.`);
-          console.error(`Attempted model access error: ${error.message}`);
-        }
-      }
-    } else {
-      console.error(`Non-Error object:`, error);
-    }
-  }
-  
-  // Log request context if available
-  if (typeof error === 'object' && error !== null && 'config' in error) {
-    console.error(`Request URL: ${(error as any).config?.url}`);
-    console.error(`Request method: ${(error as any).config?.method}`);
-    console.error(`Request headers:`, (error as any).config?.headers);
   }
 };
 
@@ -115,34 +79,9 @@ export async function POST(request: Request) {
     console.log(`[API] Validating model: ${selectedChatModel}`);
     const validModel = chatModels.some(model => model.id === selectedChatModel);
     modelToUse = validModel ? selectedChatModel : DEFAULT_CHAT_MODEL;
-    
-    // Verify that the model can be initialized
-    if (validModel) {
-      try {
-        const model = myProvider.languageModel(selectedChatModel);
-        console.log(`[API] Successfully validated model: ${selectedChatModel}`);
-      } catch (modelError) {
-        console.error(`[API] Error initializing model ${selectedChatModel}:`, modelError);
-        
-        // Special handling for o1 model errors
-        if (selectedChatModel === 'gpt-o1') {
-          console.error(`[API] O1 model initialization failed. Falling back to gpt-40.`);
-          modelToUse = 'gpt-40'; // Fallback to gpt-40 instead of the default mini model
-        } else {
-          modelToUse = DEFAULT_CHAT_MODEL;
-        }
-      }
-    }
   } catch (validationError) {
     console.error(`[API] Error during model validation:`, validationError);
-    
-    // Special handling for o1 model errors
-    if (selectedChatModel === 'gpt-o1') {
-      console.error(`[API] O1 model validation failed. Falling back to gpt-40.`);
-      modelToUse = 'gpt-40'; // Fallback to gpt-40 instead of the default mini model
-    } else {
-      modelToUse = DEFAULT_CHAT_MODEL;
-    }
+    modelToUse = DEFAULT_CHAT_MODEL;
   }
 
   console.log(`[API] Using model: ${modelToUse} (selected: ${selectedChatModel})`);
@@ -215,385 +154,188 @@ export async function POST(request: Request) {
       });
     }
 
-    // Check if we need to use agent processing instead of the standard chat flow
-    if (agentType !== 'default') {
-      // If agent is selected, redirect to agent API
-      console.log(`[API] Using ${agentType} agent for processing query`);
-      
-      // Get the latest user message content
-      const userQuery = userMessage.content;
-      
-      // Create a proper run config according to SDK
-      const runConfig = {
-        workflow_name: `Chat Agent - ${agentType}`,
-        group_id: id, // Use chat ID as group ID
-        tracing_disabled: false,
-        trace_include_sensitive_data: false,
-        trace_metadata: {
-          chatId: id,
-          modelType: modelToUse,
-          userId: session.user.id
-        }
-      };
-      
-      // Prepare agent request
-      const agentRequestBody = {
-        query: userQuery,
-        agentType: agentType,
-        stream: true,
-        workflow_name: runConfig.workflow_name,
-        group_id: runConfig.group_id,
-        tracing_disabled: runConfig.tracing_disabled,
-        trace_include_sensitive_data: runConfig.trace_include_sensitive_data,
-        metadata: runConfig.trace_metadata
-      };
-      
-      // Forward to the agent-query API endpoint
-      const agentResponse = await fetch(new URL('/api/agent-query', request.url), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(agentRequestBody)
-      });
-      
-      // Return the agent response stream directly
-      return agentResponse;
-    }
-
-    // Use the base system prompt without any file content modifications
-    const enhancedSystemPrompt = (model: string) => {
-      return systemPrompt({ selectedChatModel: model });
-    };
-
-    // Filter messages for the model to avoid token waste
-    // We need to filter out system messages with document artifacts
-    // but keep the messages that are needed for conversation history
-    const filteredMessages = messages.filter(message => {
-      // Keep all user and assistant messages for conversation history
-      if (message.role === 'user' || message.role === 'assistant') {
-        return true;
-      }
-      
-      // Filter out system messages with document artifacts
-      if (message.role === 'system' && 'documentId' in message) {
-        return false;
-      }
-      
-      // Keep any other system messages
-      return true;
-    });
-
     return createDataStreamResponse({
       execute: async (dataStream) => {
-        let currentModel = modelToUse;
-        let retryCount = 0;
-        const maxRetries = 2;
-        
-        console.log(`[API] Starting stream with model: ${currentModel}`);
-        
-        const executeStreamText = async () => {
+        try {
+          // Create conversation history format for the API
+          const formattedMessages = messages.map(message => {
+            if (message.role === 'user') {
+              return { role: 'user', content: message.content };
+            } else if (message.role === 'assistant') {
+              return { role: 'assistant', content: message.content };
+            } else if (message.role === 'system') {
+              return { role: 'system', content: message.content };
+            }
+            return null;
+          }).filter(Boolean);
+
+          // Add system prompt
+          const systemInstructions = systemPrompt({ selectedChatModel });
+          if (systemInstructions) {
+            formattedMessages.unshift({
+              role: 'system',
+              content: systemInstructions
+            });
+          }
+
+          // Format the input for the API
+          const input = { messages: formattedMessages };
+          
+          console.log(`[API] Starting stream with model: ${modelToUse}`);
+          
+          // Determine which model to use for the OpenAI Responses API
+          const apiModel = modelToUse === 'gpt-o1' ? 'gpt-4o' : 
+                          modelToUse === 'gpt-40' ? 'gpt-4o' : 
+                          'gpt-4o-mini';
+          
+          // Setup tools based on agent type
+          const tools = [];
+          
+          if (agentType === 'research') {
+            tools.push({ type: 'web_search' });
+          }
+          
           try {
-            console.log(`[API] Executing streamText with model: ${currentModel}`);
-            
-            // Add detailed logging for GPT-o1 model
-            if (currentModel === 'gpt-o1') {
-              console.log(`[API] Using GPT-o1 model with maxSteps: 30 for advanced reasoning`);
-              
-              try {
-                const modelString = myProvider.languageModel(currentModel).toString();
-                console.log(`[API] Model mapping: ${currentModel} -> ${modelString}`);
-              } catch (modelError) {
-                console.error(`[API] Error getting model string for ${currentModel}:`, modelError);
+            // Use the streaming Responses API
+            const stream = await openaiResponses.createStream(
+              JSON.stringify(input), 
+              { 
+                model: apiModel, 
+                tools: tools.length > 0 ? tools : undefined 
               }
-              
-              // Add specific warning for o1 model
-              dataStream.writeData({
-                type: 'message',
-                message: {
-                  id: generateUUID(),
-                  role: 'system',
-                  content: 'Using the advanced GPT-o1 model. This model may take longer to respond but provides enhanced reasoning capabilities.',
-                }
-              });
-            }
+            );
             
-            // Initialize the model before using it to catch any initialization errors
-            const model = myProvider.languageModel(currentModel);
-            console.log(`[API] Successfully initialized model: ${currentModel}`);
+            // Accumulate the response for saving
+            let fullResponse = '';
             
-            // Enhanced system prompt for o1 model with reasoning framework instructions
-            let systemPromptContent = enhancedSystemPrompt(currentModel);
-            
-            // For o1 model, add specific instructions about formatting
-            if (currentModel === 'gpt-o1') {
-              systemPromptContent += '\n\nIMPORTANT: When responding, clearly separate your reasoning from your final answer. Start your reasoning with "[Detailed Reasoning]" and your final answer with "[Final Answer]". This helps our system properly display your thought process separately from your conclusion.';
-            }
-            
-            const result = streamText({
-              model: model,
-              system: systemPromptContent,
-              messages: filteredMessages,
-              maxSteps: currentModel === 'gpt-o1' ? 30 : 5, // Increased steps for o1 model
-              experimental_activeTools:
-                currentModel === 'chat-model-reasoning'
-                  ? []
-                  : [
-                      'getWeather',
-                      'createDocument',
-                      'updateDocument',
-                      'requestSuggestions',
-                    ],
-              experimental_transform: smoothStream({ chunking: 'word' }),
-              experimental_generateMessageId: generateUUID,
-              tools: {
-                getWeather,
-                createDocument: createDocument({ session, dataStream }),
-                updateDocument: updateDocument({ session, dataStream }),
-                requestSuggestions: requestSuggestions({
-                  session,
-                  dataStream,
-                }),
-              },
-              onFinish: async ({ response, reasoning }) => {
-                console.log(`[API] Stream finished successfully with model: ${currentModel}`);
+            // Process the streaming response
+            for await (const chunk of stream) {
+              if ('choices' in chunk && chunk.choices?.[0]?.delta?.content) {
+                const content = chunk.choices[0].delta.content;
+                fullResponse += content;
                 
-                // For o1 model, check if we need to extract reasoning from the formatted response
-                let extractedReasoning = reasoning;
-                
-                if (currentModel === 'gpt-o1' && !reasoning) {
-                  // Try to extract reasoning from the formatted response
-                  for (const msg of response.messages) {
-                    if (msg.role === 'assistant' && typeof msg.content === 'string') {
-                      const content = msg.content;
-                      
-                      // Check for the formatted pattern
-                      const reasoningMatch = content.match(/\[Detailed Reasoning\]([\s\S]*?)\[Final Answer\]/);
-                      const answerMatch = content.match(/\[Final Answer\]([\s\S]*?)$/);
-                      
-                      if (reasoningMatch && answerMatch) {
-                        console.log(`[API] Extracted reasoning and answer from formatted response`);
-                        
-                        // Extract the reasoning and answer
-                        extractedReasoning = reasoningMatch[1].trim();
-                        
-                        // Replace the original content with just the answer
-                        const answer = answerMatch[1].trim();
-                        
-                        // Update the message content
-                        msg.content = answer;
-                      }
-                    }
-                  }
-                }
-                
-                if (session.user?.id) {
-                  try {
-                    const sanitizedResponseMessages = sanitizeResponseMessages({
-                      messages: response.messages,
-                      reasoning: extractedReasoning,
-                    });
-
-                    // Log the structure of the messages for debugging
-                    console.log(`[API] Saving ${sanitizedResponseMessages.length} messages with reasoning: ${reasoning ? 'yes' : 'no'}`);
-                    
-                    await saveMessages({
-                      messages: sanitizedResponseMessages.map((message) => {
-                        // For assistant messages with reasoning, ensure we preserve the array structure
-                        if (message.role === 'assistant' && Array.isArray(message.content)) {
-                          // Check if the content array includes reasoning
-                          const hasReasoning = message.content.some(
-                            (content) => content.type === 'reasoning'
-                          );
-                          
-                          if (hasReasoning) {
-                            console.log(`[API] Preserving array structure for message with reasoning`);
-                            // Preserve the array structure by using JSON.stringify
-                            return {
-                              id: message.id,
-                              chatId: id,
-                              role: message.role,
-                              content: JSON.stringify(message.content),
-                              createdAt: new Date(),
-                            };
-                          }
-                        }
-                        
-                        // For other messages, use the existing logic
-                        return {
-                          id: message.id,
-                          chatId: id,
-                          role: message.role,
-                          content: message.content && typeof message.content === 'string' 
-                            ? message.content 
-                            : Array.isArray(message.content) 
-                              ? JSON.stringify(message.content) 
-                              : '',
-                          createdAt: new Date(),
-                        };
-                      }),
-                    });
-                  } catch (error) {
-                    logError(error, 'Failed to save chat messages');
-                  }
-                }
-              },
-              experimental_telemetry: {
-                isEnabled: true,
-                functionId: 'stream-text',
-              },
-            });
-
-            result.mergeIntoDataStream(dataStream, {
-              sendReasoning: true,
-            });
-            
-            // Log that we're sending reasoning
-            if (currentModel === 'gpt-o1') {
-              console.log(`[API] Sending reasoning with o1 model response`);
-            }
-            
-            return result;
-          } catch (error) {
-            logError(error, `Error streaming with model ${currentModel}`);
-            
-            // Add more detailed error logging for debugging
-            console.error(`[API] Detailed error for model ${currentModel}:`);
-            
-            // Check for specific OpenAI API errors
-            if (error instanceof Error) {
-              // Check if it's a model-specific error
-              if (error.message.includes('model')) {
-                console.error(`[API] Model error detected: ${error.message}`);
-                
-                if (currentModel === 'gpt-o1') {
-                  console.error(`[API] GPT-o1 model error detected. Here are additional details:`);
-                  
-                  // Check for common o1 specific errors
-                  if (error.message.includes('not found') || 
-                      error.message.includes('does not exist') || 
-                      error.message.includes('do not have access')) {
-                    console.error(`[API] The o1 model ID may be incorrect or not accessible. Error: ${error.message}`);
-                    
-                    // Inform the user about the specific error
-                    dataStream.writeData({
-                      type: 'message',
-                      message: {
-                        id: generateUUID(),
-                        role: 'system',
-                        content: 'The GPT-o1 model is not available with your current API key. Falling back to an alternative model.',
-                      }
-                    });
-                    
-                    // Immediately switch to gpt-4o for a better fallback experience
-                    currentModel = 'gpt-40';
-                    console.log(`[API] Immediately falling back to ${currentModel} due to access error`);
-                    
-                    // Skip retry attempts for access errors
-                    return executeStreamText();
-                    
-                  } else if (error.message.includes('permission') || error.message.includes('access')) {
-                    console.error(`[API] Permission or access error for o1 model. Ensure your API key has access to o1.`);
-                    
-                    // Inform the user about the specific error
-                    dataStream.writeData({
-                      type: 'message',
-                      message: {
-                        id: generateUUID(),
-                        role: 'system',
-                        content: 'Your account does not have access to the GPT-o1 model. Falling back to an alternative model.',
-                      }
-                    });
-                    
-                  } else if (error.message.includes('capacity') || error.message.includes('overloaded')) {
-                    console.error(`[API] The o1 model appears to be at capacity or overloaded.`);
-                    
-                    // Inform the user about the specific error
-                    dataStream.writeData({
-                      type: 'message',
-                      message: {
-                        id: generateUUID(),
-                        role: 'system',
-                        content: 'The GPT-o1 model is currently at capacity. Falling back to an alternative model.',
-                      }
-                    });
-                  } else if (error.message.includes('version')) {
-                    console.error(`[API] API version error. The o1 model may require a specific API version.`);
-                  }
-                }
-              }
-              
-              // Check for rate limit errors
-              if (error.message.includes('rate limit')) {
-                console.error(`[API] Rate limit error detected: ${error.message}`);
-              }
-              
-              // Check for context length errors
-              if (error.message.includes('context length')) {
-                console.error(`[API] Context length error detected: ${error.message}`);
-              }
-              
-              // Check for API key errors
-              if (error.message.includes('api key') || error.message.includes('authentication')) {
-                console.error(`[API] API key or authentication error: ${error.message}`);
-              }
-            }
-            
-            if (retryCount < maxRetries && currentModel === 'gpt-o1') {
-              retryCount++;
-              console.warn(`[API] Error with model ${currentModel}, retrying (${retryCount}/${maxRetries}) after delay...`);
-              
-              // Add a delay before retrying to allow for potential rate limit recovery
-              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // Progressive backoff
-              
-              // If we've reached max retries, fall back to the default model
-              if (retryCount === maxRetries) {
-                console.warn(`[API] Falling back to ${DEFAULT_CHAT_MODEL} after ${maxRetries} failed attempts with ${currentModel}`);
-                currentModel = DEFAULT_CHAT_MODEL;
-                
-                // Inform the user about the fallback
+                // Stream the content to the client
                 dataStream.writeData({
                   type: 'message',
                   message: {
                     id: generateUUID(),
                     role: 'assistant',
-                    content: `I encountered an issue with the advanced ${selectedChatModel} model and have switched to a more reliable alternative. I'll still do my best to help you with your request.`,
+                    content: content,
                   }
                 });
               }
               
-              return executeStreamText();
+              // Process tool usage if present
+              if ('choices' in chunk && chunk.choices?.[0]?.delta?.tool_calls) {
+                dataStream.writeData({
+                  type: 'message',
+                  message: {
+                    id: generateUUID(),
+                    role: 'system',
+                    content: 'Using tools to process your request...',
+                  }
+                });
+              }
             }
             
-            throw error;
+            // Save the complete response
+            if (fullResponse) {
+              await saveMessages({
+                messages: [{
+                  id: generateUUID(),
+                  role: 'assistant',
+                  content: fullResponse,
+                  createdAt: new Date(),
+                  chatId: id,
+                }],
+              });
+              
+              console.log(`[API] Saved response with length: ${fullResponse.length}`);
+            } else {
+              console.error('[API] No response content to save');
+            }
+            
+          } catch (error) {
+            logError(error, 'Error with stream');
+            
+            // Notify the client about the error
+            dataStream.writeData({
+              type: 'message',
+              message: {
+                id: generateUUID(),
+                role: 'system',
+                content: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
+              }
+            });
+            
+            // Try again with fallback model
+            try {
+              console.log('[API] Attempting fallback with gpt-4o-mini');
+              
+              const fallbackStream = await openaiResponses.createStream(
+                JSON.stringify(input), 
+                { model: 'gpt-4o-mini' }
+              );
+              
+              let fallbackResponse = '';
+              
+              for await (const chunk of fallbackStream) {
+                if ('choices' in chunk && chunk.choices?.[0]?.delta?.content) {
+                  const content = chunk.choices[0].delta.content;
+                  fallbackResponse += content;
+                  
+                  dataStream.writeData({
+                    type: 'message',
+                    message: {
+                      id: generateUUID(),
+                      role: 'assistant',
+                      content: content,
+                    }
+                  });
+                }
+              }
+              
+              // Save the fallback response
+              if (fallbackResponse) {
+                await saveMessages({
+                  messages: [{
+                    id: generateUUID(),
+                    role: 'assistant',
+                    content: fallbackResponse,
+                    createdAt: new Date(),
+                    chatId: id,
+                  }],
+                });
+              }
+              
+            } catch (fallbackError) {
+              logError(fallbackError, 'Fallback also failed');
+              dataStream.writeData({
+                type: 'message',
+                message: {
+                  id: generateUUID(),
+                  role: 'system',
+                  content: 'All models failed. Please try again later.',
+                }
+              });
+            }
           }
-        };
-        
-        await executeStreamText();
+          
+        } catch (error) {
+          logError(error, 'Unexpected error in stream handling');
+          dataStream.writeData({
+            type: 'message',
+            message: {
+              id: generateUUID(),
+              role: 'system',
+              content: `An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            }
+          });
+        }
       },
       onError: (error: unknown) => {
         logError(error, 'Chat API error in dataStream');
-        
-        // Add more detailed error logging for debugging
-        if (error instanceof Error) {
-          // Check if it's a model-specific error
-          if (error.message.includes('model')) {
-            console.error(`[API] Model error detected in onError handler: ${error.message}`);
-          }
-          
-          // Check for rate limit errors
-          if (error.message.includes('rate limit')) {
-            console.error(`[API] Rate limit error detected in onError handler: ${error.message}`);
-          }
-          
-          // Check for context length errors
-          if (error.message.includes('context length')) {
-            console.error(`[API] Context length error detected in onError handler: ${error.message}`);
-            return 'The file content is too large for the model to process. Please try with a smaller file or extract the most relevant parts.';
-          }
-        }
-        
-        return `Oops, an error occurred while processing your request: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again with a smaller file or different content.`;
+        return `Oops, an error occurred while processing your request: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`;
       },
     });
   } catch (error: unknown) {

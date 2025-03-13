@@ -17,8 +17,13 @@ export type DataStreamDelta = {
     | 'suggestion'
     | 'clear'
     | 'finish'
-    | 'kind';
+    | 'kind'
+    | 'message';
   content: string | Suggestion;
+  message?: {
+    role: string;
+    content: string;
+  };
 };
 
 export function DataStreamHandler({ id }: { id: string }) {
@@ -37,6 +42,18 @@ export function DataStreamHandler({ id }: { id: string }) {
 
     (newDeltas as DataStreamDelta[]).forEach((delta: DataStreamDelta) => {
       console.log('[DataStreamHandler] Processing delta:', delta.type);
+
+      // Process artifact tool calls
+      if (delta.type === 'message' && delta.message) {
+        const content = delta.message.content || '';
+        
+        // Look for potential artifact markers in text
+        if (content.includes('Creating document:') || 
+            content.includes('Document created:') ||
+            content.includes('Updating document:')) {
+          console.log('[DataStreamHandler] Potential artifact found in message');
+        }
+      }
 
       const artifactDefinition = artifactDefinitions.find(
         (artifactDefinition) => artifactDefinition.kind === artifact.kind,
