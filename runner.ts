@@ -1,9 +1,12 @@
+// Define clear return type to help identify issues
+import { RunConfig } from './agents/tracing';
+
 // runner.ts (replacing orchestrator.ts)
 import { ResearchAgent } from './agents/ResearchAgent';
 import { ReportAgent } from './agents/ReportAgent';
 import { TriageAgent, TaskType, TriageResult } from './agents/TriageAgent';
 import { AgentResponse, StreamCallbacks, AgentContext, HandoffInputFilter } from './agents/agent';
-import { trace, configureTracing, RunConfig } from './agents/tracing';
+import { trace, configureTracing } from './agents/tracing';
 import { BaseAgent } from './agents/BaseAgent';
 import { functionTool } from './agents/tools';
 import { z } from 'zod';
@@ -31,12 +34,84 @@ export type AgentRunEvent = {
 };
 
 /**
- * Result returned from running an agent, aligned with OpenAI Agent SDK
+ * Run item types to track generated items during an agent run
  */
-export interface RunResult {
+export enum RunItemType {
+  MESSAGE = 'message',
+  HANDOFF_CALL = 'handoff_call',
+  HANDOFF_OUTPUT = 'handoff_output',
+  TOOL_CALL = 'tool_call',
+  TOOL_CALL_OUTPUT = 'tool_call_output',
+  REASONING = 'reasoning'
+}
+
+/**
+ * Base class for run items generated during agent execution
+ */
+export interface RunItem {
+  type: RunItemType;
+  timestamp: string;
+  raw_item: any;
+}
+
+/**
+ * Message output from an LLM
+ */
+export interface MessageOutputItem extends RunItem {
+  type: RunItemType.MESSAGE;
+  raw_item: { role: string; content: string };
+}
+
+/**
+ * Handoff call from an LLM
+ */
+export interface HandoffCallItem extends RunItem {
+  type: RunItemType.HANDOFF_CALL;
+  raw_item: any; // Tool call item from LLM
+}
+
+/**
+ * Output from a handoff operation
+ */
+export interface HandoffOutputItem extends RunItem {
+  type: RunItemType.HANDOFF_OUTPUT;
+  raw_item: any; // Tool response
+  source_agent: BaseAgent;
+  target_agent: BaseAgent;
+}
+
+/**
+ * Tool call from an LLM
+ */
+export interface ToolCallItem extends RunItem {
+  type: RunItemType.TOOL_CALL;
+  raw_item: any; // Tool call item from LLM
+}
+
+/**
+ * Output from a tool call
+ */
+export interface ToolCallOutputItem extends RunItem {
+  type: RunItemType.TOOL_CALL_OUTPUT;
+  raw_item: any; // Tool response
+  tool_output: any;
+}
+
+/**
+ * Reasoning from an LLM
+ */
+export interface ReasoningItem extends RunItem {
+  type: RunItemType.REASONING;
+  raw_item: string; // Reasoning content
+}
+
+/**
+ * Base result interface for agent runs, aligned with OpenAI Agent SDK
+ */
+export interface RunResultBase {
   success: boolean;
   output: string;
-  final_output: string; // Changed from optional to required for SDK alignment
+  final_output: any; // Can be string or agent-specific output type
   error?: string;
   metadata?: {
     taskType?: TaskType;
@@ -44,6 +119,11 @@ export interface RunResult {
     executionTimeMs: number;
     [key: string]: any;
   };
+  last_agent: BaseAgent; // Reference to the last agent that ran
+  new_items: RunItem[]; // Items generated during the run
+  input_guardrail_results?: any[]; // Results of input guardrails
+  output_guardrail_results?: any[]; // Results of output guardrails
+  raw_responses: any[]; // Raw LLM responses
   
   /**
    * Convert the result to an input list for a follow-up conversation turn
@@ -52,9 +132,16 @@ export interface RunResult {
 }
 
 /**
+ * Result returned from running an agent, aligned with OpenAI Agent SDK
+ */
+export interface RunResult extends RunResultBase {
+  // Non-streaming specific properties can be added here
+}
+
+/**
  * Result for streamed agent runs, aligned with OpenAI Agent SDK
  */
-export interface RunResultStreaming extends RunResult {
+export interface RunResultStreaming extends RunResultBase {
   /**
    * Returns an async generator that yields events from the agent run
    * Aligns exactly with OpenAI Agent SDK stream_events pattern
@@ -204,6 +291,10 @@ export class AgentRunner {
     
     const startTime = Date.now();
     const handoffPath: string[] = [this.agent.name]; // Track path of handoffs
+    let inputGuardrailResults: any[] = [];
+    let outputGuardrailResults: any[] = [];
+    let rawResponses: any[] = [];
+    let newItems: RunItem[] = [];
     
     try {
       // Validate input
@@ -217,12 +308,27 @@ export class AgentRunner {
         ? [{ role: 'user', content: query }] 
         : query;
       
+      // Add user message to new items
+      if (typeof query === 'string') {
+        newItems.push({
+          type: RunItemType.MESSAGE,
+          timestamp: new Date().toISOString(),
+          raw_item: { role: 'user', content: query }
+        } as MessageOutputItem);
+      }
+      
       // Apply input guardrails if provided
       let processedQuery = typeof query === 'string' ? query : JSON.stringify(query);
       if (config?.input_guardrails && Array.isArray(config.input_guardrails)) {
         for (const guardrail of config.input_guardrails) {
           if (typeof guardrail === 'function') {
+            const originalQuery = processedQuery;
             processedQuery = await guardrail(processedQuery);
+            inputGuardrailResults.push({
+              original: originalQuery,
+              processed: processedQuery,
+              guardrail: guardrail.name || 'unnamed_guardrail'
+            });
           }
         }
       }
@@ -237,28 +343,62 @@ export class AgentRunner {
         }
       );
       
+      // Store raw responses
+      if (response.rawResponses) {
+        rawResponses.push(...response.rawResponses);
+      }
+      
+      // Add any items from the agent response
+      if (response.items && Array.isArray(response.items)) {
+        newItems.push(...response.items);
+      }
+      
       // Process the response
       if (response.success) {
         let finalOutput = response.content;
+        
+        // Add response as message item
+        newItems.push({
+          type: RunItemType.MESSAGE,
+          timestamp: new Date().toISOString(),
+          raw_item: { role: 'assistant', content: finalOutput }
+        } as MessageOutputItem);
         
         // Apply output guardrails if provided
         if (config?.output_guardrails && Array.isArray(config.output_guardrails)) {
           for (const guardrail of config.output_guardrails) {
             if (typeof guardrail === 'function') {
+              const originalOutput = finalOutput;
               finalOutput = await guardrail(finalOutput);
+              outputGuardrailResults.push({
+                original: originalOutput,
+                processed: finalOutput,
+                guardrail: guardrail.name || 'unnamed_guardrail'
+              });
             }
           }
+        }
+        
+        // Determine final_output type
+        let typedFinalOutput: any = finalOutput;
+        if (this.agent.outputType && response.typedOutput) {
+          typedFinalOutput = response.typedOutput;
         }
         
         const result: RunResult = {
           success: true,
           output: finalOutput,
-          final_output: finalOutput, // For SDK compatibility
+          final_output: typedFinalOutput,
           metadata: {
             handoffPath: response.metadata?.handoffTracker || handoffPath,
             executionTimeMs: Date.now() - startTime,
             ...response.metadata
           },
+          last_agent: this.agent, // Store the last agent that ran
+          new_items: newItems,
+          input_guardrail_results: inputGuardrailResults,
+          output_guardrail_results: outputGuardrailResults,
+          raw_responses: rawResponses,
           to_input_list: () => this.createInputList(inputItems, response)
         };
         
@@ -278,12 +418,17 @@ export class AgentRunner {
       const result: RunResult = {
         success: false,
         output: '',
-        final_output: '', // Required final_output field
+        final_output: '',
         error: error instanceof Error ? error.message : 'Unknown error during run',
         metadata: {
           handoffPath,
           executionTimeMs: Date.now() - startTime
         },
+        last_agent: this.agent, // Store the last agent that ran
+        new_items: newItems,
+        input_guardrail_results: inputGuardrailResults,
+        output_guardrail_results: outputGuardrailResults,
+        raw_responses: rawResponses,
         to_input_list: () => typeof query === 'string' ? [{ role: 'user', content: query }] : query
       };
       
@@ -300,7 +445,38 @@ export class AgentRunner {
    * @returns The result of running the agent
    */
   run_sync(query: string | any[], config?: RunConfig, max_turns: number = 25): RunResult {
-    return this.run(query, config, max_turns) as unknown as RunResult;
+    // Note: This is not truly synchronous as JavaScript doesn't support blocking on async operations.
+    // In a production environment, you would need to use a different approach such as:
+    // 1. Using a synchronous binding to the OpenAI API (if available)
+    // 2. Using a worker thread approach 
+    // 3. Changing your architecture to fully embrace async/await
+    console.warn('run_sync is not truly synchronous - use run with await instead');
+    
+    // Create a promise that will be resolved when the async operation completes
+    let promiseResult: Promise<RunResult> = this.run(query, config, max_turns);
+    
+    // Return a mock result that includes the actual promise
+    // The caller will need to await this promise to get the actual result
+    const mockResult: RunResult = {
+      success: false,
+      output: 'Pending...',
+      final_output: 'Pending...',
+      error: 'This is a placeholder. You must await the _promise property to get the actual result.',
+      metadata: {
+        executionTimeMs: 0,
+        handoffPath: [this.agent.name]
+      },
+      last_agent: this.agent,
+      new_items: [],
+      input_guardrail_results: [],
+      output_guardrail_results: [],
+      raw_responses: [],
+      // @ts-ignore - Adding a non-standard property to the result
+      _promise: promiseResult,
+      to_input_list: () => typeof query === 'string' ? [{ role: 'user', content: query }] : query
+    };
+    
+    return mockResult;
   }
 
   /**
@@ -330,6 +506,12 @@ export class AgentRunner {
     let finalResultContent = '';
     let finalResultSuccess = true;
     let finalResultMetadata: Record<string, any> = {};
+    let inputGuardrailResults: any[] = [];
+    let outputGuardrailResults: any[] = [];
+    let rawResponses: any[] = [];
+    let newItems: RunItem[] = [];
+    let lastAgent: BaseAgent = this.agent;
+    let typedOutput: any = null;
     
     try {
       // Notify that streaming has started
@@ -355,12 +537,27 @@ export class AgentRunner {
         ? [{ role: 'user', content: query }] 
         : query;
       
+      // Add user message to new items
+      if (typeof query === 'string') {
+        newItems.push({
+          type: RunItemType.MESSAGE,
+          timestamp: new Date().toISOString(),
+          raw_item: { role: 'user', content: query }
+        } as MessageOutputItem);
+      }
+      
       // Apply input guardrails if provided
       let processedQuery = typeof query === 'string' ? query : JSON.stringify(query);
       if (config?.input_guardrails && Array.isArray(config.input_guardrails)) {
         for (const guardrail of config.input_guardrails) {
           if (typeof guardrail === 'function') {
+            const originalQuery = processedQuery;
             processedQuery = await guardrail(processedQuery);
+            inputGuardrailResults.push({
+              original: originalQuery,
+              processed: processedQuery,
+              guardrail: guardrail.name || 'unnamed_guardrail'
+            });
             events.push({ 
               type: 'guardrail_input', 
               timestamp: new Date().toISOString()
@@ -369,7 +566,7 @@ export class AgentRunner {
         }
       }
       
-      // Create handoff-aware wrapper callbacks
+      // Create handoff-aware wrapper callbacks with RunItem tracking
       const wrappedCallbacks: StreamCallbacks = {
         onStart: () => {
           callbacks.onStart?.();
@@ -399,9 +596,36 @@ export class AgentRunner {
           callbacks.onComplete?.(result);
           
           // Store the result data in our local variables
-          finalResultContent = typeof result === 'string' ? result : result.content || '';
-          finalResultSuccess = typeof result === 'string' ? true : (result.success !== false);
-          finalResultMetadata = typeof result === 'string' ? {} : (result.metadata || {});
+          if (typeof result === 'string') {
+            finalResultContent = result;
+            finalResultSuccess = true;
+          } else {
+            finalResultContent = result.content || '';
+            finalResultSuccess = result.success !== false;
+            finalResultMetadata = result.metadata || {};
+            
+            // Add items from the agent response
+            if (result.items && Array.isArray(result.items)) {
+              newItems.push(...result.items);
+            }
+            
+            // Store raw responses
+            if (result.rawResponses && Array.isArray(result.rawResponses)) {
+              rawResponses.push(...result.rawResponses);
+            }
+            
+            // Store typed output if available
+            if (result.typedOutput !== undefined) {
+              typedOutput = result.typedOutput;
+            }
+          }
+          
+          // Add final assistant message item
+          newItems.push({
+            type: RunItemType.MESSAGE,
+            timestamp: new Date().toISOString(),
+            raw_item: { role: 'assistant', content: finalResultContent }
+          } as MessageOutputItem);
           
           events.push({ 
             type: AgentRunEventType.AGENT_END, 
@@ -413,13 +637,51 @@ export class AgentRunner {
           events.push({ 
             type: AgentRunEventType.END, 
             timestamp: new Date().toISOString(),
-            agent: this.agent.name
+            agent: lastAgent.name
           });
         },
         // Track handoffs in the streaming process
         onHandoff: (sourceAgentName: string, targetAgentName: string) => {
+          // Get the target agent instance - handle type safely
+          let targetAgent: BaseAgent | undefined = undefined;
+          
+          if (this.agent.handoffs) {
+            // Find handoff target in a type-safe way
+            for (const handoff of this.agent.handoffs) {
+              if (typeof handoff === 'object' && 'name' in handoff && handoff.name === targetAgentName) {
+                targetAgent = handoff as BaseAgent;
+                break;
+              }
+            }
+          }
+          
+          if (targetAgent) {
+            lastAgent = targetAgent;
+          }
+          
           handoffPath.push(targetAgentName);
           callbacks.onToken?.(`\n\nHanding off from ${sourceAgentName} to ${targetAgentName}...\n\n`);
+          
+          // Create handoff items
+          const handoffCallItem: HandoffCallItem = {
+            type: RunItemType.HANDOFF_CALL,
+            timestamp: new Date().toISOString(),
+            raw_item: { from: sourceAgentName, to: targetAgentName }
+          };
+          
+          const handoffOutputItem: Partial<HandoffOutputItem> = {
+            type: RunItemType.HANDOFF_OUTPUT,
+            timestamp: new Date().toISOString(),
+            raw_item: { success: true, agent: targetAgentName },
+            source_agent: this.agent
+          };
+          
+          if (targetAgent) {
+            handoffOutputItem.target_agent = targetAgent;
+          }
+          
+          newItems.push(handoffCallItem);
+          newItems.push(handoffOutputItem as HandoffOutputItem);
           
           events.push({ 
             type: AgentRunEventType.HANDOFF, 
@@ -464,7 +726,13 @@ export class AgentRunner {
       if (config?.output_guardrails && Array.isArray(config.output_guardrails)) {
         for (const guardrail of config.output_guardrails) {
           if (typeof guardrail === 'function') {
+            const originalOutput = processedOutput;
             processedOutput = await guardrail(processedOutput);
+            outputGuardrailResults.push({
+              original: originalOutput,
+              processed: processedOutput,
+              guardrail: guardrail.name || 'unnamed_guardrail'
+            });
             events.push({ 
               type: 'guardrail_output', 
               timestamp: new Date().toISOString()
@@ -477,12 +745,17 @@ export class AgentRunner {
       const streamResult: RunResultStreaming = {
         success: finalResultSuccess,
         output: processedOutput,
-        final_output: processedOutput,
+        final_output: typedOutput !== null ? typedOutput : processedOutput,
         metadata: {
           handoffPath,
           executionTimeMs: 0, // Will be calculated
           ...finalResultMetadata
         },
+        last_agent: lastAgent,
+        new_items: newItems,
+        input_guardrail_results: inputGuardrailResults,
+        output_guardrail_results: outputGuardrailResults,
+        raw_responses: rawResponses,
         to_input_list: () => this.createInputList(inputItems, {
           content: processedOutput,
           success: finalResultSuccess,
@@ -528,6 +801,11 @@ export class AgentRunner {
           handoffPath,
           executionTimeMs: 0 // Will be calculated
         },
+        last_agent: lastAgent,
+        new_items: newItems,
+        input_guardrail_results: inputGuardrailResults,
+        output_guardrail_results: outputGuardrailResults,
+        raw_responses: rawResponses,
         to_input_list: () => typeof query === 'string' ? [{ role: 'user', content: query }] : query,
         stream_events: async function* () {
           for (const event of events) {

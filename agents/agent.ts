@@ -1,5 +1,7 @@
 // agents/agent.ts
 import { Tool } from './tools';
+import { RunConfig } from './tracing';
+import { RunItem } from '../runner';
 
 // Forward declaration to avoid circular dependency
 interface Handoff {
@@ -9,25 +11,40 @@ interface Handoff {
 
 export interface AgentResponse {
   content: string;
-  metadata?: Record<string, any>;
   success: boolean;
   error?: string;
+  metadata?: {
+    handoffTracker?: string[];
+    [key: string]: any;
+  };
+  rawResponses?: any[]; // Raw LLM responses
+  items?: RunItem[]; // Items generated during the agent run
+  typedOutput?: any; // Type-specific output if an output_type is defined
 }
 
 export interface AgentContext {
-  [key: string]: any;
+  handoffTracker?: string[]; // Tracks chain of handoffs between agents
+  maxTurns?: number; // Maximum number of conversation turns
+  previousMessages?: any[]; // Message history if available
+  memory?: any; // Memory for persistent state
+  runConfig?: RunConfig; // Configuration for the current run
+  originalQuery?: string; // Original user query for reference
+  handoffReason?: string; // Reason for handoff when applicable
+  isToolCall?: boolean; // Whether this context is from a tool call
+  callerAgent?: string; // Name of the agent that called this one as a tool
+  conversationHistory?: any[]; // Full conversation history if available
 }
 
 export interface StreamCallbacks {
   onStart?: () => void;
   onToken?: (token: string) => void;
-  onComplete?: (finalResponse: AgentResponse) => void;
-  onError?: (error: Error) => void;
+  onError?: (error: Error | string) => void;
+  onComplete?: (result: string | AgentResponse) => void;
   onHandoff?: (sourceAgentName: string, targetAgentName: string) => void;
 }
 
 // Input filter for handoffs, similar to the SDK
-export type HandoffInputFilter = (input: any) => any;
+export type HandoffInputFilter = (source: string, target: string, input: any) => any;
 
 /**
  * Configuration for an agent, similar to the OpenAI Agent SDK
@@ -87,4 +104,11 @@ export interface Agent<OutputType = any> {
    * Similar to agent.as_tool() in the SDK
    */
   asTool(toolName: string, toolDescription: string): Tool;
+}
+
+export interface HandoffOptions {
+  toolNameOverride?: string;
+  toolDescriptionOverride?: string;
+  inputType?: any;
+  onHandoff?: (context: AgentContext) => void;
 } 

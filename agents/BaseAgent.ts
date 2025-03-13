@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { Agent, AgentConfig, AgentContext, AgentResponse, StreamCallbacks, HandoffInputFilter } from './agent';
 import { Tool, agentAsTool } from './tools';
-import { generation_span, handoff_span, agent_span, SpanType, TraceMetadata, RunConfig } from './tracing';
+import { handoff_span, HandoffSpanData, RunConfig, TraceMetadata } from './tracing';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { MemoryManager, InMemoryStorage, MemoryType } from './memory';
@@ -160,53 +160,44 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
       const { id, function: { name, arguments: argsStr } } = toolCall;
       
       try {
-        // Check if this is a handoff tool call by matching against our custom tool names
+        // Check if this is a handoff tool call
         const isHandoff = name.startsWith('transfer_to_') || 
           [...this.handoffToolNames.values()].includes(name);
         
         if (isHandoff) {
-          // Parse arguments
           const handoffArgs = JSON.parse(argsStr);
           const reason = handoffArgs.reason || 'No reason provided';
           
-          // Find the target agent by matching the tool name
+          // Find the target agent
           let targetAgent: Agent | null = null;
           let targetAgentKey = '';
           
-          // First check if it's a custom tool name
-          for (const [key, toolName] of this.handoffToolNames.entries()) {
-            if (toolName === name) {
-              targetAgentKey = key;
-              break;
-            }
-          }
-          
-          // If not found, check if it's a default tool name (transfer_to_<agent_name>)
-          if (!targetAgentKey && name.startsWith('transfer_to_')) {
-            const agentNameFromTool = name.replace('transfer_to_', '').toLowerCase();
-            targetAgentKey = agentNameFromTool;
-          }
-          
-          // Find the actual agent from the handoffs array
           for (const handoffItem of this.handoffs) {
             const agent = 'handleTask' in handoffItem ? 
               handoffItem as Agent : 
               (handoffItem as Handoff).agent;
             
             const agentKey = agent.name.toLowerCase().replace(/\s+/g, '_');
-            if (agentKey === targetAgentKey) {
+            if (name.includes(agentKey) || name.includes(agent.name.toLowerCase())) {
               targetAgent = agent;
+              targetAgentKey = agentKey;
               break;
             }
           }
           
           if (targetAgent) {
-            // Create a span for the handoff
-            const handoffSpanWrapper = handoff_span(this.name, targetAgent.name, {
+            // Create a span for handoff using the correct signature
+            const handoffSpanData = {
               source_agent: this.name,
               target_agent: targetAgent.name,
               reason
-            });
+            };
+            
+            const handoffSpanWrapper = handoff_span(
+              this.name, 
+              targetAgent.name, 
+              handoffSpanData
+            );
             
             try {
               handoffSpanWrapper.enter();
@@ -253,11 +244,11 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
               // Apply input filter for this specific handoff if available
               const specificInputFilter = this.handoffInputFilters.get(targetAgentKey);
               if (specificInputFilter) {
-                handoffInput = specificInputFilter(handoffInput);
+                handoffInput = specificInputFilter(this.name, targetAgent.name, handoffInput);
               } 
               // Otherwise apply the global input filter if available
               else if (this.handoffInputFilter) {
-                handoffInput = this.handoffInputFilter(handoffInput);
+                handoffInput = this.handoffInputFilter(this.name, targetAgent.name, handoffInput);
               }
               
               // Process the handoff - extract the latest user message
@@ -407,6 +398,7 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
     // Extract the original query and run configuration if provided
     const originalQuery = typeof userQuery === 'string' ? userQuery : '';
     const runConfig = context?.runConfig as RunConfig | undefined;
+    const startTime = Date.now();
     
     // Set up context with original query
     const enhancedContext = await this.getMemoryEnhancedContext(userQuery, {
@@ -418,17 +410,11 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
     const maxTurns = enhancedContext.maxTurns || 25;
     let currentTurn = 0;
     let conversationHistory: any[] = [{ role: 'user', content: userQuery }];
-    
-    // Create a trace span for this agent's execution
-    const agentSpanWrapper = agent_span(`${this.name} execution`, {
-      agent_name: this.name,
-      agent_instructions: this.resolveInstructions(enhancedContext),
-      input: userQuery
-    });
+    let rawResponses: any[] = [];
     
     try {
-      agentSpanWrapper.enter();
       let finalResponse: AgentResponse | undefined = undefined;
+      let typedOutput: any = undefined;
       
       while (currentTurn < maxTurns) {
         currentTurn++;
@@ -447,6 +433,7 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
         
         // Call the OpenAI API
         const response = await callOpenAI(requestParams);
+        rawResponses.push(response);
         
         // Extract the response message
         const aiOutput = {
@@ -466,6 +453,17 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
           // If we got a handoff result, use that as the final output
           if (handoffResult) {
             finalResponse = handoffResult;
+            
+            // Capture handoff's raw responses if available
+            if (handoffResult.rawResponses) {
+              rawResponses = [...rawResponses, ...handoffResult.rawResponses];
+            }
+            
+            // Capture typed output from handoff if available
+            if (handoffResult.typedOutput !== undefined) {
+              typedOutput = handoffResult.typedOutput;
+            }
+            
             break;
           }
           
@@ -473,9 +471,43 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
           conversationHistory = [...conversationHistory, ...toolResults];
         } else if (aiOutput.output_text) {
           // No tool calls - we have a final response
+          const content = aiOutput.output_text;
+          
+          // Convert to typed output if output type is defined
+          if (this.outputType) {
+            try {
+              // If zod schema is provided, validate and parse the output
+              if (this.outputType instanceof z.ZodType) {
+                // Try to parse JSON from the model's response
+                try {
+                  const jsonOutput = JSON.parse(content);
+                  typedOutput = this.outputType.parse(jsonOutput);
+                } catch (e) {
+                  // If JSON parsing fails, try to parse the string directly
+                  typedOutput = this.outputType.parse(content);
+                }
+              } 
+              // Otherwise, try a basic JSON parse if the output looks like JSON
+              else if (content.trim().startsWith('{') && content.trim().endsWith('}')) {
+                try {
+                  typedOutput = JSON.parse(content);
+                } catch (e) {
+                  console.warn('Failed to parse output as JSON despite JSON-like format');
+                  typedOutput = content;
+                }
+              } else {
+                typedOutput = content;
+              }
+            } catch (e) {
+              console.error('Failed to convert output to specified type:', e);
+              typedOutput = content; // Fallback to string
+            }
+          }
+          
           finalResponse = {
-            content: aiOutput.output_text,
-            success: true
+            content,
+            success: true,
+            typedOutput
           };
           break;
         } else {
@@ -501,28 +533,27 @@ export class BaseAgent<OutputType = string> implements Agent<OutputType> {
         error: 'No response generated after multiple turns'
       };
       
-      agentSpanWrapper.addData({
-        output: result.content,
-        success: result.success
-      });
+      // Add raw responses
+      if (!result.rawResponses) {
+        result.rawResponses = rawResponses;
+      }
       
-      agentSpanWrapper.exit();
+      // Add metadata about execution time
+      if (!result.metadata) {
+        result.metadata = {};
+      }
+      result.metadata.executionTimeMs = Date.now() - startTime;
       
       return result;
     } catch (error) {
       console.error(`Error in ${this.name} agent:`, error);
       
-      agentSpanWrapper.addData({
-        error: error instanceof Error ? error.message : 'Unknown error',
-        success: false
-      });
-      
-      agentSpanWrapper.exit();
-      
       return {
         content: '',
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        metadata: { executionTimeMs: Date.now() - startTime },
+        rawResponses
       };
     }
   }
