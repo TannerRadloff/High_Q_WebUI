@@ -52,10 +52,8 @@ const nextConfig = {
     // Don't run TypeScript type checking during build to avoid failures
     ignoreBuildErrors: true,
   },
-  // Ensure proper bundling and optimization and add PPR
+  // Simplified experimental settings
   experimental: {
-    optimizeCss: true,
-    ppr: true,
     serverActions: {
       bodySizeLimit: '2mb',
       allowedOrigins: ['*']
