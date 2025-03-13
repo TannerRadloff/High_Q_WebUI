@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Toaster } from 'sonner';
 import Script from 'next/script';
 import { cn } from '@/lib/utils';
+import { Inter } from 'next/font/google';
 
 import { ThemeProvider } from '@/components/theme-provider';
 import { Providers } from './providers';
@@ -9,13 +10,16 @@ import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import ClientLayout from './client-layout';
+import { NavBar } from '@/components/nav-bar';
 
 import './globals.css';
 
+const inter = Inter({ subsets: ['latin'] });
+
 export const metadata: Metadata = {
   metadataBase: new URL('https://chat.vercel.ai'),
-  title: 'Next.js Chatbot Template',
-  description: 'Next.js chatbot template using the AI SDK.',
+  title: 'AI Chatbot',
+  description: 'Next.js AI Chatbot with Supabase Auth',
 };
 
 export const viewport = {
@@ -38,9 +42,9 @@ const THEME_COLOR_SCRIPT = `\
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html
       lang="en"
@@ -66,7 +70,8 @@ export default function RootLayout({
           // Light mode radial gradient for subtle depth effect
           'bg-gradient-to-tr from-background via-background to-muted/30',
           // Dark mode cosmic effect background
-          'dark:bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.2),rgba(2,0,15,0))]'
+          'dark:bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.2),rgba(2,0,15,0))]',
+          inter.className
         )}
       >
         <ErrorBoundary>
@@ -77,6 +82,7 @@ export default function RootLayout({
               enableSystem
               disableTransitionOnChange
             >
+              <NavBar />
               <ClientLayout>
                 {children}
               </ClientLayout>
