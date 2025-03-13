@@ -1,4 +1,4 @@
-import { getServerSession } from '@/lib/auth-utils';
+import { getServerSession } from '@/lib/auth';
 import { getSuggestionsByDocumentId } from '@/lib/db/queries';
 
 // Helper function to validate UUID format

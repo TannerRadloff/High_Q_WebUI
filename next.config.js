@@ -12,6 +12,11 @@ const nextConfig = {
         os: false,
         zlib: false,
       };
+      
+      // Ensure proper loading of client-side scripts
+      if (dev) {
+        config.output.publicPath = '/_next/';
+      }
     }
     
     // Explicitly add alias configuration
@@ -24,10 +29,16 @@ const nextConfig = {
   },
   // Ensure pdf-parse is only used on the server
   transpilePackages: ['pdf-parse'],
-  // Add the images configuration to allow avatar.vercel.sh domain
+  // Update image configuration to use remotePatterns
   images: {
-    domains: ['avatar.vercel.sh'],
+    remotePatterns: [
+      {
+        hostname: 'avatar.vercel.sh',
+      },
+    ],
   },
+  // Add the assetPrefix configuration for development
+  assetPrefix: process.env.NODE_ENV === 'development' ? '' : undefined,
   // Add proper output configurations
   output: 'standalone',
   poweredByHeader: false,
@@ -41,9 +52,10 @@ const nextConfig = {
     // Don't run TypeScript type checking during build to avoid failures
     ignoreBuildErrors: true,
   },
-  // Ensure proper bundling and optimization
+  // Ensure proper bundling and optimization and add PPR
   experimental: {
     optimizeCss: true,
+    ppr: true,
     serverActions: {
       bodySizeLimit: '2mb',
       allowedOrigins: ['*']

@@ -1,4 +1,4 @@
-import { getServerSession } from '@/lib/auth-utils';
+import { getServerSession } from '@/lib/auth';
 import type { ArtifactKind } from '@/components/artifact';
 import {
   deleteDocumentsByIdAfterTimestamp,

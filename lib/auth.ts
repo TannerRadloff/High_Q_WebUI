@@ -3,8 +3,46 @@
 import { cookies } from 'next/headers'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { Database } from '@/types/supabase'
+import { Session } from '@supabase/supabase-js'
 
-// Create a server action to handle OAuth callback
+// =============================================================================
+// Session Management
+// =============================================================================
+
+/**
+ * Gets the current Supabase session from the server
+ * Replacement for the NextAuth auth() function
+ * @returns The Supabase session object or null if not authenticated
+ */
+export async function getServerSession(): Promise<Session | null> {
+  try {
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore })
+    
+    const { data: { session }, error } = await supabase.auth.getSession()
+    
+    if (error) {
+      console.error('Error getting session:', error)
+      return null
+    }
+    
+    return session
+  } catch (error) {
+    console.error('Unexpected error in getServerSession:', error)
+    return null
+  }
+}
+
+// =============================================================================
+// OAuth Handling
+// =============================================================================
+
+/**
+ * Handle the OAuth callback from authentication providers
+ * Used in the callback route to complete the authentication flow
+ * @param code The authorization code from the OAuth provider
+ * @returns The session data if successful
+ */
 export async function handleOAuthCallback(code: string) {
   console.log('[handleOAuthCallback] Starting with code', code.substring(0, 5) + '...')
   

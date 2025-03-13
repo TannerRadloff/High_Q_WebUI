@@ -5,7 +5,7 @@ import {
   streamText,
 } from 'ai';
 
-import { getServerSession } from '@/lib/auth-utils';
+import { getServerSession } from '@/lib/auth';
 import { DEFAULT_CHAT_MODEL, chatModels, openaiResponses } from '@/lib/ai/models';
 import { systemPrompt } from '@/lib/ai/prompts';
 import {

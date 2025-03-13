@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { AppSidebar } from '@/components/app-sidebar';
 import { SidebarInset } from '@/components/ui/sidebar';
 
-import { getServerSession } from '@/lib/auth-utils';
+import { getServerSession } from '@/lib/auth';
 import Script from 'next/script';
 
 export const experimental_ppr = true;

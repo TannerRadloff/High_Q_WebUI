@@ -1,4 +1,4 @@
-import { getServerSession } from '@/lib/auth-utils';
+import { getServerSession } from '@/lib/auth';
 import { getVotesByChatId, voteMessage } from '@/lib/db/queries';
 
 export async function GET(request: Request) {
