@@ -76,13 +76,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Handle specific auth events
             switch (event) {
               case 'SIGNED_IN':
-                // Only redirect if not already on chat-home page
-                if (pathname !== '/chat-home') {
-                  console.log('[AuthProvider] Redirecting to chat-home after sign in')
+                // Only redirect if not already on home page
+                if (pathname !== '/') {
+                  console.log('[AuthProvider] Redirecting to home after sign in')
                   setHasRedirected(true)
-                  router.push('/chat-home')
+                  router.push('/')
                 } else {
-                  console.log('[AuthProvider] Already on chat-home page, no redirect needed')
+                  console.log('[AuthProvider] Already on home page, no redirect needed')
                   router.refresh()
                 }
                 break
@@ -137,8 +137,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       
       // Manual redirect instead of waiting for onAuthStateChange
-      if (pathname !== '/chat-home') {
-        router.push('/chat-home')
+      if (pathname !== '/') {
+        router.push('/')
       } else {
         router.refresh()
       }

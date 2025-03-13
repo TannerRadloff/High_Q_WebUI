@@ -28,9 +28,8 @@ const nextConfig = {
   images: {
     domains: ['avatar.vercel.sh'],
   },
-  // For Vercel deployment, let it decide output type automatically
-  // This avoids client reference manifest issues
-  output: undefined,
+  // Add proper output configurations
+  output: 'standalone',
   poweredByHeader: false,
   reactStrictMode: true,
   // Add ESLint configuration to disable some rules
@@ -42,10 +41,11 @@ const nextConfig = {
     // Don't run TypeScript type checking during build to avoid failures
     ignoreBuildErrors: true,
   },
-  // Ensure public path is correctly set
+  // Ensure proper bundling and optimization
   experimental: {
-    // Help ensure proper bundling
     optimizeCss: true,
+    // Add additional experimental features if needed
+    serverActions: true,
   },
 };
 

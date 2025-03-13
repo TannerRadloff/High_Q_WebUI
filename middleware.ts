@@ -40,9 +40,6 @@ export async function middleware(request: NextRequest) {
   // Special case for root path which should show chat UI for authenticated users,
   // but allow public access with redirect to login option
   const isRootPath = pathname === '/'
-  
-  // Check for chat-home route which requires authentication
-  const isChatHomePath = pathname === '/chat-home'
 
   // Always allow callback routes - critical for OAuth flows
   if (isCallbackRoute) {
@@ -57,12 +54,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Handle chat-home route - requires authentication
-  if (isChatHomePath && !isAuthenticated) {
-    console.log('[Middleware] Redirecting unauthenticated user from chat-home to login')
-    return NextResponse.redirect(new URL('/login', request.url))
-  }
-
   // Redirect unauthenticated users trying to access protected routes (except root)
   if (isProtectedRoute && !isRootPath && !isAuthenticated) {
     console.log('[Middleware] Redirecting unauthenticated user to login')
@@ -72,7 +63,7 @@ export async function middleware(request: NextRequest) {
   // Redirect authenticated users trying to access auth routes
   if (isAuthRoute && isAuthenticated) {
     console.log('[Middleware] Redirecting authenticated user to home')
-    return NextResponse.redirect(new URL('/chat-home', request.url))
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   // If there are any old NextAuth pages/routes being accessed, block them completely
@@ -86,7 +77,7 @@ export async function middleware(request: NextRequest) {
     console.log('[Middleware] Blocking old NextAuth route:', pathname)
     
     if (isAuthenticated) {
-      return NextResponse.redirect(new URL('/chat-home', request.url))
+      return NextResponse.redirect(new URL('/', request.url))
     } else {
       return NextResponse.redirect(new URL('/login', request.url))
     }
