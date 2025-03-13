@@ -83,7 +83,7 @@ export default function RootLayout({
               enableSystem
               disableTransitionOnChange
             >
-              <SidebarProvider defaultOpen={true}>
+              <SidebarProvider defaultWidth={280} defaultOpen={false}>
                 <NavBar />
                 <ClientLayout>
                   {children}
