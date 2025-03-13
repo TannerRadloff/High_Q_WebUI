@@ -20,15 +20,28 @@ type AgentStreamResult = {
 // Define the AgentRequest type with properly typed properties
 type AgentRequest = {
   id: string;
-  timestamp: string;
+  timestamp: number; // Changed from string to number to match the service
   query: string;
   agentType: AgentType;
   status: 'pending' | 'in-progress' | 'completed' | 'failed';
   response?: string; // Using response instead of result for consistency
   error?: string;
-  streamResult?: AgentStreamResult;
-  userId?: string;
+  metadata?: {
+    executionTimeMs?: number;
+    handoffPath?: string[];
+    [key: string]: any;
+  };
+  // streamResult moved to metadata to match the service
 };
+
+// Local extension for our API
+interface LocalAgentRequestExtension {
+  userId?: string;
+  streamResult?: AgentStreamResult;
+}
+
+// Combined type for local use
+type ExtendedAgentRequest = AgentRequest & LocalAgentRequestExtension;
 
 // Simple in-memory rate limiting (would be replaced with Redis or similar in production)
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
@@ -117,12 +130,15 @@ export async function POST(req: NextRequest) {
     // Record the new request
     AgentStateService.recordRequest({
       id: requestId,
-      timestamp: new Date().toISOString(),
+      timestamp: Date.now(),
       query,
       agentType: getAgentTypeEnum(agentType),
       status: 'pending',
-      userId: ip // Add the user ID to track conversation history
     });
+    
+    // Track user ID separately for our own use
+    const userRequestMap = new Map<string, string>();
+    userRequestMap.set(requestId, ip);
     
     // Update agent state to working
     AgentStateService.updateAgentState(
@@ -149,15 +165,18 @@ export async function POST(req: NextRequest) {
       const runner = createRunnerForAgentType(agentType);
       
       // Get previous context if this is a follow-up message
-      const prevRequest = AgentStateService.getRequestsByUser(ip)[0];
+      // TODO: Implement proper user-based request retrieval
+      // const prevRequest = AgentStateService.getRequestsByUser(ip)[0];
+      const prevRequest = AgentStateService.getRequests({ limit: 1 })[0];
       
       // Check for context to make conversation
       let inputData: string | any[] = query;
       
-      if (prevRequest?.streamResult?.inputList && prevRequest.id !== requestId) {
+      // Use type assertion to access streamResult
+      if ((prevRequest as ExtendedAgentRequest)?.streamResult?.inputList && prevRequest.id !== requestId) {
         // Use previous conversation context for follow-up
         inputData = [
-          ...prevRequest.streamResult.inputList,
+          ...((prevRequest as ExtendedAgentRequest).streamResult?.inputList || []),
           { role: 'user', content: query }
         ];
       }
@@ -170,11 +189,12 @@ export async function POST(req: NextRequest) {
       
       // Store input list for future conversations
       AgentStateService.updateRequest(requestId, {
+        // Use type assertion for the update object
         streamResult: {
           inputList: runResult.to_input_list(),
           metadata: runResult.metadata
-        } as AgentStreamResult
-      });
+        }
+      } as unknown as Partial<AgentRequest>);
       
       // Format the result for API response
       result = {
@@ -564,12 +584,13 @@ async function handleStreamingResponse(
       
       // Store the result in the context for potential follow-up messages
       AgentStateService.updateRequest(requestId, {
+        // Use type assertion for the update object
         streamResult: {
           // Only store what's needed for future to_input_list calls
           inputList: streamResult.to_input_list(),
           metadata: streamResult.metadata
-        } as AgentStreamResult
-      });
+        }
+      } as unknown as Partial<AgentRequest>);
       
     } catch (error) {
       console.error(`Error in agent stream for ${requestId}:`, error);

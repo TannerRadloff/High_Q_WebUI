@@ -61,15 +61,6 @@ export function NavBar() {
               <HomeIcon size={16} />
               <span>Home</span>
             </Link>
-            <Link
-              href="/agent-mode"
-              className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${
-                isActive('/agent-mode') ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-              }`}
-            >
-              <BotIcon size={16} />
-              <span>Agent Mode</span>
-            </Link>
           </div>
         </div>
         

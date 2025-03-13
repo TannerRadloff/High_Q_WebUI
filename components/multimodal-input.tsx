@@ -23,9 +23,31 @@ import equal from 'fast-deep-equal';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { sanitizeUIMessages, generateUUID, cn } from '@/lib/utils';
-import { ArrowUpIcon, PaperclipIcon, StopIcon, CrossIcon } from './icons';
+import { ArrowUpIcon, PaperclipIcon, StopIcon, CrossIcon, BotIcon } from './icons';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from './ui/select';
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger 
+} from './ui/tooltip';
+
+// Define agent types (from AgentType enum)
+const agentTypes = [
+  { id: 'default', name: 'Standard Chat', description: 'Regular chat with the AI model' },
+  { id: 'delegation', name: 'Delegation', description: 'Analyzes your request and delegates to specialized agents' },
+  { id: 'research', name: 'Research', description: 'Finds information and answers factual questions' },
+  { id: 'report', name: 'Report', description: 'Formats information into structured reports' },
+  { id: 'triage', name: 'Triage', description: 'Analyzes and categorizes tasks' },
+  { id: 'judge', name: 'Judge', description: 'Evaluates responses and provides feedback' }
+];
 
 // Add an interface at the top of the file
 interface MessageWithDocument extends Message {
@@ -72,6 +94,33 @@ function PureMultimodalInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
   const [isFocused, setIsFocused] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<string>('default');
+
+  // Handle agent mode submission - will pass agent type in the chat options
+  const handleAgentSubmit = (event?: { preventDefault?: () => void }) => {
+    if (event?.preventDefault) {
+      event.preventDefault();
+    }
+    
+    // Only modify behavior if not in default mode
+    if (selectedAgent !== 'default') {
+      // Include agent info in the chat request options
+      handleSubmit(event, {
+        data: {
+          agentType: selectedAgent,
+        }
+      });
+      
+      // Show which agent is being used
+      if (selectedAgent !== 'default') {
+        const agentName = agentTypes.find(a => a.id === selectedAgent)?.name || selectedAgent;
+        toast.info(`Using ${agentName} agent for this query`);
+      }
+    } else {
+      // Regular submission without agent
+      handleSubmit(event);
+    }
+  };
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -334,97 +383,163 @@ function PureMultimodalInput({
   );
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className={cn('relative w-full max-w-screen-lg', className)}
+    <div
+      className={cn(
+        'p-1.5 mt-auto z-10 bg-background/60 backdrop-blur-md backdrop-saturate-150 rounded-xl border sm:border border-border',
+        'relative lg:py-3 lg:px-3.5 w-full',
+        className,
+      )}
+      onKeyDown={e => {
+        if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
+          e.preventDefault();
+          
+          const usedAttachments = [...attachments];
+          handleAgentSubmit();
+          setAttachments([]);
+          // Reset height only if no shift key
+          resetHeight();
+        }
+      }}
     >
-      {/* Attachment preview section */}
-      <AnimatePresence>
-        {attachments.length > 0 ? (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.15, ease: 'easeInOut' }}
-            className="w-full"
-          >
-            <div className="flex flex-row flex-wrap gap-2 rounded-xl border border-border/50 bg-secondary/20 p-2 mb-2">
-              {attachments.map((file) => (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  key={file.url}
-                  className="flex max-w-full flex-row items-center gap-2 rounded-lg border border-border/50 bg-primary/5 py-1 pl-3 pr-1 text-sm"
-                >
-                  <span className="truncate">{file.name}</span>
-                  <button
-                    type="button"
-                    className="flex size-6 flex-none items-center justify-center rounded-md"
-                    onClick={() => {
-                      setAttachments((currentFiles) =>
-                        currentFiles.filter(
-                          (currentFile) => currentFile.url !== file.url,
-                        ),
-                      );
-                    }}
-                  >
-                    <CrossIcon size={16} />
-                  </button>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      <form
-        onSubmit={(e) => {
-          wrappedHandleSubmit(e); // Use our wrapped version
+      <form 
+        className="flex flex-col gap-3"
+        onSubmit={e => {
+          e.preventDefault();
+          const usedAttachments = [...attachments];
+          handleAgentSubmit();
+          setAttachments([]);
+          resetHeight();
         }}
-        className="flex w-full flex-row items-end gap-2 p-2"
       >
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileChange}
-          className="hidden"
-          multiple
-          accept="image/*,application/pdf,text/plain"
-        />
-        
-        <AttachmentsButton
-          fileInputRef={fileInputRef}
-          isLoading={isLoading || uploadQueue.length > 0}
-        />
+        {/* Agent selector */}
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Select
+                value={selectedAgent}
+                onValueChange={setSelectedAgent}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <div className="flex items-center gap-2">
+                    <BotIcon size={16} />
+                    <SelectValue placeholder="Select Agent" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  {agentTypes.map(agent => (
+                    <SelectItem key={agent.id} value={agent.id}>
+                      <div className="flex flex-col">
+                        <span>{agent.name}</span>
+                        <span className="text-xs text-muted-foreground">{agent.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </TooltipTrigger>
+            <TooltipContent>
+              Select an AI agent type to process your request
+            </TooltipContent>
+          </Tooltip>
+        </div>
 
-        <div className="relative w-full">
+        <div
+          className={cn(
+            'flex relative w-full font-sans group/input border rounded-md overflow-hidden',
+            'rounded-md border-input bg-background px-3 py-2 text-sm',
+            // Glow when isFocused
+            isFocused &&
+              'ring-2 ring-purple-600 ring-offset-2 ring-offset-background',
+            'transition-shadow ease-in-out duration-300 ring-0',
+          )}
+        >
           <Textarea
             ref={textareaRef}
             tabIndex={0}
+            name="message"
+            placeholder={selectedAgent === 'default' ? 
+              "Message..." : 
+              `Ask the ${agentTypes.find(a => a.id === selectedAgent)?.name || 'selected'} agent...`
+            }
+            className={cn(
+              'max-h-64 min-h-[98px] grow whitespace-break-spaces text-secondary-foreground resize-none',
+              'bg-transparent p-0 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0',
+              'relative z-10 h-full border-none outline-none placeholder:text-muted-foreground/70',
+              'transition-colors duration-300',
+            )}
+            onInput={handleInput}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                wrappedHandleSubmit(); // Use our wrapped version
-              }
-            }}
-            placeholder="Message..."
-            className="min-h-[40px] w-full resize-none overflow-hidden rounded-xl pr-12 py-3 focus-visible:ring-primary/70 focus-visible:border-primary/50 focus-visible:shadow-[0_0_10px_rgba(0,150,255,0.3)] bg-background/40"
             value={input}
-            onChange={handleInput}
-            disabled={isLoading || uploadQueue.length > 0}
+            spellCheck={false}
+            rows={1}
+          />
+        </div>
+
+        <div className="flex justify-between items-center">
+          <div className="flex gap-1.5">
+            <AttachmentsButton
+              fileInputRef={fileInputRef}
+              isLoading={isLoading}
+            />
+
+            <AnimatePresence>
+              {attachments.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  className="flex flex-wrap gap-1.5"
+                >
+                  {attachments.map((attachment, index) => (
+                    <div
+                      key={index}
+                      className="flex h-8 items-center gap-1.5 rounded-md border bg-muted pr-2 text-muted-foreground"
+                    >
+                      <div className="flex h-full items-center rounded-l-md border-r bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        {attachment.contentType?.split('/')[0] || 'file'}
+                      </div>
+                      <div className="max-w-28 truncate text-xs">
+                        {attachment.name?.split('/').pop() || 'attachment'}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAttachments(
+                            attachments.filter((_, i) => i !== index),
+                          );
+                        }}
+                        className="flex h-4 w-4 items-center justify-center rounded-sm text-muted-foreground/50 transition-colors hover:bg-muted-foreground/20 hover:text-muted-foreground"
+                      >
+                        <CrossIcon />
+                      </button>
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {uploadQueue.length > 0 && (
+              <div className="flex h-8 items-center gap-1.5 rounded-md border bg-muted px-3 text-xs font-medium text-muted-foreground">
+                {uploadQueue.length} files uploading...
+              </div>
+            )}
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            onChange={handleFileChange}
+            className="hidden"
           />
 
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-row items-center">
+          <div className="flex items-center gap-1.5">
             {isLoading ? (
               <StopButton stop={stop} setMessages={setMessages} />
             ) : (
               <SendButton
-                submitForm={wrappedHandleSubmit} // Use our wrapped version
+                submitForm={handleAgentSubmit}
                 input={input}
                 uploadQueue={uploadQueue}
               />
@@ -432,7 +547,7 @@ function PureMultimodalInput({
           </div>
         </div>
       </form>
-    </motion.div>
+    </div>
   );
 }
 

@@ -19,11 +19,7 @@ import { useArtifactSelector } from '@/hooks/use-artifact';
 import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
 
-// Dynamically import the AgentModeInterface to avoid loading it until needed
-const AgentModeInterface = dynamic(() => import('@/app/components/AgentModeInterface'), {
-  loading: () => <div className="flex items-center justify-center h-full">Loading agent interface...</div>,
-  ssr: false
-});
+// Agent mode functionality is now integrated directly into the MultimodalInput component
 
 // Add detailed logging function
 const logError = (error: any, context: string) => {
@@ -65,7 +61,6 @@ export function Chat({
 }) {
   const { mutate } = useSWRConfig();
   const [usesFallbackModel, setUsesFallbackModel] = useState(false);
-  const [isAgentMode, setIsAgentMode] = useState(false);
   
   console.log(`Initializing chat with model: ${selectedChatModel}`);
 
@@ -337,14 +332,6 @@ export function Chat({
     }
   };
 
-  // Toggle agent mode
-  const toggleAgentMode = () => {
-    setIsAgentMode(!isAgentMode);
-    if (!isAgentMode) {
-      toast.success("Agent mode activated. You can now use specialized AI agents.");
-    }
-  };
-
   return (
     <>
       <div className="flex flex-col min-w-0 h-dvh bg-background relative">
@@ -396,75 +383,63 @@ export function Chat({
           selectedModelId={selectedChatModel}
           selectedVisibilityType={selectedVisibilityType}
           isReadonly={isReadonly}
-          onToggleAgentMode={toggleAgentMode}
-          isAgentMode={isAgentMode}
         />
 
-        {isAgentMode ? (
-          <div className="flex-1 overflow-hidden">
-            <AgentModeInterface />
-          </div>
-        ) : (
-          <>
-            <Messages
-              chatId={id}
-              isLoading={isLoading}
-              votes={votes}
-              messages={messages}
-              setMessages={setMessages}
-              reload={reload}
-              isReadonly={isReadonly}
-              isArtifactVisible={isArtifactVisible}
-            />
-
-            <motion.div 
-              className="relative mx-auto px-4 pb-4 md:pb-6 w-full md:max-w-3xl"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <div className="absolute inset-0 -z-10 pointer-events-none" />
-              
-              <div className="flex gap-2 w-full">
-                {!isReadonly && (
-                  <MultimodalInput
-                    chatId={id}
-                    input={input}
-                    setInput={setInput}
-                    handleSubmit={handleSubmitWithLogging}
-                    isLoading={isLoading}
-                    stop={stop}
-                    attachments={attachments}
-                    setAttachments={setAttachments}
-                    messages={messages}
-                    setMessages={setMessages}
-                    append={append}
-                  />
-                )}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </div>
-
-      {!isAgentMode && (
-        <Artifact
+        <Messages
           chatId={id}
-          input={input}
-          setInput={setInput}
-          handleSubmit={handleSubmitWithLogging}
           isLoading={isLoading}
-          stop={stop}
-          attachments={attachments}
-          setAttachments={setAttachments}
-          append={append}
+          votes={votes}
           messages={messages}
           setMessages={setMessages}
           reload={reload}
-          votes={votes}
           isReadonly={isReadonly}
+          isArtifactVisible={isArtifactVisible}
         />
-      )}
+
+        <motion.div 
+          className="relative mx-auto px-4 pb-4 md:pb-6 w-full md:max-w-3xl"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="absolute inset-0 -z-10 pointer-events-none" />
+          
+          <div className="flex gap-2 w-full">
+            {!isReadonly && (
+              <MultimodalInput
+                chatId={id}
+                input={input}
+                setInput={setInput}
+                handleSubmit={handleSubmitWithLogging}
+                isLoading={isLoading}
+                stop={stop}
+                attachments={attachments}
+                setAttachments={setAttachments}
+                messages={messages}
+                setMessages={setMessages}
+                append={append}
+              />
+            )}
+          </div>
+        </motion.div>
+      </div>
+
+      <Artifact
+        chatId={id}
+        input={input}
+        setInput={setInput}
+        handleSubmit={handleSubmitWithLogging}
+        isLoading={isLoading}
+        stop={stop}
+        attachments={attachments}
+        setAttachments={setAttachments}
+        append={append}
+        messages={messages}
+        setMessages={setMessages}
+        reload={reload}
+        votes={votes}
+        isReadonly={isReadonly}
+      />
     </>
   );
 }

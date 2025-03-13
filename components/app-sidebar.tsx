@@ -43,42 +43,30 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                 HighQ - Beta
               </span>
             </Link>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  type="button"
-                  className="p-2 h-fit hover:bg-primary/10 hover:text-primary"
-                  onClick={() => {
-                    setOpenMobile(false);
-                    router.push('/');
-                    router.refresh();
-                  }}
-                >
-                  <PlusIcon />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent align="end">New Chat</TooltipContent>
-            </Tooltip>
+            <div className="flex items-center justify-between gap-1 mb-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0 flex items-center justify-center"
+                    onClick={() => {
+                      setOpenMobile(false);
+                      router.push('/');
+                      router.refresh();
+                    }}
+                  >
+                    <PlusIcon size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent align="end">New Chat</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
           
-          {/* Link to Agent Mode */}
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              isActive={pathname === '/agent-mode'}
-              tooltip="Agent Mode"
-            >
-              <Link 
-                href="/agent-mode"
-                onClick={() => setOpenMobile(false)}
-                className="flex items-center gap-2"
-              >
-                <BoxIcon size={16} />
-                <span>Agent Mode</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {/* Link to Agent Mode section removed - agent mode functionality is now integrated into the main chat interface */}
+          
+          {/* Chat list */}
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
