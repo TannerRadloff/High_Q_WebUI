@@ -3,6 +3,7 @@ import { Toaster } from 'sonner';
 import Script from 'next/script';
 import { cn } from '@/lib/utils';
 import { Inter } from 'next/font/google';
+import { usePathname } from 'next/navigation';
 
 import { ThemeProvider } from '@/components/theme-provider';
 import { Providers } from './providers';
@@ -41,6 +42,61 @@ const THEME_COLOR_SCRIPT = `\
   meta.setAttribute('content', '${DARK_THEME_COLOR}');
 })();`;
 
+function isAuthPage(pathname: string | null) {
+  if (!pathname) return false;
+  return pathname.startsWith('/login') || 
+         pathname.startsWith('/register') || 
+         pathname.startsWith('/forgot-password') ||
+         pathname.startsWith('/reset-password');
+}
+
+function LayoutContent({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isAuth = isAuthPage(pathname);
+
+  return (
+    <ErrorBoundary>
+      <Providers>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <SidebarProvider defaultWidth={280} defaultOpen={false}>
+            <div className={cn(
+              "flex min-h-screen",
+              isAuth ? "flex-col" : "flex-row"
+            )}>
+              {!isAuth && <NavBar />}
+              <main className={cn(
+                "flex-1",
+                !isAuth && "pl-4",
+                isAuth && "flex items-center justify-center"
+              )}>
+                <ClientLayout>
+                  {children}
+                </ClientLayout>
+              </main>
+            </div>
+            <Toaster
+              position="top-center"
+              toastOptions={{
+                className: 'border rounded-lg shadow-md',
+                classNames: {
+                  toast: 'group',
+                  title: 'group-[.toast]:text-foreground',
+                  description: 'group-[.toast]:text-muted-foreground',
+                },
+              }}
+            />
+          </SidebarProvider>
+        </ThemeProvider>
+      </Providers>
+    </ErrorBoundary>
+  );
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -75,38 +131,7 @@ export default function RootLayout({
           inter.className
         )}
       >
-        <ErrorBoundary>
-          <Providers>
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="system"
-              enableSystem
-              disableTransitionOnChange
-            >
-              <SidebarProvider defaultWidth={280} defaultOpen={false}>
-                <div className="flex min-h-screen">
-                  <NavBar />
-                  <main className="flex-1">
-                    <ClientLayout>
-                      {children}
-                    </ClientLayout>
-                  </main>
-                </div>
-                <Toaster
-                  position="top-center"
-                  toastOptions={{
-                    className: 'border rounded-lg shadow-md',
-                    classNames: {
-                      toast: 'group',
-                      title: 'group-[.toast]:text-foreground',
-                      description: 'group-[.toast]:text-muted-foreground',
-                    },
-                  }}
-                />
-              </SidebarProvider>
-            </ThemeProvider>
-          </Providers>
-        </ErrorBoundary>
+        <LayoutContent>{children}</LayoutContent>
         <Analytics />
         <SpeedInsights />
       </body>

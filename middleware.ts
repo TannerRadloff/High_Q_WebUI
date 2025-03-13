@@ -1,7 +1,8 @@
-import { NextResponse, type NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
 // This middleware handles authentication routing for the application
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
   try {
     // Log request details
     const url = new URL(request.url)
@@ -67,6 +68,16 @@ export async function middleware(request: NextRequest) {
   }
 }
 
+// Configure the middleware to run on specific paths
 export const config = {
-  matcher: ['/', '/:path*'],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
 } 
