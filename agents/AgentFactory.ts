@@ -15,7 +15,8 @@ export enum AgentType {
   RESEARCH = 'Research',
   REPORT = 'Report',
   TRIAGE = 'Triage',
-  CUSTOM = 'Custom'
+  CUSTOM = 'Custom',
+  JUDGE = 'Judge'
 }
 
 /**
