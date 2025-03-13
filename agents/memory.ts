@@ -269,10 +269,12 @@ export class MemoryManager {
     return {
       ...context,
       conversationHistory,
-      relevantMemories: relevantMemories.map(memory => ({
-        content: memory.content,
-        timestamp: memory.metadata.timestamp
-      }))
+      memory: {
+        relevantMemories: relevantMemories.map(memory => ({
+          content: memory.content,
+          timestamp: memory.metadata.timestamp
+        }))
+      }
     };
   }
 } 

@@ -496,7 +496,9 @@ async function handleStreamingResponse(
           controller.enqueue(encoder.encode(`event: ${handoffEvent.event}\ndata: ${handoffEvent.data}\n\n`));
         },
         
-        onComplete: (result: AgentResponse | RunResult) => {
+        onComplete: (result: string | AgentResponse) => {
+          const typedResult = typeof result === 'string' ? { content: result, success: true } : result;
+          
           if (!controller) return;
           
           // Clean up intervals
@@ -511,18 +513,18 @@ async function handleStreamingResponse(
           }
           
           // Get content from the result
-          const content = 'content' in result 
-            ? result.content 
-            : ('output' in result ? result.output : '');
+          const content = 'content' in typedResult 
+            ? typedResult.content 
+            : '';
           
           // Create a complete event
           const completeEvent = {
             event: 'complete',
             data: JSON.stringify({
-              success: result.success === false ? false : true,
+              success: typedResult.success === false ? false : true,
               content,
-              error: result.error,
-              metadata: result.metadata,
+              error: typedResult.error,
+              metadata: typedResult.metadata,
               timestamp: new Date().toISOString()
             })
           };
@@ -542,9 +544,9 @@ async function handleStreamingResponse(
           
           // Update request status
           AgentStateService.updateRequest(requestId, {
-            status: result.success === false ? 'failed' : 'completed',
+            status: typedResult.success === false ? 'failed' : 'completed',
             response: content,
-            error: result.error
+            error: typedResult.error
           });
         },
         

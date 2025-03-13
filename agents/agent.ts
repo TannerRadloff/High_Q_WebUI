@@ -2,12 +2,9 @@
 import { Tool } from './tools';
 import { RunConfig } from './tracing';
 import { RunItem } from '../runner';
+import type { Handoff } from './handoff';
 
-// Forward declaration to avoid circular dependency
-interface Handoff {
-  agent: Agent;
-  // Other properties defined in handoff.ts
-}
+export type { Handoff };
 
 export interface AgentResponse {
   content: string;
