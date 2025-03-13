@@ -1,12 +1,7 @@
-// NOTE: This page is disabled due to client reference manifest issues in Next.js 15.
-// We've moved the chat functionality to /chat-home to avoid build problems.
-// The (chat) route group causes issues with the output: 'standalone' setting.
-// DO NOT REMOVE THIS FILE as it might break other imports or references.
-
-/*
 'use server';
 
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 
 import { Chat } from '@/components/chat';
 import { DEFAULT_CHAT_MODEL, chatModels } from '@/lib/ai/models';
@@ -17,21 +12,20 @@ import { DataStreamHandler } from '@/components/data-stream-handler';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Explicitly use server component
-export default async function Page() {
+export default async function ChatHomePage() {
   const id = generateUUID();
 
-  // Need to use await with cookies() in NextJS 15
+  // Use cookies function with await as needed in Next.js 15
   const cookieStore = await cookies();
   const modelIdFromCookie = cookieStore.get('chat-model');
 
-  // If no cookie or the model doesn't exist in chatModels, use default
+  // Get the chat model - either from cookie or default
   const chatModel = modelIdFromCookie && 
-                    chatModels.some(model => model.id === modelIdFromCookie.value) 
-                    ? modelIdFromCookie.value 
-                    : DEFAULT_CHAT_MODEL;
+                   chatModels.some(model => model.id === modelIdFromCookie.value) 
+                   ? modelIdFromCookie.value 
+                   : DEFAULT_CHAT_MODEL;
 
-  // Simplified component structure to avoid client reference manifest issues
+  // Simple div wrapper to avoid fragments
   return (
     <div className="flex flex-col h-full">
       <Chat
@@ -44,7 +38,4 @@ export default async function Page() {
       <DataStreamHandler id={id} />
     </div>
   );
-}
-*/
-
-
+} 

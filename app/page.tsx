@@ -20,6 +20,11 @@ export default function Home() {
         if (window.location.pathname === '/') {
           router.push('/login')
         }
+      } else {
+        // Redirect authenticated users to the chat-home route
+        // This helps avoid issues with the (chat) route group
+        console.log('[HomePage] User authenticated, redirecting to chat-home')
+        router.push('/chat-home')
       }
     }
   }, [user, isLoading, router])
@@ -34,20 +39,6 @@ export default function Home() {
           <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">Loading...</p>
         </div>
       </div>
-    )
-  }
-
-  // Show chat UI only if user is authenticated
-  if (user) {
-    console.log('[HomePage] User authenticated, showing chat UI')
-    return (
-      <Chat 
-        id="new"
-        initialMessages={[]}
-        selectedChatModel="gpt-3.5-turbo"
-        selectedVisibilityType="private"
-        isReadonly={false}
-      />
     )
   }
 

@@ -28,9 +28,9 @@ const nextConfig = {
   images: {
     domains: ['avatar.vercel.sh'],
   },
-  // Changed to export to avoid client reference manifest issues with group routes
-  // This is a workaround for Next.js 15 build issues with route groups like (chat)
-  output: process.env.VERCEL ? undefined : 'standalone',
+  // For Vercel deployment, let it decide output type automatically
+  // This avoids client reference manifest issues
+  output: undefined,
   poweredByHeader: false,
   reactStrictMode: true,
   // Add ESLint configuration to disable some rules
