@@ -33,6 +33,7 @@ export interface AgentContext {
   conversationHistory?: any[]; // Full conversation history if available
   userName?: string; // User's name or identifier
   relevantMemories?: any[]; // Relevant memories for the current context
+  userId?: string; // User's unique identifier
 }
 
 export interface StreamCallbacks {
