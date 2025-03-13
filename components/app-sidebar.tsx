@@ -1,6 +1,6 @@
 'use client';
 
-import type { User } from 'next-auth';
+import type { User } from '@supabase/supabase-js';
 // @ts-ignore - Next.js type declarations issue
 import { useRouter, usePathname } from 'next/navigation';
 

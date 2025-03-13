@@ -3,6 +3,8 @@
 import { z } from 'zod';
 import { genSaltSync, hashSync } from 'bcrypt-ts';
 import { randomBytes } from 'node:crypto';
+import { getSupabaseServerClient } from '@/lib/supabase/server';
+import { cookies } from 'next/headers';
 
 import { 
   createUser, 
@@ -13,8 +15,6 @@ import {
   updateUserPassword, 
 } from '@/lib/db/queries';
 import { sendPasswordResetEmail } from '@/lib/email';
-
-import { signIn } from './auth';
 
 const authFormSchema = z.object({
   email: z.string().min(1),
@@ -42,26 +42,24 @@ export const login = async (
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
     
-    if (email === 'admin' && password === 'admin') {
-      await signIn('credentials', {
-        email: 'admin',
-        password: 'admin',
-        redirect: false,
-      });
-      return { status: 'success' };
-    }
-    
-    // For non-admin users, validate using the schema
+    // Validate the form data
     const validatedData = authFormSchema.parse({
       email,
       password,
     });
 
-    await signIn('credentials', {
+    // Use Supabase directly for authentication
+    const supabase = await getSupabaseServerClient();
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: validatedData.email,
       password: validatedData.password,
-      redirect: false,
     });
+
+    if (error) {
+      console.error('Supabase login error:', error);
+      return { status: 'failed' };
+    }
 
     return { status: 'success' };
   } catch (error) {
@@ -98,12 +96,22 @@ export const register = async (
     if (user) {
       return { status: 'user_exists' } as RegisterActionState;
     }
+
+    // Create user in your database
     await createUser(validatedData.email, validatedData.password);
-    await signIn('credentials', {
+    
+    // Sign up with Supabase
+    const supabase = await getSupabaseServerClient();
+    
+    const { error } = await supabase.auth.signUp({
       email: validatedData.email,
       password: validatedData.password,
-      redirect: false,
     });
+
+    if (error) {
+      console.error('Supabase signup error:', error);
+      return { status: 'failed' };
+    }
 
     return { status: 'success' };
   } catch (error) {
@@ -129,21 +137,20 @@ export const forgotPassword = async (
       return { status: 'invalid_data' };
     }
 
-    const users = await getUser(email);
-    if (users.length === 0) {
-      return { status: 'user_not_found' };
-    }
-
-    const user = users[0];
-    const token = randomBytes(32).toString('hex');
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 1); // Token expires in 1 hour
-
-    await createPasswordResetToken(user.id, token, expiresAt);
-
+    // Use Supabase's built-in password reset
+    const supabase = await getSupabaseServerClient();
+    
     // Get the base URL from the environment or use a default
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    await sendPasswordResetEmail(email, token, baseUrl);
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${baseUrl}/reset-password`,
+    });
+
+    if (error) {
+      console.error('Supabase password reset error:', error);
+      return { status: 'failed' };
+    }
 
     return { status: 'success' };
   } catch (error) {
@@ -161,34 +168,22 @@ export const resetPassword = async (
   formData: FormData,
 ): Promise<ResetPasswordActionState> => {
   try {
-    const token = formData.get('token') as string;
-    if (!token) {
-      return { status: 'invalid_token' };
-    }
-
-    const resetToken = await getPasswordResetByToken(token);
-    if (!resetToken) {
-      return { status: 'invalid_token' };
-    }
-
-    if (resetToken.used) {
-      return { status: 'invalid_token' };
-    }
-
-    if (resetToken.expiresAt < new Date()) {
-      return { status: 'expired_token' };
-    }
-
     const validatedData = resetPasswordFormSchema.parse({
       password: formData.get('password'),
       confirmPassword: formData.get('confirmPassword'),
     });
 
-    const salt = genSaltSync(10);
-    const hash = hashSync(validatedData.password, salt);
+    // Use Supabase to update the password
+    const supabase = await getSupabaseServerClient();
+    
+    const { error } = await supabase.auth.updateUser({
+      password: validatedData.password
+    });
 
-    await updateUserPassword(resetToken.userId, hash);
-    await markPasswordResetTokenAsUsed(resetToken.id);
+    if (error) {
+      console.error('Supabase password update error:', error);
+      return { status: 'failed' };
+    }
 
     return { status: 'success' };
   } catch (error) {
@@ -200,3 +195,5 @@ export const resetPassword = async (
     return { status: 'failed' };
   }
 };
+
+

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/app/(auth)/auth';
+import { getServerSession } from '@/lib/auth-utils';
 import { saveDocument } from '@/lib/db/queries';
 import { generateUUID } from '@/lib/utils';
 
@@ -16,7 +16,7 @@ interface SystemMessageWithDocument {
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
+  const session = await getServerSession();
 
   if (!session || !session.user || !session.user.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -75,3 +75,4 @@ export async function POST(request: Request) {
     );
   }
 } 
+

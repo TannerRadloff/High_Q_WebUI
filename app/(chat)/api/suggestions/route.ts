@@ -1,4 +1,4 @@
-import { auth } from '@/app/(auth)/auth';
+import { getServerSession } from '@/lib/auth-utils';
 import { getSuggestionsByDocumentId } from '@/lib/db/queries';
 
 export async function GET(request: Request) {
@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     return new Response('Not Found', { status: 404 });
   }
 
-  const session = await auth();
+  const session = await getServerSession();
 
   if (!session || !session.user) {
     return new Response('Unauthorized', { status: 401 });
@@ -31,3 +31,5 @@ export async function GET(request: Request) {
 
   return Response.json(suggestions, { status: 200 });
 }
+
+

@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
     console.log('[Auth Callback] Session exchange completed')
 
     // Redirect to the home page after successful authentication
+    // Ensure we're going to the main app interface
     return NextResponse.redirect(new URL('/', requestUrl.origin))
   } catch (error) {
     console.error('[Auth Callback] Error processing OAuth callback:', error)
@@ -46,3 +47,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(errorMsg)}`, request.url))
   }
 } 
+

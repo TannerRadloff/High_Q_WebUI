@@ -2,7 +2,7 @@ import { put } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { auth } from '@/app/(auth)/auth';
+import { getServerSession } from '@/lib/auth-utils';
 import { parsePdf } from '@/lib/server/pdf-parser';
 import { extractTextFromFile, identifyFileType } from '@/lib/utils';
 
@@ -23,7 +23,7 @@ const FileSchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const session = await auth();
+  const session = await getServerSession();
 
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -108,3 +108,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
+

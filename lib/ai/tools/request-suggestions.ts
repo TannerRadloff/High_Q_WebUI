@@ -1,10 +1,12 @@
-import { z } from 'zod';
-import type { Session } from 'next-auth';
+import type { Session } from '@supabase/supabase-js';
 import { type DataStreamWriter, streamObject, tool } from 'ai';
+import { z } from 'zod';
 import { getDocumentById, saveSuggestions } from '@/lib/db/queries';
 import type { Suggestion } from '@/lib/db/schema';
 import { generateUUID } from '@/lib/utils';
 import { myProvider } from '../models';
+// Import getSuggestions if needed from the correct location
+// import { getSuggestions } from '@/artifacts/actions';
 
 interface RequestSuggestionsProps {
   session: Session;

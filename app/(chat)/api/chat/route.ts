@@ -5,7 +5,7 @@ import {
   streamText,
 } from 'ai';
 
-import { auth } from '@/app/(auth)/auth';
+import { getServerSession } from '@/lib/auth-utils';
 import { myProvider, DEFAULT_CHAT_MODEL, chatModels } from '@/lib/ai/models';
 import { systemPrompt } from '@/lib/ai/prompts';
 import {
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
 
   console.log(`[API] Chat request with model: ${selectedChatModel}`);
 
-  const session = await auth();
+  const session = await getServerSession();
 
   if (!session || !session.user || !session.user.id) {
     return new Response('Unauthorized', { status: 401 });
@@ -557,7 +557,7 @@ export async function DELETE(request: Request) {
     return new Response('Not Found', { status: 404 });
   }
 
-  const session = await auth();
+  const session = await getServerSession();
 
   if (!session || !session.user) {
     return new Response('Unauthorized', { status: 401 });
@@ -579,4 +579,6 @@ export async function DELETE(request: Request) {
     });
   }
 }
+
+
 
