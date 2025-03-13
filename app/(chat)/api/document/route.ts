@@ -5,6 +5,13 @@ import {
   getDocumentsById,
   saveDocument,
 } from '@/lib/db/queries';
+import { generateUUID } from '@/lib/utils';
+
+// Helper function to validate UUID format
+function isValidUUID(id: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(id);
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -12,6 +19,16 @@ export async function GET(request: Request) {
 
   if (!id) {
     return new Response('Missing id', { status: 400 });
+  }
+
+  // Validate UUID format
+  if (!isValidUUID(id)) {
+    return new Response(
+      JSON.stringify({
+        error: 'Invalid document ID format. Expected a valid UUID.',
+      }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 
   const session = await getServerSession();
@@ -43,6 +60,19 @@ export async function POST(request: Request) {
     return new Response('Missing id', { status: 400 });
   }
 
+  // Handle special case for "new" - generate a proper UUID
+  const documentId = id === "new" ? generateUUID() : id;
+  
+  // For regular IDs, validate UUID format
+  if (id !== "new" && !isValidUUID(id)) {
+    return new Response(
+      JSON.stringify({
+        error: 'Invalid document ID format. Expected a valid UUID.',
+      }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
   const session = await getServerSession();
 
   if (!session) {
@@ -58,7 +88,7 @@ export async function POST(request: Request) {
 
   if (session.user?.id) {
     const document = await saveDocument({
-      id,
+      id: documentId,
       content,
       title,
       kind,
@@ -78,6 +108,16 @@ export async function PATCH(request: Request) {
 
   if (!id) {
     return new Response('Missing id', { status: 400 });
+  }
+
+  // Validate UUID format
+  if (!isValidUUID(id)) {
+    return new Response(
+      JSON.stringify({
+        error: 'Invalid document ID format. Expected a valid UUID.',
+      }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 
   const session = await getServerSession();

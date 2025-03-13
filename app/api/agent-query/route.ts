@@ -10,6 +10,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { AgentType } from '../../../agents/AgentFactory';
 import { BaseAgent } from '../../../agents/BaseAgent';
 import { includeSensitiveData } from '../../../agents/api-utils';
+import { configureAgentSDK, configureAgentTracing, configureAgentLogging } from '@/lib/agents/config';
+
+// Initialize the OpenAI Agents SDK
+configureAgentSDK();
+configureAgentTracing(false); // Enable tracing by default
+configureAgentLogging(process.env.NODE_ENV === 'development'); // Verbose logging in development
 
 // Update the AgentRequest type to match our service
 type AgentStreamResult = {
@@ -266,6 +272,7 @@ export async function POST(req: NextRequest) {
 
 /**
  * Creates a runner with the appropriate agent based on the requested type
+ * Updated to align with OpenAI Agents SDK
  */
 function createRunnerForAgentType(agentType: string): AgentRunner {
   let agent: BaseAgent | undefined = undefined;
@@ -285,8 +292,10 @@ function createRunnerForAgentType(agentType: string): AgentRunner {
       break;
   }
   
-  // Return a runner with the selected agent or the default DelegationAgent
-  return new AgentRunner(agent);
+  // Create the runner with proper SDK options
+  return new AgentRunner(agent, {
+    traceEnabled: true // Enable tracing by default
+  });
 }
 
 /**

@@ -87,14 +87,21 @@ export async function POST(request: Request) {
     messages,
     selectedChatModel,
     experimental_attachments,
+    data
   }: { 
     id: string; 
     messages: Array<Message>; 
     selectedChatModel: string;
     experimental_attachments?: ExtendedAttachment[];
+    data?: {
+      agentType?: string;
+    };
   } = await request.json();
 
-  console.log(`[API] Chat request with model: ${selectedChatModel}`);
+  // Extract agent type from request data if present
+  const agentType = data?.agentType || 'default';
+  
+  console.log(`[API] Chat request with model: ${selectedChatModel}${agentType !== 'default' ? `, agent: ${agentType}` : ''}`);
 
   const session = await getServerSession();
 
@@ -206,6 +213,52 @@ export async function POST(request: Request) {
       }), {
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+
+    // Check if we need to use agent processing instead of the standard chat flow
+    if (agentType !== 'default') {
+      // If agent is selected, redirect to agent API
+      console.log(`[API] Using ${agentType} agent for processing query`);
+      
+      // Get the latest user message content
+      const userQuery = userMessage.content;
+      
+      // Create a proper run config according to SDK
+      const runConfig = {
+        workflow_name: `Chat Agent - ${agentType}`,
+        group_id: id, // Use chat ID as group ID
+        tracing_disabled: false,
+        trace_include_sensitive_data: false,
+        trace_metadata: {
+          chatId: id,
+          modelType: modelToUse,
+          userId: session.user.id
+        }
+      };
+      
+      // Prepare agent request
+      const agentRequestBody = {
+        query: userQuery,
+        agentType: agentType,
+        stream: true,
+        workflow_name: runConfig.workflow_name,
+        group_id: runConfig.group_id,
+        tracing_disabled: runConfig.tracing_disabled,
+        trace_include_sensitive_data: runConfig.trace_include_sensitive_data,
+        metadata: runConfig.trace_metadata
+      };
+      
+      // Forward to the agent-query API endpoint
+      const agentResponse = await fetch(new URL('/api/agent-query', request.url), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(agentRequestBody)
+      });
+      
+      // Return the agent response stream directly
+      return agentResponse;
     }
 
     // Use the base system prompt without any file content modifications
