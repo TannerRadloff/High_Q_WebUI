@@ -1,5 +1,3 @@
-'use server';
-
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
@@ -12,6 +10,7 @@ import { DataStreamHandler } from '@/components/data-stream-handler';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// This is a React Server Component by default in Next.js App Router
 export default async function ChatHomePage() {
   const id = generateUUID();
 
