@@ -1,7 +1,13 @@
 'use client';
 
 import React from 'react';
-import AgentModeInterface from '../components/AgentModeInterface';
+import dynamic from 'next/dynamic';
+
+// Dynamically import the AgentModeInterface to avoid loading it until needed
+const AgentModeInterface = dynamic(() => import('@/app/components/AgentModeInterface'), {
+  loading: () => <div className="flex items-center justify-center h-full">Loading agent interface...</div>,
+  ssr: false
+});
 
 export default function AgentModePage() {
   return (

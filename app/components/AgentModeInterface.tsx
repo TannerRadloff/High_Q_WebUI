@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+'use client';
+
+import React, { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
@@ -78,7 +80,7 @@ export default function AgentModeInterface() {
     const requestId = `req-${Date.now()}`;
     const newRequest: AgentRequest = {
       id: requestId,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().getTime(),
       query: userInput,
       agentType: selectedAgent,
       status: 'pending'
@@ -239,7 +241,7 @@ export default function AgentModeInterface() {
   };
 
   // Format timestamp for display
-  const formatTimestamp = (timestamp: string) => {
+  const formatTimestamp = (timestamp: number): string => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
@@ -297,11 +299,13 @@ export default function AgentModeInterface() {
                   {availableAgents.map(agent => (
                     <div 
                       key={agent.id}
-                      className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                      className={`border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer ${
+                        selectedAgent === agent.type ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'
+                      }`}
                       onClick={() => setSelectedAgent(agent.type)}
                     >
                       <h4 className="font-medium">{agent.name}</h4>
-                      <p className="text-sm text-gray-600">{agent.description}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{agent.description}</p>
                     </div>
                   ))}
                 </div>
@@ -310,17 +314,17 @@ export default function AgentModeInterface() {
 
             {/* Conversation history */}
             {agentRequests.map((request) => (
-              <div key={request.id} className="space-y-4">
+              <div key={request.id} id={`request-${request.id}`} className="space-y-4">
                 {/* User message */}
                 <div className="flex items-start">
-                  <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center mr-2">
+                  <div className="w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center mr-2">
                     <span className="text-sm font-bold">U</span>
                   </div>
                   <div className="flex-1">
-                    <div className="bg-blue-100 rounded-lg p-3">
+                    <div className="bg-blue-100 dark:bg-blue-900/30 rounded-lg p-3">
                       <p>{request.query}</p>
                     </div>
-                    <div className="text-xs text-gray-500 mt-1 flex justify-between">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex justify-between">
                       <span>{formatTimestamp(request.timestamp)}</span>
                       <span>Sent to {request.agentType} Agent</span>
                     </div>
@@ -329,11 +333,11 @@ export default function AgentModeInterface() {
                 
                 {/* Agent response */}
                 <div className="flex items-start">
-                  <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center mr-2">
-                    <span className="text-sm font-bold">A</span>
+                  <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center mr-2">
+                    <span className="text-sm font-bold text-white">A</span>
                   </div>
                   <div className="flex-1">
-                    <div className="bg-white border rounded-lg p-3">
+                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                       {request.status === 'pending' && <div className="animate-pulse">Processing...</div>}
                       {request.status === 'in-progress' && request.id === agentRequests[0]?.id && (
                         <ReactMarkdown className="prose prose-sm max-w-none">
@@ -351,7 +355,7 @@ export default function AgentModeInterface() {
                         </div>
                       )}
                     </div>
-                    <div className="text-xs text-gray-500 mt-1 flex justify-between">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex justify-between">
                       <span>{request.status.charAt(0).toUpperCase() + request.status.slice(1)}</span>
                       {request.metadata?.executionTimeMs && (
                         <span>{(request.metadata.executionTimeMs / 1000).toFixed(2)}s</span>
@@ -386,11 +390,11 @@ export default function AgentModeInterface() {
             {/* Real-time streaming response */}
             {isProcessing && agentRequests.length > 0 && (
               <div className="flex items-start">
-                <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center mr-2">
-                  <span className="text-sm font-bold">A</span>
+                <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center mr-2">
+                  <span className="text-sm font-bold text-white">A</span>
                 </div>
                 <div className="flex-1">
-                  <div className="bg-white border rounded-lg p-3">
+                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                     <ReactMarkdown className="prose prose-sm max-w-none">
                       {currentResponse || 'Processing your request...'}
                     </ReactMarkdown>
@@ -404,12 +408,12 @@ export default function AgentModeInterface() {
           </div>
           
           {/* Input area */}
-          <div className="border-t p-4 bg-white">
+          <div className="border-t p-4 bg-white dark:bg-gray-800">
             <form onSubmit={handleSubmit} className="flex space-x-2">
               <div className="flex-1 relative">
                 <textarea
                   ref={textareaRef}
-                  className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full border dark:border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white dark:bg-gray-900"
                   placeholder={`Ask the ${selectedAgent} Agent...`}
                   rows={1}
                   value={userInput}
@@ -426,14 +430,14 @@ export default function AgentModeInterface() {
                 disabled={isProcessing || !userInput.trim()}
                 className={`px-4 py-2 rounded-lg font-medium ${
                   isProcessing || !userInput.trim()
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
                     : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
               >
                 {isProcessing ? 'Processing...' : 'Send'}
               </button>
             </form>
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Press Enter to send. Agent: {availableAgents.find(a => a.type === selectedAgent)?.name}
             </div>
           </div>

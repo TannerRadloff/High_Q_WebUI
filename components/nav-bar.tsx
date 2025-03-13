@@ -7,6 +7,8 @@ import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/components/auth/auth-provider'
 import { LogoutButton } from '@/components/auth/logout-button'
+import { UserAuthStatus } from '@/components/user-auth-status'
+import { BotIcon, HomeIcon } from './icons'
 
 const routes = [
   {
@@ -25,6 +27,10 @@ export function NavBar() {
   const pathname = usePathname()
   const { user, isLoading } = useAuth()
   
+  const isActive = (path: string) => {
+    return pathname === path;
+  };
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 max-w-screen-2xl items-center justify-between">
@@ -45,6 +51,26 @@ export function NavBar() {
               )
             )}
           </nav>
+          <div className="ml-4 flex items-center space-x-2">
+            <Link
+              href="/"
+              className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${
+                isActive('/') ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+              }`}
+            >
+              <HomeIcon size={16} />
+              <span>Home</span>
+            </Link>
+            <Link
+              href="/agent-mode"
+              className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${
+                isActive('/agent-mode') ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+              }`}
+            >
+              <BotIcon size={16} />
+              <span>Agent Mode</span>
+            </Link>
+          </div>
         </div>
         
         <div className="flex items-center gap-2">
@@ -69,6 +95,7 @@ export function NavBar() {
           )}
         </div>
       </div>
+      <UserAuthStatus />
     </header>
   )
 } 

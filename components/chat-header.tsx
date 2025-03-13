@@ -6,7 +6,7 @@ import { useWindowSize } from 'usehooks-ts';
 import { ModelSelector } from '@/components/model-selector';
 import { SidebarToggle } from '@/components/sidebar-toggle';
 import { Button } from '@/components/ui/button';
-import { PlusIcon } from './icons';
+import { PlusIcon, BotIcon } from './icons';
 import { useSidebar } from './ui/sidebar';
 import { memo } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
@@ -18,11 +18,15 @@ function PureChatHeader({
   selectedModelId,
   selectedVisibilityType,
   isReadonly,
+  onToggleAgentMode,
+  isAgentMode = false,
 }: {
   chatId: string;
   selectedModelId: string;
   selectedVisibilityType: VisibilityType;
   isReadonly: boolean;
+  onToggleAgentMode?: () => void;
+  isAgentMode?: boolean;
 }) {
   const router = useRouter();
   const { open } = useSidebar();
@@ -47,6 +51,26 @@ function PureChatHeader({
           selectedVisibilityType={selectedVisibilityType}
           className="order-1 md:order-3"
         />
+
+        {onToggleAgentMode && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={isAgentMode ? "default" : "outline"}
+                className={`order-1 md:order-4 ${isAgentMode ? "bg-purple-600 hover:bg-purple-700" : ""}`}
+                onClick={onToggleAgentMode}
+              >
+                <BotIcon className={isAgentMode ? "text-white" : ""} />
+                <span className="sr-only md:not-sr-only md:ml-2">
+                  {isAgentMode ? "Agent Mode" : "Enable Agents"}
+                </span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {isAgentMode ? "Switch to normal chat mode" : "Enable AI agent assistance"}
+            </TooltipContent>
+          </Tooltip>
+        )}
       </div>
 
       {/* Button to create a new chat */}
@@ -74,5 +98,8 @@ function PureChatHeader({
 }
 
 export const ChatHeader = memo(PureChatHeader, (prevProps, nextProps) => {
-  return prevProps.selectedModelId === nextProps.selectedModelId;
+  return (
+    prevProps.selectedModelId === nextProps.selectedModelId &&
+    prevProps.isAgentMode === nextProps.isAgentMode
+  );
 });
