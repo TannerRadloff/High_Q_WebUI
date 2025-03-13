@@ -86,9 +86,21 @@ export function Chat({
             }),
           });
           
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to create chat');
+          let error;
+          try {
+            const data = await response.json();
+            if (!response.ok) {
+              error = data.error || 'Failed to create chat';
+            } else if (data.id) {
+              setChatId(data.id);
+              return;
+            }
+          } catch (e) {
+            error = 'Invalid response from server';
+          }
+          
+          if (error) {
+            throw new Error(error);
           }
           
           setChatId(newId);

@@ -7,20 +7,27 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession();
     
     if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+      return new NextResponse(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { 
+          status: 401,
+          headers: { 'Content-Type': 'application/json' }
+        }
       );
     }
 
-    const { id, title, visibility } = await req.json();
-
-    if (!id || !title) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
+    const body = await req.json().catch(() => null);
+    if (!body || !body.id || !body.title) {
+      return new NextResponse(
+        JSON.stringify({ error: 'Missing required fields' }),
+        { 
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        }
       );
     }
+
+    const { id, title, visibility } = body;
 
     // Create the chat in the database
     await saveChat({
@@ -29,12 +36,21 @@ export async function POST(req: NextRequest) {
       title,
     });
 
-    return NextResponse.json({ success: true, id });
+    return new NextResponse(
+      JSON.stringify({ success: true, id }),
+      { 
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
   } catch (error) {
     console.error('Error creating chat:', error);
-    return NextResponse.json(
-      { error: 'Failed to create chat' },
-      { status: 500 }
+    return new NextResponse(
+      JSON.stringify({ error: 'Failed to create chat' }),
+      { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
     );
   }
 } 
