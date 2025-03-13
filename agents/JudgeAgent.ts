@@ -60,7 +60,14 @@ Be specific and constructive in your feedback. Your goal is to help improve resp
       modelSettings: {
         temperature: config.temperature ?? 0.3
       },
-      outputType: EvaluationSchema
+      outputType: {
+        score: 0,
+        strengths: [],
+        weaknesses: [],
+        suggestions: [],
+        is_acceptable: false,
+        reasoning: ''
+      }
     });
   }
 
