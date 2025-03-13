@@ -66,7 +66,7 @@ async function main() {
     onStart: () => console.log('Processing has started...'),
     onToken: (token: string) => process.stdout.write(token),
     onComplete: () => console.log('\n\n--- Processing complete ---\n'),
-    onError: (error: Error) => console.error('Error:', error.message)
+    onError: (error: Error | string) => console.error('Error:', typeof error === 'string' ? error : error.message)
   };
   
   // Simulate a conversation with multiple turns
