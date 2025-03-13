@@ -31,6 +31,8 @@ export interface AgentContext {
   isToolCall?: boolean; // Whether this context is from a tool call
   callerAgent?: string; // Name of the agent that called this one as a tool
   conversationHistory?: any[]; // Full conversation history if available
+  userName?: string; // User's name or identifier
+  relevantMemories?: any[]; // Relevant memories for the current context
 }
 
 export interface StreamCallbacks {
