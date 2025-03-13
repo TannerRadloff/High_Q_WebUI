@@ -154,3 +154,111 @@ const response = await runner.handleTask(
 ### Using Memory
 
 ```
+
+## Agent Self-Improvement
+
+This implementation now includes comprehensive agent evaluation and self-improvement mechanisms that align with OpenAI's Agents SDK guidance. These features allow agents to:
+
+1. Have their responses evaluated by a specialized "judge" agent
+2. Receive structured feedback on their performance
+3. Improve their responses based on this feedback
+4. Continue the improvement loop until quality standards are met
+
+### Using the JudgeAgent
+
+The `JudgeAgent` is a specialized agent that evaluates the quality of responses from other agents:
+
+```typescript
+import { JudgeAgent } from './agents/JudgeAgent';
+
+// Create a judge with custom evaluation criteria
+const judge = new JudgeAgent({
+  evaluationCriteria: [
+    'Accuracy and factual correctness',
+    'Completeness of response',
+    'Logical coherence',
+    // Add more criteria as needed
+  ]
+});
+
+// Evaluate a response
+const evaluation = await judge.evaluateResponse(
+  "What are the pros and cons of microservices?", // Original query
+  "Microservices have several advantages..." // Response to evaluate
+);
+
+// Structured evaluation result
+console.log(`Score: ${evaluation.score}/10`);
+console.log(`Acceptable: ${evaluation.is_acceptable}`);
+console.log(`Strengths: ${evaluation.strengths}`);
+console.log(`Weaknesses: ${evaluation.weaknesses}`);
+console.log(`Suggestions: ${evaluation.suggestions}`);
+```
+
+### Self-Improvement Loop
+
+The self-improvement loop uses a `JudgeAgent` to iteratively improve an agent's responses:
+
+```typescript
+import { improveWithFeedback } from './agents/improvement';
+
+// Create your primary agent
+const researchAgent = new ResearchAgent();
+
+// Create a judge agent
+const judge = new JudgeAgent();
+
+// Use the improvement loop
+const result = await improveWithFeedback(
+  researchAgent,
+  judge,
+  "What are the latest developments in AI?",
+  undefined, // Initial response is optional
+  context, // Optional context
+  {
+    maxIterations: 3,
+    minAcceptableScore: 8,
+    verbose: true
+  }
+);
+
+// Access the final improved response
+console.log(result.finalResponse);
+
+// Access improvement metadata
+console.log(`Iterations: ${result.iterations}`);
+console.log(`Final score: ${result.finalEvaluation.score}`);
+console.log(`Success: ${result.success}`);
+```
+
+### Factory Support
+
+The `AgentFactory` now supports creating self-improving workflows:
+
+```typescript
+import { AgentFactory, AgentType } from './agents/AgentFactory';
+
+const factory = new AgentFactory();
+
+// Create a self-improving workflow
+const workflow = factory.createSelfImprovingWorkflow({
+  primaryAgentType: AgentType.RESEARCH,
+  primaryAgentConfig: {
+    // Configuration for the primary agent
+  },
+  judgeAgentConfig: {
+    // Optional judge configuration
+    evaluationCriteria: ['Accuracy', 'Completeness', 'Clarity']
+  },
+  improvementConfig: {
+    // Optional improvement loop configuration
+    maxIterations: 2,
+    minAcceptableScore: 8
+  }
+});
+
+// Use the workflow
+const result = await workflow.handleTask("What is quantum computing?");
+```
+
+See the examples directory for more detailed usage examples.

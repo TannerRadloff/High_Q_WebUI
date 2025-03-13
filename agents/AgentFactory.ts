@@ -3,7 +3,9 @@ import { AgentRunner } from '../runner';
 import { TriageAgent } from './TriageAgent';
 import { ResearchAgent } from './ResearchAgent';
 import { ReportAgent } from './ReportAgent';
+import { JudgeAgent } from './JudgeAgent';
 import { AgentConfig, AgentContext } from './agent';
+import { improveWithFeedback } from './improvement';
 
 /**
  * Agent types supported by the factory
@@ -13,6 +15,7 @@ export enum AgentType {
   TRIAGE = 'triage',
   RESEARCH = 'research',
   REPORT = 'report',
+  JUDGE = 'judge',
   CUSTOM = 'custom'
 }
 
@@ -75,6 +78,10 @@ export class AgentFactory {
         agent = new ReportAgent() as unknown as BaseAgent<T>;
         break;
         
+      case AgentType.JUDGE:
+        agent = new JudgeAgent(config as any) as unknown as BaseAgent<T>;
+        break;
+        
       case AgentType.CUSTOM:
         // For custom agents, we require a config
         if (!config) {
@@ -118,6 +125,65 @@ export class AgentFactory {
   }
   
   /**
+   * Create a self-improving agent workflow 
+   * that uses a judge to evaluate and improve responses
+   */
+  createSelfImprovingWorkflow(config: {
+    primaryAgentType: AgentType;
+    primaryAgentConfig?: Partial<AgentConfig>;
+    judgeAgentConfig?: {
+      model?: string;
+      temperature?: number;
+      evaluationCriteria?: string[];
+    };
+    improvementConfig?: {
+      maxIterations?: number;
+      minAcceptableScore?: number;
+      timeout?: number;
+    }
+  } = { primaryAgentType: AgentType.RESEARCH }) {
+    // Create the primary agent
+    const primaryAgent = this.createAgent(
+      config.primaryAgentType,
+      config.primaryAgentConfig
+    );
+    
+    // Create the judge agent
+    const judgeAgent = this.createAgent(
+      AgentType.JUDGE,
+      {
+        name: 'QualityJudge',
+        model: config.judgeAgentConfig?.model || this.defaultModel,
+        modelSettings: {
+          temperature: config.judgeAgentConfig?.temperature || 0.3
+        },
+        ...config.judgeAgentConfig
+      }
+    ) as JudgeAgent;
+    
+    // Return a wrapper function that handles the improvement workflow
+    return {
+      async handleTask(query: string, context?: AgentContext) {
+        const result = await improveWithFeedback(
+          primaryAgent,
+          judgeAgent,
+          query,
+          undefined,
+          context,
+          {
+            maxIterations: config.improvementConfig?.maxIterations || 3,
+            minAcceptableScore: config.improvementConfig?.minAcceptableScore || 8,
+            timeout: config.improvementConfig?.timeout || 60000,
+            verbose: true
+          }
+        );
+        
+        return result;
+      }
+    };
+  }
+  
+  /**
    * Create a specialized delegation workflow with multiple agents
    */
   createDelegationWorkflow(): BaseAgent {
@@ -130,9 +196,8 @@ export class AgentFactory {
     return this.createAgent(AgentType.CUSTOM, {
       name: 'WorkflowRunner',
       instructions: (context: AgentContext) => {
-        const userName = context.userName || 'user';
-        
-        return `You are an orchestration agent that helps ${userName} by delegating tasks to specialized agents.
+        // Simplified to avoid type errors with context properties
+        return `You are an orchestration agent that helps the user by delegating tasks to specialized agents.
         
         Your job is to analyze the request and determine which specialized agent can best handle it:
         - TriageAgent: For analyzing and categorizing tasks

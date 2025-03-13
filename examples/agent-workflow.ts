@@ -50,7 +50,7 @@ async function main() {
       onStart: () => console.log('Processing has started...'),
       onToken: (token: string) => process.stdout.write(token),
       onComplete: () => console.log('\n--- Processing complete ---'),
-      onError: (error: Error) => console.error('Error:', error.message)
+      onError: (error: string | Error) => console.error('Error:', error instanceof Error ? error.message : error)
     };
     
     // Example user query
@@ -64,14 +64,14 @@ async function main() {
         // Additional context data
         source: 'example',
         timestamp: new Date().toISOString()
-      });
+      } as any);
     } else {
       // Fallback to non-streaming API
       const result = await runner.handleTask(userQuery, {
         // Additional context data
         source: 'example',
         timestamp: new Date().toISOString()
-      });
+      } as any);
       
       console.log('\n\nFinal result:', typeof result === 'string' ? result : JSON.stringify(result, null, 2));
     }
