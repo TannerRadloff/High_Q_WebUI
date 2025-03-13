@@ -86,26 +86,21 @@ export function Chat({
             }),
           });
           
-          let error;
-          try {
-            const data = await response.json();
-            if (!response.ok) {
-              error = data.error || 'Failed to create chat';
-            } else if (data.id) {
-              setChatId(data.id);
-              return;
-            }
-          } catch (e) {
-            error = 'Invalid response from server';
+          const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to create chat');
           }
           
-          if (error) {
-            throw new Error(error);
+          if (data.id) {
+            setChatId(data.id);
+            // Update the URL without refreshing the page
+            window.history.replaceState({}, '', `/chat/${data.id}`);
+          } else {
+            throw new Error('No chat ID returned from server');
           }
-          
-          setChatId(newId);
         } catch (error) {
           logError(error, 'Failed to create new chat');
+          // Only show error toast here, not in useChat error handler
           toast.error(error instanceof Error ? error.message : 'Failed to create new chat. Please try again.');
         } finally {
           setIsCreatingChat(false);
@@ -159,7 +154,6 @@ export function Chat({
     onFinish: (message) => {
       console.log(`[CHAT] Chat completed successfully with model: ${selectedChatModel}`);
       
-      // Check if the response contains information about a fallback model
       if (message.content.includes('fallback model')) {
         console.log('[CHAT] Using fallback model detected');
         setUsesFallbackModel(true);
@@ -171,34 +165,9 @@ export function Chat({
     onError: (error) => {
       logError(error, `Chat error with model ${selectedChatModel}`);
       
-      // Log additional details about the error
-      console.error(`[CHAT] Error details for model ${selectedChatModel}:`);
-      
-      // Type assertion for API error objects that might have response/request properties
-      const apiError = error as Error & { 
-        response?: { status: number; data: any }; 
-        request?: any;
-      };
-      
-      if (apiError.response) {
-        console.error(`Response status: ${apiError.response.status}`);
-        console.error(`Response data:`, apiError.response.data);
-      }
-      
-      if (apiError.request) {
-        console.error(`Request details:`, apiError.request);
-      }
-      
-      // Provide more specific error messages based on the error
-      if (error.message && error.message.includes('model')) {
-        console.error(`[CHAT] Model-specific error detected: ${error.message}`);
-        toast.error(`Model error: The selected model (${selectedChatModel}) may not be available. Please try a different model.`);
-      } else if (error.message && error.message.includes('context length')) {
-        toast.error('The conversation is too long for the model. Please start a new chat.');
-      } else if (error.message && error.message.includes('rate limit')) {
-        toast.error('Rate limit exceeded. Please wait a moment before trying again.');
-      } else {
-        toast.error(`An error occurred: ${error.message || 'Unknown error'}`);
+      // Only show error toast for non-chat-creation errors
+      if (!error.message?.includes('create-new')) {
+        toast.error(error instanceof Error ? error.message : 'An error occurred during chat');
       }
     },
   });
