@@ -1,11 +1,13 @@
 import { Chat } from '@/components/chat';
-import { DEFAULT_CHAT_MODEL, chatModels } from '@/lib/ai/models';
+import { DEFAULT_CHAT_MODEL } from '@/lib/ai/models';
 import { generateUUID } from '@/lib/utils';
 import { DataStreamHandler } from '@/components/data-stream-handler';
 
+// Configure page options
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'default-no-store';
 
-export default async function Page() {
+export default function Page() {
   const id = generateUUID();
   
   return (
