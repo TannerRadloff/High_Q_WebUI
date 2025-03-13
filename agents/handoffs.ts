@@ -1,6 +1,11 @@
 // agents/handoffs.ts
+// Re-export from handoff.ts for backwards compatibility
+export * from './handoff';
+
+// Add any additional handoffs-specific functionality here
+
 import { z } from 'zod';
-import { Agent, AgentContext, HandoffInputFilter, Handoff as HandoffInterface } from './agent';
+import { Agent, AgentContext, HandoffInputFilter } from './agent';
 
 /**
  * Interface for Handoff object that follows OpenAI Agents SDK patterns
@@ -15,14 +20,9 @@ export interface Handoff {
 }
 
 /**
- * Create a customized handoff to an agent
- * Similar to the handoff() function in OpenAI Agents SDK
- * 
- * @param agent The agent to hand off to
- * @param options Optional configurations for the handoff
- * @returns A Handoff object
+ * Creates a handoff to another agent
  */
-export function handoff(
+export function createHandoff(
   agent: Agent,
   options?: {
     toolNameOverride?: string;
@@ -31,7 +31,7 @@ export function handoff(
     inputType?: z.ZodType<any>;
     inputFilter?: HandoffInputFilter;
   }
-): HandoffInterface {
+): Handoff {
   return {
     agent,
     toolNameOverride: options?.toolNameOverride,
@@ -41,6 +41,11 @@ export function handoff(
     inputFilter: options?.inputFilter
   };
 }
+
+/**
+ * Alias for createHandoff for backward compatibility
+ */
+export const handoff = createHandoff;
 
 /**
  * Default function to generate the tool name for a handoff
