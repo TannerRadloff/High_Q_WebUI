@@ -19,7 +19,8 @@
     "db:push": "drizzle-kit push",
     "db:pull": "drizzle-kit pull",
     "db:check": "drizzle-kit check",
-    "db:up": "drizzle-kit up"
+    "db:up": "drizzle-kit up",
+    "check:env": "node scripts/check-env.js"
   },
   "dependencies": {
     "@ai-sdk/fireworks": "^0.1.14",

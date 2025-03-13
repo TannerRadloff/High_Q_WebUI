@@ -1,15 +1,24 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { LoginForm } from '@/components/auth/login-form'
 import { useAuth } from '@/components/auth/auth-provider'
+import { getEnvErrorMessage } from '@/lib/env-check'
 
 export default function LoginPage() {
   const { user, isLoading } = useAuth()
   const router = useRouter()
+  const [envError, setEnvError] = useState<string | null>(null)
 
   useEffect(() => {
+    // Check for environment configuration issues
+    const error = getEnvErrorMessage()
+    if (error) {
+      console.error('[LoginPage] Environment configuration error:', error)
+      setEnvError(error)
+    }
+
     if (!isLoading) {
       console.log('[LoginPage] Auth state loaded:', { hasUser: !!user })
       
@@ -35,6 +44,25 @@ export default function LoginPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
           <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show environment error if there is one
+  if (envError) {
+    return (
+      <div className="w-full mx-auto max-w-md space-y-6 rounded-xl bg-gradient-to-b from-zinc-50/70 to-white/90 p-8 shadow-2xl shadow-red-500/10 dark:from-zinc-900/70 dark:to-zinc-800/90 dark:shadow-zinc-900/30 backdrop-blur-sm border border-zinc-200/80 dark:border-zinc-800/80">
+        <div className="flex flex-col text-center">
+          <h2 className="text-2xl font-bold tracking-tight text-red-600 dark:text-red-400">Configuration Error</h2>
+          <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+            <p className="text-sm text-red-600 dark:text-red-400">
+              {envError}
+            </p>
+          </div>
+          <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+            Please check your environment configuration before continuing.
+          </p>
         </div>
       </div>
     )

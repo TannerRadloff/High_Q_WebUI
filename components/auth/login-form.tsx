@@ -20,6 +20,7 @@ export function LoginForm() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null)
   const { signIn } = useAuth()
   const supabase = createClient()
 
@@ -28,10 +29,24 @@ export function LoginForm() {
     console.log('Login form initialized')
     console.log('Supabase URL available:', !!process.env.NEXT_PUBLIC_SUPABASE_URL)
     console.log('Supabase Key available:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+    
+    // Check for OpenAI API key
+    const openaiApiKey = process.env.OPENAI_API_KEY
+    if (!openaiApiKey) {
+      console.error('OpenAI API key is missing')
+      setApiKeyError('The application is missing an OpenAI API key. Please add a valid API key to your .env.local file.')
+    }
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Prevent login attempt if API key is missing
+    if (apiKeyError) {
+      toast.error(apiKeyError)
+      return
+    }
+    
     setIsLoading(true)
 
     try {
@@ -108,6 +123,14 @@ export function LoginForm() {
           Enter your credentials to access your account
         </p>
       </div>
+
+      {apiKeyError && (
+        <div className="p-4 mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+          <p className="text-sm text-red-600 dark:text-red-400">
+            {apiKeyError}
+          </p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">

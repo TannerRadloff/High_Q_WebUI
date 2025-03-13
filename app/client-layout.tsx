@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useTheme } from 'next-themes';
+import { useEffect, useState } from 'react';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
@@ -38,6 +40,15 @@ export default function ClientLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const { theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
   // Initialize global error handlers
   useEffect(() => {
     initGlobalErrorHandlers();
@@ -47,14 +58,17 @@ export default function ClientLayout({
   const isAuth = isAuthPage(pathname);
   const isChat = isChatPage(pathname);
 
+  // Wrap the entire application with the ErrorBoundary to catch OpenAI errors
   return (
-    <div className={cn(
-      "w-full", 
-      isAuth && "flex flex-col items-center justify-center min-h-[calc(100vh-3.5rem)]",
-      isChat && "h-full" // Chat pages (including home) don't need extra height adjustment
-    )}>
-      {children}
-    </div>
+    <ErrorBoundary>
+      <div className={cn(
+        "w-full", 
+        isAuth && "flex flex-col items-center justify-center min-h-[calc(100vh-3.5rem)]",
+        isChat && "h-full" // Chat pages (including home) don't need extra height adjustment
+      )}>
+        {children}
+      </div>
+    </ErrorBoundary>
   );
 } 
 

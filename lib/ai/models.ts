@@ -3,10 +3,16 @@ import {
   customProvider,
 } from 'ai';
 
-// Initialize the OpenAI client
-const openaiClient = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Check if OpenAI API key is available
+const apiKey = process.env.OPENAI_API_KEY;
+if (!apiKey) {
+  console.error('OPENAI_API_KEY environment variable is missing or empty. Please set it in your .env.local file.');
+}
+
+// Initialize the OpenAI client with proper validation
+const openaiClient = apiKey 
+  ? new OpenAI({ apiKey })
+  : null; // Will be null if API key is missing
 
 export const DEFAULT_CHAT_MODEL: string = 'gpt-o3-mini';
 
@@ -67,6 +73,11 @@ export const chatModels: Array<ChatModel> = [
 export const openaiResponses = {
   create: async (input: string, options: { model?: string, tools?: any[] } = {}) => {
     try {
+      // Check if OpenAI client is available
+      if (!openaiClient) {
+        throw new Error('OpenAI client is not initialized. Please provide a valid OPENAI_API_KEY in your environment variables.');
+      }
+      
       const model = options.model || 'gpt-4o-mini';
       console.log(`[Responses API] Creating response with model: ${model}`);
       
@@ -77,8 +88,13 @@ export const openaiResponses = {
       });
     } catch (error) {
       logModelError(options.model || 'unknown', error);
-      console.log(`[Responses API] Falling back to gpt-4o-mini`);
       
+      // If OpenAI client is missing, don't attempt to fallback
+      if (!openaiClient) {
+        throw error;
+      }
+      
+      console.log(`[Responses API] Falling back to gpt-4o-mini`);
       return await openaiClient.responses.create({
         model: 'gpt-4o-mini',
         input,
@@ -88,6 +104,11 @@ export const openaiResponses = {
   
   createStream: async (input: string, options: { model?: string, tools?: any[] } = {}) => {
     try {
+      // Check if OpenAI client is available
+      if (!openaiClient) {
+        throw new Error('OpenAI client is not initialized. Please provide a valid OPENAI_API_KEY in your environment variables.');
+      }
+      
       const model = options.model || 'gpt-4o-mini';
       console.log(`[Responses API] Creating streaming response with model: ${model}`);
       
@@ -99,8 +120,13 @@ export const openaiResponses = {
       });
     } catch (error) {
       logModelError(options.model || 'unknown', error);
-      console.log(`[Responses API] Falling back to gpt-4o-mini for streaming`);
       
+      // If OpenAI client is missing, don't attempt to fallback
+      if (!openaiClient) {
+        throw error;
+      }
+      
+      console.log(`[Responses API] Falling back to gpt-4o-mini for streaming`);
       return await openaiClient.responses.create({
         model: 'gpt-4o-mini',
         input,

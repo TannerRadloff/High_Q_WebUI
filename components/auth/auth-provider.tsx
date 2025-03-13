@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
+import { checkRequiredEnvVars } from '@/lib/env-check'
 
 interface AuthContextType {
   user: User | null
@@ -22,6 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [hasEnvError, setHasEnvError] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -31,6 +33,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     console.log('[AuthProvider] Initializing', { pathname })
+    
+    // Check for environment configuration issues
+    const envCheck = checkRequiredEnvVars();
+    if (!envCheck.isValid) {
+      console.error('[AuthProvider] Environment configuration issues detected:', envCheck.message);
+      setHasEnvError(true);
+      setIsLoading(false);
+      return;
+    }
+    
     const setupUser = async () => {
       setIsLoading(true)
       
@@ -114,8 +126,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     
-    setupUser()
-  }, [pathname, router, supabase, hasRedirected])
+    if (!hasEnvError) {
+      setupUser()
+    }
+  }, [pathname, router, supabase, hasRedirected, hasEnvError])
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -207,7 +221,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         session,
-        isLoading,
+        isLoading: isLoading || hasEnvError, // Treat env errors as still loading
         signIn,
         signOut,
         refreshSession,
