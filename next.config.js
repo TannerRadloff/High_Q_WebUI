@@ -28,7 +28,7 @@ const nextConfig = {
   images: {
     domains: ['avatar.vercel.sh'],
   },
-  // Add proper output configurations
+  // Use standalone output for proper server components handling
   output: 'standalone',
   poweredByHeader: false,
   reactStrictMode: true,
@@ -41,12 +41,12 @@ const nextConfig = {
     // Don't run TypeScript type checking during build to avoid failures
     ignoreBuildErrors: true,
   },
-  // Fix browser-side JS loading errors
-  swcMinify: true,
   // Ensure public path is correctly set
   experimental: {
     // Help ensure proper bundling
     optimizeCss: true,
+    // Add configuration to better handle server/client components
+    serverComponentsExternalPackages: [],
   },
 };
 
