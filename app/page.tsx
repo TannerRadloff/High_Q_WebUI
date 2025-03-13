@@ -43,7 +43,7 @@ export default function Home() {
     return (
       <HomeLayout>
         <Chat 
-          id="new"
+          id="create-new"
           initialMessages={[]}
           selectedChatModel="gpt-3.5-turbo"
           selectedVisibilityType="private"
