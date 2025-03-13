@@ -96,32 +96,6 @@ function PureMultimodalInput({
   const [isFocused, setIsFocused] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<string>('default');
 
-  // Handle agent mode submission - will pass agent type in the chat options
-  const handleAgentSubmit = (event?: { preventDefault?: () => void }) => {
-    if (event?.preventDefault) {
-      event.preventDefault();
-    }
-    
-    // Only modify behavior if not in default mode
-    if (selectedAgent !== 'default') {
-      // Include agent info in the chat request options
-      handleSubmit(event, {
-        data: {
-          agentType: selectedAgent,
-        }
-      });
-      
-      // Show which agent is being used
-      if (selectedAgent !== 'default') {
-        const agentName = agentTypes.find(a => a.id === selectedAgent)?.name || selectedAgent;
-        toast.info(`Using ${agentName} agent for this query`);
-      }
-    } else {
-      // Regular submission without agent
-      handleSubmit(event);
-    }
-  };
-
   useEffect(() => {
     if (textareaRef.current) {
       adjustHeight();
@@ -169,7 +143,11 @@ function PureMultimodalInput({
   };
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadQueue, setUploadQueue] = useState<Array<string>>([]);
+  const [uploadQueue, setUploadQueue] = useState<string[]>([]);
+
+  const handleFileButtonClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
 
   const uploadFile = async (file: File) => {
     const formData = new FormData();
@@ -183,7 +161,7 @@ function PureMultimodalInput({
 
       if (response.ok) {
         const data = await response.json();
-        const { url, pathname, contentType, textContent } = data;
+        const { url, pathname, contentType } = data;
 
         // Simply return the file data for attachment
         // We'll process it further when the user submits
@@ -191,7 +169,6 @@ function PureMultimodalInput({
           url,
           name: pathname,
           contentType: contentType,
-          ...(textContent && { textContent }),
         };
       }
       const { error } = await response.json();
@@ -227,112 +204,7 @@ function PureMultimodalInput({
     [setAttachments],
   );
   
-  // New function to process text files as artifacts
-  const processTextFiles = useCallback(async (attachmentsToProcess: ExtendedAttachment[]) => {
-    const textFileAttachments = attachmentsToProcess.filter(
-      attachment => attachment.contentType === 'text/plain' && attachment.textContent
-    );
-    
-    const otherAttachments = attachmentsToProcess.filter(
-      attachment => attachment.contentType !== 'text/plain' || !attachment.textContent
-    );
-    
-    // Process text files to create artifacts
-    for (const textAttachment of textFileAttachments) {
-      try {
-        console.log('Creating text artifact for:', textAttachment.name);
-        
-        const artifactResponse = await fetch('/api/text-artifact', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            chatId,
-            fileUrl: textAttachment.url,
-            fileName: textAttachment.name,
-            textContent: textAttachment.textContent,
-          }),
-        });
-
-        if (artifactResponse.ok) {
-          const artifactData = await artifactResponse.json();
-          console.log('Text artifact created:', artifactData);
-          
-          // Only add the document artifact to the chat
-          if (artifactData.documentId) {
-            // Create the message with the document
-            const documentMessage: MessageWithDocument = {
-              id: generateUUID(),
-              role: 'system',
-              content: '',
-              createdAt: new Date(),
-              documentId: artifactData.documentId,
-              artifactTitle: artifactData.title,
-              artifactKind: 'text',
-            };
-            
-            // Add the document message to the local message state
-            setMessages(currentMessages => [...currentMessages, documentMessage]);
-            
-            // Make a direct API call to create the chat with just the artifact
-            const chatResponse = await fetch('/api/chat', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                id: chatId,
-                messages: [documentMessage],
-                selectedChatModel: 'chat-model-small', // Default model
-              }),
-            });
-            
-            if (chatResponse.ok) {
-              // Add a user message that displays the artifact
-              const toolInvocation = {
-                toolName: 'createDocument',
-                toolCallId: generateUUID(),
-                state: 'result' as const,
-                args: {
-                  title: artifactData.title,
-                },
-                result: {
-                  id: artifactData.documentId,
-                  kind: 'text',
-                  title: artifactData.title,
-                }
-              };
-
-              // Create an assistant message to display the artifact
-              const assistantMessage: Message = {
-                id: generateUUID(),
-                role: 'assistant',
-                content: `I've created a document "${artifactData.title}" from your uploaded text file.`,
-                createdAt: new Date(),
-                toolInvocations: [toolInvocation],
-              };
-
-              // Add the assistant message to show the artifact in the UI
-              setMessages(currentMessages => [...currentMessages, assistantMessage]);
-            }
-            
-            toast.success(`Created document from ${textAttachment.name}`);
-          }
-        } else {
-          console.error('Failed to create text artifact, response:', await artifactResponse.text());
-          toast.error(`Failed to create document from ${textAttachment.name}`);
-        }
-      } catch (error) {
-        console.error('Error creating text artifact:', error);
-        toast.error(`Error creating document from ${textAttachment.name}`);
-      }
-    }
-    
-    return otherAttachments;
-  }, [setMessages, chatId]);
-  
-  // Wrap the original handleSubmit to process text files first
+  // Wrap the original handleSubmit to process attachments
   const wrappedHandleSubmit = useCallback(
     async (event?: { preventDefault?: () => void }, chatRequestOptions?: ChatRequestOptions) => {
       if (event?.preventDefault) {
@@ -349,26 +221,11 @@ function PureMultimodalInput({
         return;
       }
       
-      // Track if we processed any text files
-      let processedTextFiles = false;
-      
-      // Process any text file attachments first
-      if (attachments.length > 0) {
-        const initialAttachmentCount = attachments.length;
-        const remainingAttachments = await processTextFiles([...attachments]);
-        processedTextFiles = remainingAttachments.length < initialAttachmentCount;
-      }
-      
-      // Only proceed with regular submission if there's input text or non-text file attachments
-      if (input.trim() || (attachments.length > 0 && !processedTextFiles)) {
-        // Then handle the submission with remaining attachments
-        handleSubmit(event, {
-          ...chatRequestOptions,
-          experimental_attachments: attachments.filter(
-            attachment => attachment.contentType !== 'text/plain' || !attachment.textContent
-          ),
-        });
-      }
+      // Handle the submission with attachments
+      handleSubmit(event, {
+        ...chatRequestOptions,
+        experimental_attachments: attachments,
+      });
       
       // Clear attachments after submission
       setAttachments([]);
@@ -379,7 +236,15 @@ function PureMultimodalInput({
         textareaRef.current?.focus();
       }
     },
-    [handleSubmit, attachments, setAttachments, uploadQueue, processTextFiles, input, setLocalStorageInput, resetHeight, width]
+    [handleSubmit, attachments, setAttachments, uploadQueue, input, setLocalStorageInput, resetHeight, width]
+  );
+  
+  // Function to handle agent submission
+  const handleAgentSubmit = useCallback(
+    (event?: { preventDefault?: () => void }) => {
+      wrappedHandleSubmit(event);
+    },
+    [wrappedHandleSubmit]
   );
 
   return (
