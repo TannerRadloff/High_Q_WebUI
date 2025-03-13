@@ -1,14 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
-import ReactMarkdown from 'react-markdown';
 import { AgentType } from '../../agents/AgentFactory';
-import AgentStateService, { AgentState, AgentRequest as ServiceAgentRequest } from '../../services/agentStateService';
-
-// Interface definition that matches the component needs
-interface AgentRequest extends ServiceAgentRequest {}
+import AgentStateService, { AgentState, AgentRequest } from '../../services/agentStateService';
 
 // Initial set of available agents
 const availableAgents = [
@@ -18,6 +12,12 @@ const availableAgents = [
   { id: 'triage', name: 'Triage Agent', type: AgentType.TRIAGE, description: 'Analyzes and categorizes tasks' },
   { id: 'custom', name: 'Custom Workflow', type: AgentType.CUSTOM, description: 'Uses multiple agents in a specialized workflow' }
 ];
+
+// Helper function to format timestamps
+const formatTimestamp = (timestamp: number): string => {
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
 
 export default function AgentModeInterface() {
   // State for user input
@@ -71,215 +71,51 @@ export default function AgentModeInterface() {
     return () => clearInterval(interval);
   }, []);
 
-  // Handle submitting a new query to an agent
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handle form submission
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!userInput.trim() || isProcessing) return;
     
     // Create a new request
-    const requestId = `req-${Date.now()}`;
     const newRequest: AgentRequest = {
-      id: requestId,
-      timestamp: new Date().getTime(),
+      id: `req-${Date.now()}`,
       query: userInput,
       agentType: selectedAgent,
-      status: 'pending'
+      timestamp: Date.now(),
+      status: 'in-progress'
     };
     
-    // Record the request in the service
-    AgentStateService.recordRequest(newRequest);
-    
-    // Update local state
+    // Add to requests
     setAgentRequests(prev => [newRequest, ...prev]);
     
-    // Clear input and set processing state
+    // Clear input
     setUserInput('');
-    setIsProcessing(true);
-    setCurrentResponse('');
     
-    try {
-      // Update the agent's state to working
-      AgentStateService.updateAgentState(
-        selectedAgent, 
-        'working', 
-        userInput.substring(0, 50) + (userInput.length > 50 ? '...' : '')
+    // Set processing state
+    setIsProcessing(true);
+    
+    // Simulate agent processing
+    setTimeout(() => {
+      // Update request with response
+      setAgentRequests(prev => 
+        prev.map(req => 
+          req.id === newRequest.id 
+            ? { 
+                ...req, 
+                status: 'completed',
+                response: `This is a simulated response from the ${selectedAgent} Agent for your query: "${userInput}". In a real implementation, this would be processed by the AI agent.`
+              } 
+            : req
+        )
       );
       
-      // Update local agent states
-      setActiveAgents(AgentStateService.getAgentStates());
-      
-      // Update request status to in-progress
-      const updatedRequest = AgentStateService.updateRequest(requestId, { status: 'in-progress' });
-      if (updatedRequest) {
-        setAgentRequests(prev => 
-          prev.map(req => req.id === requestId ? updatedRequest : req)
-        );
-      }
-      
-      // Make the API call to the agent endpoint
-      const response = await fetch('/api/agent-query', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          query: userInput,
-          agentType: selectedAgent.toLowerCase(),
-          stream: true
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error from agent API: ${response.statusText}`);
-      }
-      
-      // Handle streaming response
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('Response body is not readable');
-      
-      const decoder = new TextDecoder();
-      let streamedResponse = '';
-      
-      // Process the streaming response
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        // Decode and parse the chunk
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n\n').filter(line => line.trim());
-        
-        for (const line of lines) {
-          if (line.startsWith('event: token')) {
-            const data = JSON.parse(line.substring(line.indexOf('{'), line.lastIndexOf('}') + 1));
-            if (data.token) {
-              streamedResponse += data.token;
-              setCurrentResponse(streamedResponse);
-            }
-          } else if (line.startsWith('event: handoff')) {
-            // Handle agent handoffs - in a real app, update UI to show handoff
-            const data = JSON.parse(line.substring(line.indexOf('{'), line.lastIndexOf('}') + 1));
-            console.log('Agent handoff:', data);
-          } else if (line.startsWith('event: complete')) {
-            const data = JSON.parse(line.substring(line.indexOf('{'), line.lastIndexOf('}') + 1));
-            // Final update with complete response
-            streamedResponse = data.content || streamedResponse;
-            setCurrentResponse(streamedResponse);
-            
-            // Update request in the service
-            const completedRequest = AgentStateService.updateRequest(requestId, {
-              status: 'completed',
-              response: streamedResponse,
-              metadata: data.metadata
-            });
-            
-            if (completedRequest) {
-              // Update local request state
-              setAgentRequests(prev => 
-                prev.map(req => req.id === requestId ? completedRequest : req)
-              );
-            }
-            
-            // Reset agent state to idle
-            AgentStateService.updateAgentState(selectedAgent, 'idle');
-            setActiveAgents(AgentStateService.getAgentStates());
-          } else if (line.startsWith('event: error')) {
-            const data = JSON.parse(line.substring(line.indexOf('{'), line.lastIndexOf('}') + 1));
-            
-            // Update request with error
-            const failedRequest = AgentStateService.updateRequest(requestId, {
-              status: 'failed',
-              error: data.message
-            });
-            
-            if (failedRequest) {
-              // Update local request state
-              setAgentRequests(prev => 
-                prev.map(req => req.id === requestId ? failedRequest : req)
-              );
-            }
-            
-            // Set agent state to error
-            AgentStateService.updateAgentState(selectedAgent, 'error');
-            setActiveAgents(AgentStateService.getAgentStates());
-            
-            throw new Error(data.message);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error processing agent request:', error);
-      
-      // Update request with error
-      const failedRequest = AgentStateService.updateRequest(requestId, {
-        status: 'failed',
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
-      });
-      
-      if (failedRequest) {
-        // Update local request state
-        setAgentRequests(prev => 
-          prev.map(req => req.id === requestId ? failedRequest : req)
-        );
-      }
-      
-      // Set agent state to error
-      AgentStateService.updateAgentState(selectedAgent, 'error');
-      setActiveAgents(AgentStateService.getAgentStates());
-    } finally {
       setIsProcessing(false);
-    }
-  };
-  
-  // Load more history
-  const handleLoadMoreHistory = () => {
-    const currentRequestCount = agentRequests.length;
-    const moreRequests = AgentStateService.getRequests({ 
-      limit: currentRequestCount + 10 
-    });
-    setAgentRequests(moreRequests);
-  };
-
-  // Format timestamp for display
-  const formatTimestamp = (timestamp: number): string => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }, 3000);
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header section with agent selection and controls */}
-      <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-        <div className="flex items-center space-x-2">
-          <h2 className="text-lg font-semibold">Agent Mode</h2>
-          <select 
-            className="border rounded px-2 py-1 text-sm"
-            value={selectedAgent}
-            onChange={(e) => setSelectedAgent(e.target.value as AgentType)}
-          >
-            {availableAgents.map(agent => (
-              <option key={agent.id} value={agent.type}>
-                {agent.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex space-x-2">
-          <button 
-            className={`px-3 py-1 rounded text-sm font-medium ${showHistory ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
-            onClick={() => setShowHistory(!showHistory)}
-          >
-            History
-          </button>
-          <button 
-            className={`px-3 py-1 rounded text-sm font-medium ${showAgentDetails ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
-            onClick={() => setShowAgentDetails(!showAgentDetails)}
-          >
-            Agent Status
-          </button>
-        </div>
-      </div>
-      
+    <div className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
       <div className="flex flex-1 overflow-hidden">
         {/* Main chat container */}
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -291,11 +127,11 @@ export default function AgentModeInterface() {
             {agentRequests.length === 0 && (
               <div className="text-center py-8">
                 <h3 className="text-xl font-semibold mb-2">Welcome to Agent Mode</h3>
-                <p className="text-gray-600 mb-4">
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
                   Choose an agent and start a conversation. <br />
                   The agent will process your request and return a response.
                 </p>
-                <div className="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
                   {availableAgents.map(agent => (
                     <div 
                       key={agent.id}
@@ -313,7 +149,7 @@ export default function AgentModeInterface() {
             )}
 
             {/* Conversation history */}
-            {agentRequests.map((request) => (
+            {agentRequests.map(request => (
               <div key={request.id} id={`request-${request.id}`} className="space-y-4">
                 {/* User message */}
                 <div className="flex items-start">
@@ -332,79 +168,52 @@ export default function AgentModeInterface() {
                 </div>
                 
                 {/* Agent response */}
-                <div className="flex items-start">
-                  <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center mr-2">
-                    <span className="text-sm font-bold text-white">A</span>
+                {(request.status === 'completed' || request.status === 'failed') && (
+                  <div className="flex items-start">
+                    <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center mr-2">
+                      <span className="text-sm font-bold text-white">A</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                        {request.status === 'completed' ? (
+                          <p>{request.response}</p>
+                        ) : (
+                          <p className="text-red-500">
+                            Sorry, there was an error processing your request. Please try again.
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <span>{formatTimestamp(request.timestamp + 3000)}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-                      {request.status === 'pending' && <div className="animate-pulse">Processing...</div>}
-                      {request.status === 'in-progress' && request.id === agentRequests[0]?.id && (
-                        <ReactMarkdown className="prose prose-sm max-w-none">
-                          {currentResponse || 'Processing your request...'}
-                        </ReactMarkdown>
-                      )}
-                      {(request.status === 'completed' || (request.status === 'in-progress' && request.id !== agentRequests[0]?.id)) && (
-                        <ReactMarkdown className="prose prose-sm max-w-none">
-                          {request.response || 'No response received.'}
-                        </ReactMarkdown>
-                      )}
-                      {request.status === 'failed' && (
-                        <div className="text-red-600">
-                          Error: {request.error || 'Unknown error occurred'}
-                        </div>
-                      )}
+                )}
+                
+                {/* Processing indicator */}
+                {request.status === 'in-progress' && (
+                  <div className="flex items-start">
+                    <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center mr-2">
+                      <span className="text-sm font-bold text-white">A</span>
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex justify-between">
-                      <span>{request.status.charAt(0).toUpperCase() + request.status.slice(1)}</span>
-                      {request.metadata?.executionTimeMs && (
-                        <span>{(request.metadata.executionTimeMs / 1000).toFixed(2)}s</span>
-                      )}
-                    </div>
-                    
-                    {/* Handoff path display */}
-                    {request.metadata?.handoffPath && request.metadata.handoffPath.length > 1 && (
-                      <div className="mt-2 text-xs">
-                        <div className="text-gray-500 mb-1">Agent workflow:</div>
-                        <div className="flex items-center flex-wrap">
-                          {request.metadata.handoffPath.map((agent, index) => (
-                            <React.Fragment key={`${request.id}-${agent}-${index}`}>
-                              <span className="bg-gray-100 rounded px-2 py-1">
-                                {agent}
-                              </span>
-                              {index < request.metadata!.handoffPath!.length - 1 && (
-                                <svg className="w-4 h-4 mx-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
-                              )}
-                            </React.Fragment>
-                          ))}
+                    <div className="flex-1">
+                      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                        <div className="flex items-center space-x-2">
+                          <div className="animate-pulse flex space-x-1">
+                            <div className="h-2 w-2 bg-gray-400 dark:bg-gray-600 rounded-full"></div>
+                            <div className="h-2 w-2 bg-gray-400 dark:bg-gray-600 rounded-full"></div>
+                            <div className="h-2 w-2 bg-gray-400 dark:bg-gray-600 rounded-full"></div>
+                          </div>
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                            {request.agentType} Agent is processing...
+                          </span>
                         </div>
                       </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {/* Real-time streaming response */}
-            {isProcessing && agentRequests.length > 0 && (
-              <div className="flex items-start">
-                <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center mr-2">
-                  <span className="text-sm font-bold text-white">A</span>
-                </div>
-                <div className="flex-1">
-                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-                    <ReactMarkdown className="prose prose-sm max-w-none">
-                      {currentResponse || 'Processing your request...'}
-                    </ReactMarkdown>
-                    <div className="h-4 w-4 ml-2 inline-block">
-                      <div className="animate-pulse">▋</div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
-            )}
+            ))}
           </div>
           
           {/* Input area */}
@@ -442,143 +251,6 @@ export default function AgentModeInterface() {
             </div>
           </div>
         </div>
-        
-        {/* Sidebar for history and agent details */}
-        <AnimatePresence>
-          {(showHistory || showAgentDetails) && (
-            <motion.div
-              initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 320, opacity: 1 }}
-              exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="border-l bg-gray-50 overflow-hidden"
-            >
-              <div className="h-full flex flex-col">
-                <div className="p-3 border-b font-medium">
-                  {showHistory ? 'Request History' : 'Agent Status'}
-                </div>
-                
-                <div className="flex-1 overflow-y-auto p-3">
-                  {showHistory && (
-                    <div className="space-y-3">
-                      {agentRequests.length === 0 ? (
-                        <div className="text-gray-500 text-sm">No requests yet</div>
-                      ) : (
-                        <>
-                          {agentRequests.map(req => (
-                            <div 
-                              key={req.id} 
-                              className="border rounded bg-white p-2 text-sm hover:bg-gray-50 cursor-pointer"
-                              onClick={() => {
-                                // Scroll to this request in the chat
-                                const element = document.getElementById(`request-${req.id}`);
-                                if (element) {
-                                  element.scrollIntoView({ behavior: 'smooth' });
-                                }
-                              }}
-                            >
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="font-medium truncate">
-                                  {req.query.length > 30 ? req.query.substring(0, 30) + '...' : req.query}
-                                </span>
-                                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                                  req.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                  req.status === 'failed' ? 'bg-red-100 text-red-800' :
-                                  'bg-yellow-100 text-yellow-800'
-                                }`}>
-                                  {req.status}
-                                </span>
-                              </div>
-                              <div className="flex justify-between text-xs text-gray-500">
-                                <span>{req.agentType} Agent</span>
-                                <span>{formatTimestamp(req.timestamp)}</span>
-                              </div>
-                            </div>
-                          ))}
-                          
-                          {/* Load more button */}
-                          <button
-                            onClick={handleLoadMoreHistory}
-                            className="w-full py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded"
-                          >
-                            Load more history
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                  
-                  {showAgentDetails && (
-                    <div className="space-y-3">
-                      {activeAgents.map(agent => (
-                        <div 
-                          key={agent.id} 
-                          className="border rounded bg-white p-3 text-sm"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium">{agent.name}</span>
-                            <span className={`h-2 w-2 rounded-full ${
-                              agent.status === 'idle' ? 'bg-green-500' :
-                              agent.status === 'working' ? 'bg-yellow-500' :
-                              'bg-red-500'
-                            }`}></span>
-                          </div>
-                          <div className="space-y-1">
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Status:</span>
-                              <span>{agent.status.charAt(0).toUpperCase() + agent.status.slice(1)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Type:</span>
-                              <span>{agent.type}</span>
-                            </div>
-                            {agent.currentTask && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-500">Current task:</span>
-                                <span className="truncate max-w-[150px]">{agent.currentTask}</span>
-                              </div>
-                            )}
-                            <div className="flex justify-between">
-                              <span className="text-gray-500">Last updated:</span>
-                              <span>{formatTimestamp(agent.lastUpdated)}</span>
-                            </div>
-                          </div>
-                          
-                          {/* Agent stats */}
-                          <div className="mt-3 border-t pt-2">
-                            <div className="text-xs font-medium mb-1">Agent Stats</div>
-                            <div className="grid grid-cols-2 gap-1 text-xs">
-                              <div className="flex justify-between">
-                                <span className="text-gray-500">Total requests:</span>
-                                <span>{agent.stats.totalRequests}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-500">Success rate:</span>
-                                <span>
-                                  {agent.stats.totalRequests > 0 
-                                    ? `${Math.round((agent.stats.successfulRequests / agent.stats.totalRequests) * 100)}%` 
-                                    : 'N/A'}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-gray-500">Avg. time:</span>
-                                <span>
-                                  {agent.stats.averageResponseTimeMs > 0 
-                                    ? `${(agent.stats.averageResponseTimeMs / 1000).toFixed(1)}s` 
-                                    : 'N/A'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </div>
   );

@@ -11,12 +11,11 @@ import { improveWithFeedback } from './improvement';
  * Agent types supported by the factory
  */
 export enum AgentType {
-  DELEGATION = 'delegation',
-  TRIAGE = 'triage',
-  RESEARCH = 'research',
-  REPORT = 'report',
-  JUDGE = 'judge',
-  CUSTOM = 'custom'
+  DELEGATION = 'Delegation',
+  RESEARCH = 'Research',
+  REPORT = 'Report',
+  TRIAGE = 'Triage',
+  CUSTOM = 'Custom'
 }
 
 /**
@@ -76,10 +75,6 @@ export class AgentFactory {
         
       case AgentType.REPORT:
         agent = new ReportAgent() as unknown as BaseAgent<T>;
-        break;
-        
-      case AgentType.JUDGE:
-        agent = new JudgeAgent(config as any) as unknown as BaseAgent<T>;
         break;
         
       case AgentType.CUSTOM:
