@@ -9,6 +9,15 @@ export async function middleware(request: NextRequest) {
   // Get the current URL path
   const url = new URL(request.url)
   const pathname = url.pathname
+  const referer = request.headers.get('referer') || 'none'
+
+  // Debug information to diagnose redirect loops
+  console.log(`[Middleware] Request:`, {
+    path: pathname,
+    authenticated: isAuthenticated,
+    referer,
+    cookieNames: Array.from(request.cookies.keys()),
+  })
 
   // Define route categories
   const isAuthRoute = pathname === '/login' || 
@@ -28,29 +37,27 @@ export async function middleware(request: NextRequest) {
 
   const isProtectedRoute = pathname.startsWith('/') && !isPublicRoute
 
-  // Debug middleware execution
-  console.log(`[Middleware] Path: ${pathname}, Authenticated: ${isAuthenticated}`)
-  console.log('[Middleware] Session cookie:', sessionCookie ? 'present' : 'absent')
-  
+  // Special case for root path which should show chat UI for authenticated users,
+  // but allow public access with redirect to login option
+  const isRootPath = pathname === '/'
+
   // Always allow callback routes - critical for OAuth flows
   if (isCallbackRoute) {
     console.log('[Middleware] Allowing OAuth callback')
     return NextResponse.next()
   }
 
-  // Redirect unauthenticated users trying to access protected routes
-  if (isProtectedRoute && !isAuthenticated) {
+  // Always allow access to the root path and let the client decide what to show
+  // This prevents redirect loops between / and /login
+  if (isRootPath) {
+    console.log('[Middleware] Allowing access to root path, client will handle auth state')
+    return NextResponse.next()
+  }
+
+  // Redirect unauthenticated users trying to access protected routes (except root)
+  if (isProtectedRoute && !isRootPath && !isAuthenticated) {
     console.log('[Middleware] Redirecting unauthenticated user to login')
-    const loginUrl = new URL('/login', request.url)
-    const response = NextResponse.redirect(loginUrl)
-    
-    // Set cookie to expire immediately
-    response.headers.set(
-      'Set-Cookie',
-      'sb-access-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
-    )
-    
-    return response
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
   // Redirect authenticated users trying to access auth routes
@@ -69,21 +76,10 @@ export async function middleware(request: NextRequest) {
       pathname.includes('/auth/signout')) {
     console.log('[Middleware] Blocking old NextAuth route:', pathname)
     
-    // Redirect to main app if authenticated, login if not
     if (isAuthenticated) {
       return NextResponse.redirect(new URL('/', request.url))
     } else {
-      // Clear any invalid cookies when redirecting to login
-      const loginUrl = new URL('/login', request.url)
-      const response = NextResponse.redirect(loginUrl)
-      
-      // Set cookie to expire immediately
-      response.headers.set(
-        'Set-Cookie',
-        'sb-access-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
-      )
-      
-      return response
+      return NextResponse.redirect(new URL('/login', request.url))
     }
   }
 

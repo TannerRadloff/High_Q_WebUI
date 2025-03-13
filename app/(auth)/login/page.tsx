@@ -15,11 +15,17 @@ export default function LoginPage() {
       
       if (user) {
         console.log('[LoginPage] User is authenticated, redirecting to home')
-        // Force a hard navigation to the home page
-        window.location.href = '/'
+        // Safe redirect - only redirect if we're actually on the login page
+        // This prevents redirect loops
+        if (window.location.pathname.includes('/login')) {
+          // Use router.push instead of window.location for a smoother experience
+          router.push('/')
+        } else {
+          console.log('[LoginPage] Already at home, not redirecting')
+        }
       }
     }
-  }, [user, isLoading])
+  }, [user, isLoading, router])
 
   // Show loading state while checking auth
   if (isLoading) {
@@ -44,8 +50,9 @@ export default function LoginPage() {
     )
   }
 
-  // This return is technically not needed since we redirect in useEffect,
-  // but it's good practice to always have a return
+  // If we're authenticated but not on the login page, render nothing
+  // This prevents unnecessary redirects
+  console.log('[LoginPage] User authenticated but not on login page')
   return null
 }
 

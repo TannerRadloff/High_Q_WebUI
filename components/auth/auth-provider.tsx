@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
@@ -23,10 +23,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
+  const pathname = usePathname()
   const supabase = createClient()
+  
+  // Track if we've already redirected to prevent loops
+  const [hasRedirected, setHasRedirected] = useState(false)
 
   useEffect(() => {
-    console.log('[AuthProvider] Initializing')
+    console.log('[AuthProvider] Initializing', { pathname })
     const setupUser = async () => {
       setIsLoading(true)
       
@@ -55,25 +59,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log('[AuthProvider] Auth state changed:', { 
               event, 
               hasSession: !!updatedSession,
-              user: updatedSession?.user?.email
+              user: updatedSession?.user?.email,
+              pathname
             })
             
             setSession(updatedSession)
             setUser(updatedSession?.user ?? null)
             
+            // Don't redirect again if we've already redirected once during this session
+            if (hasRedirected) {
+              console.log('[AuthProvider] Already redirected once, skipping redirect')
+              router.refresh()
+              return
+            }
+            
             // Handle specific auth events
             switch (event) {
               case 'SIGNED_IN':
-                // Force refresh and redirect to home
-                router.refresh()
-                window.location.href = '/'
+                // Only redirect if not already on home page
+                if (pathname !== '/') {
+                  console.log('[AuthProvider] Redirecting to home after sign in')
+                  setHasRedirected(true)
+                  router.push('/')
+                } else {
+                  console.log('[AuthProvider] Already on home page, no redirect needed')
+                  router.refresh()
+                }
                 break
               case 'SIGNED_OUT':
-                // Clear state and redirect to login
-                setUser(null)
-                setSession(null)
-                router.refresh()
-                window.location.href = '/login'
+                // Only redirect if not already on login page
+                if (pathname !== '/login') {
+                  console.log('[AuthProvider] Redirecting to login after sign out')
+                  setHasRedirected(true)
+                  router.push('/login')
+                } else {
+                  console.log('[AuthProvider] Already on login page, no redirect needed')
+                  router.refresh()
+                }
                 break
               default:
                 router.refresh()
@@ -93,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     
     setupUser()
-  }, [router, supabase])
+  }, [pathname, router, supabase, hasRedirected])
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -114,7 +136,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user: data.user?.email
       })
       
-      // The onAuthStateChange handler will handle the redirect
+      // Manual redirect instead of waiting for onAuthStateChange
+      if (pathname !== '/') {
+        router.push('/')
+      } else {
+        router.refresh()
+      }
     } catch (error: any) {
       console.error('[AuthProvider] Sign in exception:', error)
       toast.error(error.message || 'Failed to sign in')
@@ -133,7 +160,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
       
-      // The onAuthStateChange handler will handle the redirect and state cleanup
+      // Manual redirect instead of waiting for onAuthStateChange
+      setSession(null)
+      setUser(null)
+      
+      if (pathname !== '/login') {
+        router.push('/login')
+      } else {
+        router.refresh()
+      }
     } catch (error: any) {
       console.error('[AuthProvider] Sign out exception:', error)
       toast.error(error.message || 'Failed to sign out')
