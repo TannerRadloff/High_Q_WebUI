@@ -25,27 +25,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const supabase = createClient()
 
+  // Log Supabase env variables availability for debugging
+  useEffect(() => {
+    console.log('Auth Provider initialized')
+    console.log('Supabase URL available:', !!process.env.NEXT_PUBLIC_SUPABASE_URL)
+    console.log('Supabase Key available:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  }, [])
+
   useEffect(() => {
     const setupUser = async () => {
       setIsLoading(true)
       
       try {
+        console.log('Getting current session...')
         // Get current session
-        const { data: { session: currentSession } } = await supabase.auth.getSession()
+        const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession()
+        
+        if (sessionError) {
+          console.error('Error getting session:', sessionError)
+          return
+        }
+        
+        console.log('Session retrieved:', !!currentSession)
         setSession(currentSession)
         setUser(currentSession?.user ?? null)
         
         // Set up auth state listener
-        const { data: { subscription } } = await supabase.auth.onAuthStateChange(
-          (_event: AuthChangeEvent, updatedSession: Session | null) => {
-            setSession(updatedSession)
-            setUser(updatedSession?.user ?? null)
-            router.refresh()
+        console.log('Setting up auth state change listener...')
+        try {
+          const { data: { subscription } } = await supabase.auth.onAuthStateChange(
+            (event: AuthChangeEvent, updatedSession: Session | null) => {
+              console.log('Auth state changed:', event)
+              setSession(updatedSession)
+              setUser(updatedSession?.user ?? null)
+              router.refresh()
+            }
+          )
+          
+          return () => {
+            console.log('Unsubscribing from auth changes')
+            subscription.unsubscribe()
           }
-        )
-        
-        return () => {
-          subscription.unsubscribe()
+        } catch (subscriptionError) {
+          console.error('Error setting up auth subscription:', subscriptionError)
         }
       } catch (error) {
         console.error('Error setting up auth:', error)
@@ -59,17 +81,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      console.log('Attempting sign in with email:', email)
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
+        console.error('Sign in error:', error)
+        toast.error(error.message || 'Failed to sign in')
         throw error
       }
 
+      console.log('Sign in successful, session:', !!data.session)
+      setUser(data.user)
+      setSession(data.session)
       router.refresh()
+      router.push('/')
     } catch (error: any) {
+      console.error('Sign in exception:', error)
       toast.error(error.message || 'Failed to sign in')
       throw error
     }
@@ -77,29 +107,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
+      console.log('Signing out...')
       const { error } = await supabase.auth.signOut()
       
       if (error) {
-        throw error
+        console.error('Sign out error:', error)
+        toast.error(error.message || 'Failed to sign out')
+        return
       }
       
+      console.log('Sign out successful')
       setUser(null)
       setSession(null)
       router.refresh()
       router.push('/login')
     } catch (error: any) {
+      console.error('Sign out exception:', error)
       toast.error(error.message || 'Failed to sign out')
     }
   }
 
   const refreshSession = async () => {
     try {
+      console.log('Refreshing session...')
       const { data, error } = await supabase.auth.refreshSession()
       
       if (error) {
+        console.error('Session refresh error:', error)
         throw error
       }
       
+      console.log('Session refreshed:', !!data.session)
       setSession(data.session)
       setUser(data.session?.user ?? null)
       router.refresh()

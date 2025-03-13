@@ -12,11 +12,6 @@ const nextConfig = {
         os: false,
         zlib: false,
       };
-      
-      // Ensure proper loading of client-side scripts
-      if (dev) {
-        config.output.publicPath = '/_next/';
-      }
     }
     
     // Explicitly add alias configuration
@@ -33,8 +28,12 @@ const nextConfig = {
   images: {
     domains: ['avatar.vercel.sh'],
   },
-  // Fix development asset loading
-  assetPrefix: process.env.NODE_ENV === 'development' ? '' : undefined,
+  // Remove the assetPrefix configuration as it's causing issues
+  // assetPrefix: process.env.NODE_ENV === 'development' ? '' : undefined,
+  // Add proper output configurations
+  output: 'standalone',
+  poweredByHeader: false,
+  reactStrictMode: true,
 };
 
 module.exports = nextConfig; 
