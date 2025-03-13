@@ -30,6 +30,7 @@ export async function middleware(request: NextRequest) {
 
   // Debug middleware execution
   console.log(`[Middleware] Path: ${pathname}, Authenticated: ${isAuthenticated}`)
+  console.log('[Middleware] Session cookie:', sessionCookie ? 'present' : 'absent')
   
   // Always allow callback routes - critical for OAuth flows
   if (isCallbackRoute) {
@@ -40,28 +41,53 @@ export async function middleware(request: NextRequest) {
   // Redirect unauthenticated users trying to access protected routes
   if (isProtectedRoute && !isAuthenticated) {
     console.log('[Middleware] Redirecting unauthenticated user to login')
-    // Make sure we're redirecting to the correct Supabase login page
-    return NextResponse.redirect(new URL('/login', request.url))
+    const loginUrl = new URL('/login', request.url)
+    const response = NextResponse.redirect(loginUrl)
+    
+    // Set cookie to expire immediately
+    response.headers.set(
+      'Set-Cookie',
+      'sb-access-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    )
+    
+    return response
   }
 
   // Redirect authenticated users trying to access auth routes
   if (isAuthRoute && isAuthenticated) {
     console.log('[Middleware] Redirecting authenticated user to home')
-    // Make sure we're redirecting to the main chat interface
     return NextResponse.redirect(new URL('/', request.url))
   }
 
-  // If there are any old NextAuth pages/routes being accessed, redirect to the equivalent app/ routes
+  // If there are any old NextAuth pages/routes being accessed, block them completely
+  // and redirect to the new Supabase auth routes
   if (pathname === '/pages/login' || 
       pathname.startsWith('/api/auth/signin') || 
       pathname.startsWith('/api/auth/callback') ||
       pathname.startsWith('/api/auth/signout') ||
       pathname.includes('/auth/signin') ||
       pathname.includes('/auth/signout')) {
-    console.log('[Middleware] Redirecting from old NextAuth route to Supabase login:', pathname)
-    return NextResponse.redirect(new URL('/login', request.url))
+    console.log('[Middleware] Blocking old NextAuth route:', pathname)
+    
+    // Redirect to main app if authenticated, login if not
+    if (isAuthenticated) {
+      return NextResponse.redirect(new URL('/', request.url))
+    } else {
+      // Clear any invalid cookies when redirecting to login
+      const loginUrl = new URL('/login', request.url)
+      const response = NextResponse.redirect(loginUrl)
+      
+      // Set cookie to expire immediately
+      response.headers.set(
+        'Set-Cookie',
+        'sb-access-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT'
+      )
+      
+      return response
+    }
   }
 
+  // For all other routes, proceed normally
   return NextResponse.next()
 }
 

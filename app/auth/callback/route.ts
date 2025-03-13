@@ -37,8 +37,17 @@ export async function GET(request: NextRequest) {
     await handleOAuthCallback(code)
     console.log('[Auth Callback] Session exchange completed')
 
-    // Redirect to the home page after successful authentication
-    // Ensure we're going to the main app interface
+    // Log any old NextAuth cookies that might exist (for debugging)
+    const oldCookies = ['next-auth.session-token', 'next-auth.callback-url', 'next-auth.csrf-token']
+    oldCookies.forEach(cookieName => {
+      if (request.cookies.has(cookieName)) {
+        console.log('[Auth Callback] Found old NextAuth cookie:', cookieName)
+      }
+    })
+
+    // Force a redirect to the main application route
+    // This should bypass any old auth middleware and use our new middleware logic
+    console.log('[Auth Callback] Redirecting to main application')
     return NextResponse.redirect(new URL('/', requestUrl.origin))
   } catch (error) {
     console.error('[Auth Callback] Error processing OAuth callback:', error)
