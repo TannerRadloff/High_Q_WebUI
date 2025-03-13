@@ -11,6 +11,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import ClientLayout from './client-layout';
 import { NavBar } from '@/components/nav-bar';
+import { SidebarProvider } from '@/components/ui/sidebar';
 
 import './globals.css';
 
@@ -82,21 +83,23 @@ export default function RootLayout({
               enableSystem
               disableTransitionOnChange
             >
-              <NavBar />
-              <ClientLayout>
-                {children}
-              </ClientLayout>
-              <Toaster
-                position="top-center"
-                toastOptions={{
-                  className: 'border rounded-lg shadow-md',
-                  classNames: {
-                    toast: 'group',
-                    title: 'group-[.toast]:text-foreground',
-                    description: 'group-[.toast]:text-muted-foreground',
-                  },
-                }}
-              />
+              <SidebarProvider defaultOpen={true}>
+                <NavBar />
+                <ClientLayout>
+                  {children}
+                </ClientLayout>
+                <Toaster
+                  position="top-center"
+                  toastOptions={{
+                    className: 'border rounded-lg shadow-md',
+                    classNames: {
+                      toast: 'group',
+                      title: 'group-[.toast]:text-foreground',
+                      description: 'group-[.toast]:text-muted-foreground',
+                    },
+                  }}
+                />
+              </SidebarProvider>
             </ThemeProvider>
           </Providers>
         </ErrorBoundary>

@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 
 import { AppSidebar } from '@/components/app-sidebar';
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarInset } from '@/components/ui/sidebar';
 
 import { getServerSession } from '@/lib/auth-utils';
 import Script from 'next/script';
@@ -241,13 +241,11 @@ export default async function Layout({
         }}
       />
       <Script src="/animation-diagnostic.js" strategy="afterInteractive" />
-      <SidebarProvider defaultOpen={!isCollapsed}>
-        <AppSidebar user={session?.user} />
-        <SidebarInset>
-          {/* Animation elements are now created by the script if they don't exist */}
-          {children}
-        </SidebarInset>
-      </SidebarProvider>
+      <AppSidebar user={session?.user} />
+      <SidebarInset>
+        {/* Animation elements are now created by the script if they don't exist */}
+        {children}
+      </SidebarInset>
     </>
   );
 }
