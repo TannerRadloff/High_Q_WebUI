@@ -31,10 +31,12 @@ export default function HomeLayout({
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden">
+    <div className="flex h-full w-full overflow-hidden">
       <AppSidebar user={user || undefined} />
       <SidebarInset className="flex-1 overflow-auto">
-        {children}
+        <div className="flex flex-col h-full">
+          {children}
+        </div>
       </SidebarInset>
     </div>
   );
