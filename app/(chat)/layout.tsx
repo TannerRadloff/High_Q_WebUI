@@ -242,10 +242,9 @@ export default async function Layout({
       />
       <Script src="/animation-diagnostic.js" strategy="afterInteractive" />
       <AppSidebar user={session?.user} />
-      <SidebarInset className="flex-1 overflow-auto flex flex-col items-center">
-        <div className="w-full max-w-4xl mx-auto flex-1">
-          {children}
-        </div>
+      <SidebarInset className="flex-1 overflow-auto">
+        {/* Animation elements are now created by the script if they don't exist */}
+        {children}
       </SidebarInset>
     </div>
   );
