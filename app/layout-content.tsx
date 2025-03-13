@@ -1,0 +1,66 @@
+"use client";
+
+import { usePathname } from 'next/navigation';
+import { Toaster } from 'sonner';
+import { cn } from '@/lib/utils';
+import { ThemeProvider } from '@/components/theme-provider';
+import { Providers } from './providers';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { NavBar } from '@/components/nav-bar';
+import { SidebarProvider } from '@/components/ui/sidebar';
+import ClientLayout from './client-layout';
+
+function isAuthPage(pathname: string | null) {
+  if (!pathname) return false;
+  return pathname.startsWith('/login') || 
+         pathname.startsWith('/register') || 
+         pathname.startsWith('/forgot-password') ||
+         pathname.startsWith('/reset-password');
+}
+
+export function LayoutContent({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isAuth = isAuthPage(pathname);
+
+  return (
+    <ErrorBoundary>
+      <Providers>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <SidebarProvider defaultWidth={280} defaultOpen={false}>
+            <div className={cn(
+              "flex min-h-screen",
+              isAuth ? "flex-col" : "flex-row"
+            )}>
+              {!isAuth && <NavBar />}
+              <main className={cn(
+                "flex-1",
+                !isAuth && "pl-4",
+                isAuth && "flex items-center justify-center"
+              )}>
+                <ClientLayout>
+                  {children}
+                </ClientLayout>
+              </main>
+            </div>
+            <Toaster
+              position="top-center"
+              toastOptions={{
+                className: 'border rounded-lg shadow-md',
+                classNames: {
+                  toast: 'group',
+                  title: 'group-[.toast]:text-foreground',
+                  description: 'group-[.toast]:text-muted-foreground',
+                },
+              }}
+            />
+          </SidebarProvider>
+        </ThemeProvider>
+      </Providers>
+    </ErrorBoundary>
+  );
+} 
