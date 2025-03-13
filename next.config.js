@@ -44,8 +44,10 @@ const nextConfig = {
   // Ensure proper bundling and optimization
   experimental: {
     optimizeCss: true,
-    // Add additional experimental features if needed
-    serverActions: true,
+    serverActions: {
+      bodySizeLimit: '2mb',
+      allowedOrigins: ['*']
+    }
   },
 };
 

@@ -2,7 +2,7 @@
 
 // Updated for @ai-sdk/openai v1.2.2: changed input to prompt
 import { generateText, type Message } from 'ai';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 
 import {
   deleteMessagesByChatIdAfterTimestamp,
@@ -52,6 +52,19 @@ export async function updateChatVisibility({
   visibility: VisibilityType;
 }) {
   await updateChatVisiblityById({ chatId, visibility });
+}
+
+export async function getChatModelFromCookie() {
+  try {
+    const cookieStore = cookies();
+    const allCookies = Object.fromEntries(
+      cookieStore.getAll().map(cookie => [cookie.name, cookie.value])
+    );
+    return allCookies['chat-model'] || null;
+  } catch (error) {
+    console.error('Error reading chat model cookie:', error);
+    return null;
+  }
 }
 
 
