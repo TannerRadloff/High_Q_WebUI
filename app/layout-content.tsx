@@ -18,9 +18,15 @@ function isAuthPage(pathname: string | null) {
          pathname.startsWith('/reset-password');
 }
 
+function isChatPage(pathname: string | null) {
+  if (!pathname) return false;
+  return pathname === '/' || pathname.startsWith('/chat');
+}
+
 export function LayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuth = isAuthPage(pathname);
+  const isChat = isChatPage(pathname);
 
   return (
     <ErrorBoundary>
@@ -36,10 +42,10 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
               "flex min-h-screen",
               isAuth ? "flex-col" : "flex-row"
             )}>
-              {!isAuth && <NavBar />}
+              {!isAuth && !isChat && <NavBar />}
               <main className={cn(
                 "flex-1",
-                !isAuth && "pl-4",
+                !isAuth && !isChat && "pl-4",
                 isAuth && "flex items-center justify-center"
               )}>
                 <ClientLayout>

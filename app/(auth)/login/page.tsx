@@ -31,7 +31,7 @@ export default function LoginPage() {
   if (isLoading) {
     console.log('[LoginPage] Loading auth state...')
     return (
-      <div className="flex h-dvh w-screen items-center justify-center bg-background">
+      <div className="flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
           <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">Loading...</p>
@@ -43,11 +43,7 @@ export default function LoginPage() {
   // Only show login form if user is not authenticated
   if (!user) {
     console.log('[LoginPage] User not authenticated, showing login form')
-    return (
-      <div className="flex h-dvh w-screen items-start pt-12 md:pt-0 md:items-center justify-center bg-background">
-        <LoginForm />
-      </div>
-    )
+    return <LoginForm />
   }
 
   // If we're authenticated but not on the login page, render nothing

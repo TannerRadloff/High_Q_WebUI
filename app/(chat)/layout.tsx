@@ -230,7 +230,7 @@ export default async function Layout({
   const isCollapsed = cookieStore.get('sidebar:state')?.value !== 'true';
 
   return (
-    <>
+    <div className="flex h-screen w-full overflow-hidden">
       <Script
         src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"
         strategy="beforeInteractive"
@@ -242,11 +242,11 @@ export default async function Layout({
       />
       <Script src="/animation-diagnostic.js" strategy="afterInteractive" />
       <AppSidebar user={session?.user} />
-      <SidebarInset>
+      <SidebarInset className="flex-1 overflow-auto">
         {/* Animation elements are now created by the script if they don't exist */}
         {children}
       </SidebarInset>
-    </>
+    </div>
   );
 }
 

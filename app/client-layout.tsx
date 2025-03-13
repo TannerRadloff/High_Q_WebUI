@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 // Add global error handler for message channel errors
 const initGlobalErrorHandlers = () => {
@@ -17,6 +19,19 @@ const initGlobalErrorHandlers = () => {
   }
 };
 
+function isAuthPage(pathname: string | null) {
+  if (!pathname) return false;
+  return pathname.startsWith('/login') || 
+         pathname.startsWith('/register') || 
+         pathname.startsWith('/forgot-password') ||
+         pathname.startsWith('/reset-password');
+}
+
+function isChatPage(pathname: string | null) {
+  if (!pathname) return false;
+  return pathname === '/' || pathname.startsWith('/chat');
+}
+
 export default function ClientLayout({
   children,
 }: {
@@ -27,6 +42,18 @@ export default function ClientLayout({
     initGlobalErrorHandlers();
   }, []);
 
-  return <>{children}</>;
+  const pathname = usePathname();
+  const isAuth = isAuthPage(pathname);
+  const isChat = isChatPage(pathname);
+
+  return (
+    <div className={cn(
+      "w-full", 
+      isAuth && "flex flex-col items-center justify-center min-h-[calc(100vh-3.5rem)]",
+      isChat && "h-full" // Chat pages don't need extra height adjustment as they have their own layout
+    )}>
+      {children}
+    </div>
+  );
 } 
 
