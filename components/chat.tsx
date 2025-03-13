@@ -65,7 +65,14 @@ export function Chat({
   const [chatId, setChatId] = useState<string>(id);
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const { user } = useAuth();
+  const [hasShownError, setHasShownError] = useState(false);
   
+  // Reset error state when chat ID changes or component unmounts
+  useEffect(() => {
+    setHasShownError(false);
+    return () => setHasShownError(false);
+  }, [id]);
+
   // Handle new chat creation
   useEffect(() => {
     async function createNewChat() {
@@ -100,8 +107,10 @@ export function Chat({
           }
         } catch (error) {
           logError(error, 'Failed to create new chat');
-          // Only show error toast here, not in useChat error handler
-          toast.error(error instanceof Error ? error.message : 'Failed to create new chat. Please try again.');
+          if (!hasShownError) {
+            toast.error(error instanceof Error ? error.message : 'Failed to create new chat. Please try again.');
+            setHasShownError(true);
+          }
         } finally {
           setIsCreatingChat(false);
         }
@@ -109,30 +118,7 @@ export function Chat({
     }
 
     createNewChat();
-  }, [id, user, selectedVisibilityType]);
-
-  // Log when the component mounts or when the selected model changes
-  useEffect(() => {
-    console.log(`[CHAT] Component mounted or model changed: ${selectedChatModel}`);
-    
-    // Reset fallback model state when model changes
-    setUsesFallbackModel(false);
-    
-    // Add specific error handling for message channel errors
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      if (event.reason && event.reason.message && 
-          event.reason.message.includes('message channel closed')) {
-        console.error('[CHAT] Message channel closed prematurely:', event.reason);
-        event.preventDefault(); // Prevent the default error handling
-      }
-    };
-    
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-    
-    return () => {
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-    };
-  }, [selectedChatModel]);
+  }, [id, user, selectedVisibilityType, hasShownError]);
 
   const {
     messages,
@@ -157,7 +143,10 @@ export function Chat({
       if (message.content.includes('fallback model')) {
         console.log('[CHAT] Using fallback model detected');
         setUsesFallbackModel(true);
-        toast.warning(`The ${selectedChatModel} model is currently unavailable. Using a fallback model instead.`);
+        if (!hasShownError) {
+          toast.warning(`The ${selectedChatModel} model is currently unavailable. Using a fallback model instead.`);
+          setHasShownError(true);
+        }
       }
       
       mutate('/api/history');
@@ -165,12 +154,38 @@ export function Chat({
     onError: (error) => {
       logError(error, `Chat error with model ${selectedChatModel}`);
       
-      // Only show error toast for non-chat-creation errors
-      if (!error.message?.includes('create-new')) {
+      // Only show error toast if we haven't shown one yet and it's not a chat creation error
+      if (!hasShownError && !error.message?.includes('create-new')) {
         toast.error(error instanceof Error ? error.message : 'An error occurred during chat');
+        setHasShownError(true);
       }
     },
   });
+
+  // Reset error state when the error is resolved
+  useEffect(() => {
+    if (!isLoading && messages.length > 0) {
+      setHasShownError(false);
+    }
+  }, [isLoading, messages.length]);
+
+  // Handle errors from the API
+  useEffect(() => {
+    const handleApiError = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'error' && !hasShownError) {
+          toast.error(data.error || 'An error occurred');
+          setHasShownError(true);
+        }
+      } catch (error) {
+        // Ignore parsing errors for non-error messages
+      }
+    };
+
+    window.addEventListener('message', handleApiError);
+    return () => window.removeEventListener('message', handleApiError);
+  }, [hasShownError]);
 
   const { data: votes } = useSWR<Array<Vote>>(
     `/api/vote?chatId=${chatId}`,
@@ -375,10 +390,10 @@ export function Chat({
             isLoading={isLoading}
             chatId={chatId}
             isReadonly={isReadonly}
-            votes={[]}
+            votes={votes || []}
             setMessages={setMessages}
             reload={reload}
-            isArtifactVisible={false}
+            isArtifactVisible={isArtifactVisible}
           />
           <MultimodalInput
             chatId={chatId}
