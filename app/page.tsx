@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth/auth-provider'
 import { Chat } from '@/components/chat'
-import type { VisibilityType } from '@/components/visibility-selector'
+import HomeLayout from './home-layout'
 
 export default function Home() {
   const { user, isLoading } = useAuth()
@@ -41,13 +41,15 @@ export default function Home() {
   if (user) {
     console.log('[HomePage] User authenticated, showing chat UI')
     return (
-      <Chat 
-        id="new"
-        initialMessages={[]}
-        selectedChatModel="gpt-3.5-turbo"
-        selectedVisibilityType="private"
-        isReadonly={false}
-      />
+      <HomeLayout>
+        <Chat 
+          id="new"
+          initialMessages={[]}
+          selectedChatModel="gpt-3.5-turbo"
+          selectedVisibilityType="private"
+          isReadonly={false}
+        />
+      </HomeLayout>
     )
   }
 

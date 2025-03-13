@@ -20,7 +20,8 @@ function isAuthPage(pathname: string | null) {
 
 function isChatPage(pathname: string | null) {
   if (!pathname) return false;
-  return pathname === '/' || pathname.startsWith('/chat');
+  // Only consider /chat/* paths as chat pages, not the root path
+  return pathname.startsWith('/chat');
 }
 
 export function LayoutContent({ children }: { children: React.ReactNode }) {
@@ -42,10 +43,10 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
               "flex min-h-screen",
               isAuth ? "flex-col" : "flex-row"
             )}>
-              {!isAuth && !isChat && <NavBar />}
+              {!isAuth && <NavBar />}
               <main className={cn(
                 "flex-1",
-                !isAuth && !isChat && "pl-4",
+                !isAuth && "pl-4",
                 isAuth && "flex items-center justify-center"
               )}>
                 <ClientLayout>

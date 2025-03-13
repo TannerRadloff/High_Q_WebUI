@@ -29,7 +29,8 @@ function isAuthPage(pathname: string | null) {
 
 function isChatPage(pathname: string | null) {
   if (!pathname) return false;
-  return pathname === '/' || pathname.startsWith('/chat');
+  // Only consider /chat/* paths as chat pages, not the root path
+  return pathname.startsWith('/chat');
 }
 
 export default function ClientLayout({
@@ -45,12 +46,14 @@ export default function ClientLayout({
   const pathname = usePathname();
   const isAuth = isAuthPage(pathname);
   const isChat = isChatPage(pathname);
+  const isHome = pathname === '/';
 
   return (
     <div className={cn(
       "w-full", 
       isAuth && "flex flex-col items-center justify-center min-h-[calc(100vh-3.5rem)]",
-      isChat && "h-full" // Chat pages don't need extra height adjustment as they have their own layout
+      isChat && "h-full", // Chat pages don't need extra height adjustment as they have their own layout
+      isHome && "h-full" // Home page should have the same height handling as chat pages
     )}>
       {children}
     </div>
