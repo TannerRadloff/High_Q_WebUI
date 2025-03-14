@@ -5,45 +5,27 @@ import { AgentType } from '../../agents/AgentFactory';
 import AgentStateService, { AgentRequest } from '../../services/agentStateService';
 import { Button } from '@/src/components/ui/button';
 import { BotIcon } from '@/components/icons';
+import { agentTypeConfig } from '@/src/config/agent-types';
 
-// Agent configuration with descriptions and capabilities
-const agentConfigs = [
-  { 
-    id: 'delegation', 
-    name: 'Delegation', 
-    type: AgentType.DELEGATION, 
-    description: 'Analyzes your request and delegates to specialized agents',
-    capabilities: ['Task routing', 'Multi-agent coordination', 'Complex request handling']
-  },
-  { 
-    id: 'research', 
-    name: 'Research', 
-    type: AgentType.RESEARCH, 
-    description: 'Finds information and answers factual questions',
-    capabilities: ['Information retrieval', 'Fact checking', 'Data analysis']
-  },
-  { 
-    id: 'report', 
-    name: 'Report', 
-    type: AgentType.REPORT, 
-    description: 'Formats information into structured reports',
-    capabilities: ['Content organization', 'Data visualization', 'Summary generation']
-  },
-  { 
-    id: 'triage', 
-    name: 'Triage', 
-    type: AgentType.TRIAGE, 
-    description: 'Analyzes and categorizes tasks',
-    capabilities: ['Priority assessment', 'Task categorization', 'Workflow optimization']
-  },
-  { 
-    id: 'judge', 
-    name: 'Judge', 
-    type: AgentType.JUDGE, 
-    description: 'Evaluates responses and provides feedback',
-    capabilities: ['Quality assessment', 'Feedback generation', 'Improvement suggestions']
+// Map the centralized config to include AgentType enum values needed by this component
+const agentConfigs = agentTypeConfig
+  .filter(agent => agent.id !== 'default') // Exclude the default agent
+  .map(agent => ({
+    ...agent, 
+    type: getAgentTypeFromId(agent.id)
+  }));
+
+// Helper function to map ID to AgentType
+function getAgentTypeFromId(id: string): AgentType {
+  switch (id) {
+    case 'delegation': return AgentType.DELEGATION;
+    case 'research': return AgentType.RESEARCH;
+    case 'report': return AgentType.REPORT;
+    case 'triage': return AgentType.TRIAGE;
+    case 'judge': return AgentType.JUDGE;
+    default: return AgentType.DELEGATION;
   }
-];
+}
 
 // Helper function to format timestamps
 const formatTimestamp = (timestamp: number): string => {

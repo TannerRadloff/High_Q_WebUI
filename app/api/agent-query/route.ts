@@ -624,10 +624,11 @@ async function handleStreamingResponse(
  * Map string agent type to enum
  */
 function getAgentTypeEnum(type: string): AgentType {
-  switch (type) {
+  switch (type.toLowerCase()) {
     case 'research': return AgentType.RESEARCH;
     case 'report': return AgentType.REPORT;
     case 'triage': return AgentType.TRIAGE;
+    case 'judge': return AgentType.JUDGE;
     case 'auto': 
     case 'delegation': 
       return AgentType.DELEGATION;

@@ -41,16 +41,7 @@ import {
 } from '@/src/components/ui/tooltip';
 import { generateUUID } from '@/utils/auth';
 import { sanitizeUIMessages } from '@/utils/messages';
-
-// Define agent types (from AgentType enum)
-const agentTypes = [
-  { id: 'default', name: 'Standard Chat', description: 'Regular chat with the AI model' },
-  { id: 'delegation', name: 'Delegation', description: 'Analyzes your request and delegates to specialized agents' },
-  { id: 'research', name: 'Research', description: 'Finds information and answers factual questions' },
-  { id: 'report', name: 'Report', description: 'Formats information into structured reports' },
-  { id: 'triage', name: 'Triage', description: 'Analyzes and categorizes tasks' },
-  { id: 'judge', name: 'Judge', description: 'Evaluates responses and provides feedback' }
-];
+import { agentTypeConfig } from '@/src/config/agent-types';
 
 // Add an interface at the top of the file
 interface MessageWithDocument extends Message {
@@ -447,7 +438,7 @@ function PureMultimodalInput({
                   </div>
                 </SelectTrigger>
                 <SelectContent>
-                  {agentTypes.map(agent => (
+                  {agentTypeConfig.map(agent => (
                     <SelectItem key={agent.id} value={agent.id}>
                       <div className="flex flex-col">
                         <span>{agent.name}</span>
@@ -480,7 +471,7 @@ function PureMultimodalInput({
             name="message"
             placeholder={selectedAgent === 'default' ? 
               "Message..." : 
-              `Ask the ${agentTypes.find(a => a.id === selectedAgent)?.name || 'selected'} agent...`
+              `Ask the ${agentTypeConfig.find((a) => a.id === selectedAgent)?.name || 'selected'} agent...`
             }
             className={cn(
               'max-h-64 min-h-[98px] grow whitespace-break-spaces text-secondary-foreground resize-none',
