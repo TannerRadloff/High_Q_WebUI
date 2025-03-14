@@ -17,7 +17,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  useSidebar,
+  useSidebar
 } from '@/src/components/ui/sidebar';
 // @ts-ignore - Next.js type declarations issue
 import Link from 'next/link';

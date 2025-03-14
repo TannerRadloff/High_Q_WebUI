@@ -19,6 +19,9 @@ interface MessagesProps {
   ) => Promise<string | null | undefined>;
   isReadonly: boolean;
   isArtifactVisible: boolean;
+  showLoadingUi?: boolean;
+  error?: Error;
+  baseUrlPath?: string;
 }
 
 function PureMessages({
@@ -29,6 +32,9 @@ function PureMessages({
   setMessages,
   reload,
   isReadonly,
+  showLoadingUi,
+  error,
+  baseUrlPath,
 }: MessagesProps) {
   const [messagesContainerRef, messagesEndRef] =
     useScrollToBottom<HTMLDivElement>();

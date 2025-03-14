@@ -11,6 +11,7 @@ import { AgentType } from '../../../agents/AgentFactory';
 import { BaseAgent } from '../../../agents/BaseAgent';
 import { includeSensitiveData } from '../../../agents/api-utils';
 import { configureAgentSDK, configureAgentTracing, configureAgentLogging } from '@/lib/agents/config';
+import { AgentFactory } from '../../../agents/AgentFactory';
 
 // Initialize the OpenAI Agents SDK
 configureAgentSDK();
@@ -275,27 +276,52 @@ export async function POST(req: NextRequest) {
  * Updated to align with OpenAI Agents SDK
  */
 function createRunnerForAgentType(agentType: string): AgentRunner {
-  let agent: BaseAgent | undefined = undefined;
+  const factory = new AgentFactory();
+  const agentTypeEnum = getAgentTypeEnum(agentType);
   
-  // Create specific agent if requested, otherwise use default DelegationAgent
-  switch (agentType) {
-    case 'triage':
-      agent = new TriageAgent() as unknown as BaseAgent;
-      break;
-      
-    case 'research':
-      agent = new ResearchAgent() as unknown as BaseAgent;
-      break;
-      
-    case 'report':
-      agent = new ReportAgent() as unknown as BaseAgent;
-      break;
+  // Configure tracing as needed
+  if (process.env.ENABLE_AGENT_TRACING === 'true') {
+    configureAgentTracing(true);
   }
   
-  // Create the runner with proper SDK options
-  return new AgentRunner(agent, {
-    traceEnabled: true // Enable tracing by default
-  });
+  // Configure advanced logging based on environment
+  const verboseLogging = process.env.NODE_ENV === 'development';
+  configureAgentLogging(verboseLogging);
+  
+  let agent;
+  
+  // Create appropriate agent based on type
+  switch (agentTypeEnum) {
+    case AgentType.MIMIR:
+    case AgentType.DELEGATION:
+      // Use the new MimirAgent for delegation
+      agent = factory.createAgent(AgentType.MIMIR);
+      break;
+      
+    case AgentType.TRIAGE:
+      agent = factory.createAgent(AgentType.TRIAGE);
+      break;
+      
+    case AgentType.RESEARCH:
+      agent = factory.createAgent(AgentType.RESEARCH);
+      break;
+      
+    case AgentType.REPORT:
+      agent = factory.createAgent(AgentType.REPORT);
+      break;
+      
+    case AgentType.JUDGE:
+      agent = factory.createAgent(AgentType.JUDGE);
+      break;
+      
+    default:
+      // Default to research agent if type is not recognized
+      console.warn(`Unknown agent type: ${agentType}, defaulting to Research`);
+      agent = factory.createAgent(AgentType.RESEARCH);
+  }
+  
+  // Create a runner for this agent
+  return new AgentRunner(agent);
 }
 
 /**
@@ -315,6 +341,8 @@ async function handleStreamingResponse(
   let currentResponse = '';
   let heartbeatInterval: NodeJS.Timeout | null = null;
   let requestTimeout: NodeJS.Timeout | null = null;
+  let delegationInfoSent = false;
+  let delegationHeaders: Record<string, string> = {};
   
   // Create a ReadableStream for SSE
   const stream = new ReadableStream({
@@ -449,85 +477,12 @@ async function handleStreamingResponse(
           controller.enqueue(encoder.encode(`event: ${tokenEvent.event}\ndata: ${tokenEvent.data}\n\n`));
         },
         
-        onTriageComplete: (result) => {
-          if (!controller) return;
-          
-          // Create a triage event
-          const triageEvent = {
-            event: 'triage',
-            data: JSON.stringify({ result })
-          };
-          
-          // Send the triage event
-          controller.enqueue(encoder.encode(`event: ${triageEvent.event}\ndata: ${triageEvent.data}\n\n`));
+        onError: (error) => {
+          console.error(`Error in agent execution for ${requestId}:`, error);
+          endStreamWithError(typeof error === 'string' ? error : error.message || 'An error occurred during processing');
         },
         
-        onResearchStart: () => {
-          if (!controller) return;
-          
-          // Create a research start event
-          const researchEvent = {
-            event: 'research_start',
-            data: JSON.stringify({
-              timestamp: new Date().toISOString()
-            })
-          };
-          
-          // Send the research start event
-          controller.enqueue(encoder.encode(`event: ${researchEvent.event}\ndata: ${researchEvent.data}\n\n`));
-        },
-        
-        onResearchComplete: (researchData) => {
-          if (!controller) return;
-          
-          // Create a research complete event
-          const researchEvent = {
-            event: 'research_complete',
-            data: JSON.stringify({
-              data: researchData,
-              timestamp: new Date().toISOString()
-            })
-          };
-          
-          // Send the research complete event
-          controller.enqueue(encoder.encode(`event: ${researchEvent.event}\ndata: ${researchEvent.data}\n\n`));
-        },
-        
-        onReportStart: () => {
-          if (!controller) return;
-          
-          // Create a report start event
-          const reportEvent = {
-            event: 'report_start',
-            data: JSON.stringify({
-              timestamp: new Date().toISOString()
-            })
-          };
-          
-          // Send the report start event
-          controller.enqueue(encoder.encode(`event: ${reportEvent.event}\ndata: ${reportEvent.data}\n\n`));
-        },
-        
-        onHandoff: (fromAgent, toAgent) => {
-          if (!controller) return;
-          
-          // Create a handoff event
-          const handoffEvent = {
-            event: 'handoff',
-            data: JSON.stringify({
-              from: fromAgent,
-              to: toAgent,
-              timestamp: new Date().toISOString()
-            })
-          };
-          
-          // Send the handoff event
-          controller.enqueue(encoder.encode(`event: ${handoffEvent.event}\ndata: ${handoffEvent.data}\n\n`));
-        },
-        
-        onComplete: (result: string | AgentResponse) => {
-          const typedResult = typeof result === 'string' ? { content: result, success: true } : result;
-          
+        onComplete: (result) => {
           if (!controller) return;
           
           // Clean up intervals
@@ -542,26 +497,58 @@ async function handleStreamingResponse(
           }
           
           // Get content from the result
-          const content = 'content' in typedResult 
-            ? typedResult.content 
-            : '';
+          let finalContent = '';
+          if (typeof result === 'string') {
+            finalContent = result;
+          } else if (result && typeof result === 'object') {
+            if ('final_output' in result) {
+              finalContent = result.final_output as string;
+            } else if ('content' in result) {
+              finalContent = result.content as string;
+            }
+            
+            // Check for delegation info in metadata
+            if (result.metadata?.delegationResult && !delegationInfoSent) {
+              const delegationInfo = result.metadata.delegationResult;
+              
+              // Store delegation info for headers
+              delegationHeaders = {
+                'x-delegation-status': JSON.stringify({
+                  agentName: delegationInfo.agentName,
+                  taskDomain: delegationInfo.taskDomain,
+                  confidence: delegationInfo.confidence,
+                  reasoning: delegationInfo.reasoning
+                })
+              };
+              
+              // Send delegation info as a special event
+              const delegationEvent = {
+                event: 'delegation',
+                data: JSON.stringify({
+                  agentName: delegationInfo.agentName,
+                  reasoning: delegationInfo.reasoning,
+                  taskDomain: delegationInfo.taskDomain
+                })
+              };
+              
+              controller.enqueue(encoder.encode(`event: ${delegationEvent.event}\ndata: ${delegationEvent.data}\n\n`));
+              delegationInfoSent = true;
+            }
+          }
           
           // Create a complete event
           const completeEvent = {
             event: 'complete',
             data: JSON.stringify({
-              success: typedResult.success === false ? false : true,
-              content,
-              error: typedResult.error,
-              metadata: typedResult.metadata,
-              timestamp: new Date().toISOString()
+              content: finalContent,
+              metadata: result && typeof result === 'object' ? result.metadata : undefined
             })
           };
           
           // Send the complete event
           controller.enqueue(encoder.encode(`event: ${completeEvent.event}\ndata: ${completeEvent.data}\n\n`));
           
-          // End the stream
+          // Close the stream
           controller.close();
           
           // Update agent state to idle
@@ -573,51 +560,56 @@ async function handleStreamingResponse(
           
           // Update request status
           AgentStateService.updateRequest(requestId, {
-            status: typedResult.success === false ? 'failed' : 'completed',
-            response: content,
-            error: typedResult.error
+            status: 'completed',
+            response: finalContent
           });
         },
         
-        onError: (error) => {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          endStreamWithError(errorMessage);
+        onHandoff: (sourceAgentName, targetAgentName) => {
+          if (!controller) return;
+          
+          console.log(`Handoff from ${sourceAgentName} to ${targetAgentName} for request ${requestId}`);
+          
+          // Create a handoff event
+          const handoffEvent = {
+            event: 'handoff',
+            data: JSON.stringify({
+              from: sourceAgentName,
+              to: targetAgentName
+            })
+          };
+          
+          // Send the handoff event
+          controller.enqueue(encoder.encode(`event: ${handoffEvent.event}\ndata: ${handoffEvent.data}\n\n`));
+          
+          // Update agent state
+          AgentStateService.updateAgentState(
+            getAgentTypeEnum(agentType),
+            'working',
+            `Handing off to ${targetAgentName}`
+          );
         }
       };
       
       // Run the agent with streaming
-      const streamResult = await runner.run_streamed(query, callbacks, {
-        ...runConfig,
-        max_turns: 25 // Default max turns for API requests
-      });
-      
-      // Store the result in the context for potential follow-up messages
-      AgentStateService.updateRequest(requestId, {
-        // Use type assertion for the update object
-        streamResult: {
-          // Only store what's needed for future to_input_list calls
-          inputList: streamResult.to_input_list(),
-          metadata: streamResult.metadata
-        }
-      } as unknown as Partial<AgentRequest>);
-      
+      await runner.run_streamed(query, callbacks, runConfig);
     } catch (error) {
-      console.error(`Error in agent stream for ${requestId}:`, error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error in agent stream';
-      endStreamWithError(errorMessage);
+      console.error(`Unhandled error in agent streaming for ${requestId}:`, error);
+      endStreamWithError(error instanceof Error ? error.message : 'An unexpected error occurred');
     }
   })();
   
   // Set response headers for SSE
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache, no-transform',
-      'Connection': 'keep-alive',
-      'Content-Encoding': 'none',
-      'X-Request-ID': requestId
-    }
-  });
+  const headers = {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    'Connection': 'keep-alive',
+    'Content-Encoding': 'none',
+    'X-Request-ID': requestId,
+    ...delegationHeaders // Include any delegation headers that were set
+  };
+  
+  return new Response(stream, { headers });
 }
 
 /**
@@ -629,6 +621,7 @@ function getAgentTypeEnum(type: string): AgentType {
     case 'report': return AgentType.REPORT;
     case 'triage': return AgentType.TRIAGE;
     case 'judge': return AgentType.JUDGE;
+    case 'mimir': return AgentType.MIMIR;
     case 'auto': 
     case 'delegation': 
       return AgentType.DELEGATION;

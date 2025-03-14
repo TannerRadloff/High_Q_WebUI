@@ -70,6 +70,11 @@ export function Chat({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   
+  // Add Mimir delegation agent states
+  const [delegationStatus, setDelegationStatus] = useState<'idle' | 'delegating' | 'delegated'>('idle');
+  const [activeAgent, setActiveAgent] = useState<string>('MimirAgent');
+  const [delegationReason, setDelegationReason] = useState<string>('');
+  
   // Optimize scroll behavior to bottom of messages
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     if (messagesEndRef.current) {
@@ -205,14 +210,42 @@ export function Chat({
     isLoading,
     stop,
     reload,
+    error,
   } = useChat({
+    api: '/api/agent-query',
     id: chatId,
-    body: { id: chatId, selectedChatModel },
+    body: {
+      agentType: 'Mimir', // Use the Mimir delegation agent by default
+      userId: user?.id,
+      chatId,
+      selectedChatModel,
+      selectedVisibilityType
+    },
     initialMessages,
-    experimental_throttle: 100,
-    sendExtraMessageFields: true,
-    generateId: generateUUID,
     onResponse(response) {
+      // Reset error states when we get a successful response
+      setHasError(false);
+      setErrorMessage(null);
+      
+      // Handle delegation information in the response
+      try {
+        const responseText = response.headers.get('x-delegation-status');
+        if (responseText) {
+          const delegationInfo = JSON.parse(responseText);
+          if (delegationInfo.agentName) {
+            setDelegationStatus('delegated');
+            setActiveAgent(delegationInfo.agentName);
+            setDelegationReason(delegationInfo.reasoning || '');
+            
+            // Animate the delegation transition
+            setShowSparkles(true);
+            setTimeout(() => setShowSparkles(false), 2500);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to parse delegation info', err);
+      }
+      
       // Check for HTTP errors
       if (!response.ok) {
         const status = response.status;
@@ -349,6 +382,36 @@ export function Chat({
     window.location.href = '/login';
   }, []);
 
+  // Enhanced display of delegation status
+  const renderDelegationStatus = () => {
+    if (delegationStatus === 'idle' || isLoading) return null;
+    
+    return (
+      <motion.div 
+        className="flex items-center gap-2 mb-2 p-2 rounded-md bg-slate-50 dark:bg-slate-900 text-sm border border-slate-200 dark:border-slate-800"
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0 }}
+      >
+        <div className="flex-shrink-0">
+          {delegationStatus === 'delegating' ? (
+            <div className="animate-pulse h-2 w-2 rounded-full bg-blue-500"></div>
+          ) : (
+            <div className="h-2 w-2 rounded-full bg-green-500"></div>
+          )}
+        </div>
+        <div>
+          {delegationStatus === 'delegating' 
+            ? 'Mimir is analyzing your request...' 
+            : `Delegated to ${activeAgent}`}
+          {delegationReason && (
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{delegationReason}</p>
+          )}
+        </div>
+      </motion.div>
+    );
+  };
+
   return (
     <div 
       className="relative flex flex-col w-full h-full overflow-hidden"
@@ -474,6 +537,11 @@ export function Chat({
           </motion.div>
         )}
         
+        {/* Show delegation status */}
+        <AnimatePresence>
+          {renderDelegationStatus()}
+        </AnimatePresence>
+        
         {/* Loading indicator when no messages yet */}
         {isLoading && messages.length === 0 && !showWelcome && (
           <div className="flex justify-center items-center h-32">
@@ -488,12 +556,15 @@ export function Chat({
         <Messages
           messages={messages}
           isLoading={isLoading}
+          showLoadingUi={showSparkles}
+          error={error}
+          baseUrlPath={`/chat/${chatId}`}
           chatId={chatId}
           votes={votes ?? []}
           setMessages={setMessages}
           reload={reload}
           isReadonly={isReadonly}
-          isArtifactVisible={isArtifactVisible}
+          isArtifactVisible={false}
         />
         
         {/* Used to scroll to bottom of messages */}

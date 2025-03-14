@@ -4,6 +4,7 @@ import { TriageAgent } from './TriageAgent';
 import { ResearchAgent } from './ResearchAgent';
 import { ReportAgent } from './ReportAgent';
 import { JudgeAgent } from './JudgeAgent';
+import { MimirAgent } from './MimirAgent';
 import { AgentConfig, AgentContext } from './agent';
 import { improveWithFeedback } from './improvement';
 
@@ -12,6 +13,7 @@ import { improveWithFeedback } from './improvement';
  */
 export enum AgentType {
   DELEGATION = 'Delegation',
+  MIMIR = 'Mimir',
   RESEARCH = 'Research',
   REPORT = 'Report',
   TRIAGE = 'Triage',
@@ -54,16 +56,14 @@ export class AgentFactory {
     let agent: BaseAgent<T>;
     
     switch (type) {
+      case AgentType.MIMIR:
+        // Create the Mimir delegation agent
+        agent = new MimirAgent() as unknown as BaseAgent<T>;
+        break;
+        
       case AgentType.DELEGATION:
-        // Create a basic delegation agent with default settings
-        agent = new BaseAgent({
-          name: 'DelegationAgent',
-          instructions: 'You are an agent that delegates tasks to specialized agents.',
-          model: this.defaultModel,
-          modelSettings: {
-            temperature: this.defaultTemperature
-          }
-        }) as unknown as BaseAgent<T>;
+        // For backward compatibility, now use Mimir for delegation
+        agent = new MimirAgent() as unknown as BaseAgent<T>;
         break;
         
       case AgentType.TRIAGE:
@@ -76,6 +76,10 @@ export class AgentFactory {
         
       case AgentType.REPORT:
         agent = new ReportAgent() as unknown as BaseAgent<T>;
+        break;
+        
+      case AgentType.JUDGE:
+        agent = new JudgeAgent() as unknown as BaseAgent<T>;
         break;
         
       case AgentType.CUSTOM:

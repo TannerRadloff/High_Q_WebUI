@@ -7,7 +7,7 @@ import { ThemeProvider } from '@/src/components/common/theme-provider';
 import { Providers } from './providers';
 import { ErrorBoundary } from '@/src/components/ui/error-boundary';
 import { NavBar } from '@/src/components/layout/nav-bar';
-import { SidebarProvider } from './components/sidebar-provider';
+import { SidebarProvider } from '@/src/components/ui/sidebar';
 import ClientLayout from './client-layout';
 
 function isAuthPage(pathname: string | null) {

@@ -34,6 +34,7 @@ export interface AgentContext {
   userName?: string; // User's name or identifier
   relevantMemories?: any[]; // Relevant memories for the current context
   userId?: string; // User's unique identifier
+  stream?: (message: { type: string; content: string; [key: string]: any }) => Promise<void>; // Stream messages to the client
 }
 
 export interface StreamCallbacks {
