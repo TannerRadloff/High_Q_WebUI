@@ -3,23 +3,23 @@
 import { startTransition, useMemo, useOptimistic, useState } from 'react';
 
 import { saveChatModelAsCookie } from '@/app/(chat)/actions';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/src/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@/src/components/ui/dropdown-menu';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+} from '@/src/components/ui/tooltip';
 import { chatModels } from '@/lib/ai/models';
 import { cn } from '@/lib/utils';
 
-import { CheckCircleFillIcon, ChevronDownIcon, InfoIcon } from './icons';
+import { CheckCircleFillIcon, ChevronDownIcon, InfoIcon } from '@/src/components/common/icons';
 
 export function ModelSelector({
   selectedModelId,

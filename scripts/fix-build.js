@@ -1,50 +1,48 @@
+/**
+ * Pre-build script to fix common issues that might cause build failures
+ */
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
-// Ensure both directories exist
-const serverManifestDir = path.join(process.cwd(), '.next', 'server', 'app', '(chat)');
-const standaloneManifestDir = path.join(process.cwd(), '.next', 'standalone', '.next', 'server', 'app', '(chat)');
+console.log('Running build fix script...');
 
-// Create directories if they don't exist
-[serverManifestDir, standaloneManifestDir].forEach(dir => {
-  try {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-      console.log(`Created directory: ${dir}`);
-    }
-  } catch (error) {
-    console.log(`Note: Could not create directory ${dir}. It may be created during the build: ${error.message}`);
+// Ensure required directories exist
+const requiredDirs = [
+  '.next/server/app/(chat)',
+  '.next/standalone/.next/server/app/(chat)'
+];
+
+requiredDirs.forEach(dir => {
+  const fullPath = path.join(process.cwd(), dir);
+  if (!fs.existsSync(fullPath)) {
+    console.log(`Created directory: ${fullPath}`);
+    fs.mkdirSync(fullPath, { recursive: true });
   }
 });
 
-// Create the client reference manifest content
-const manifestContent = `
-// This file is needed for Next.js build process
-// It provides client reference information for the page
-export const clientReferenceManifest = {
-  ssrModuleMapping: {},
-  edgeSSRModuleMapping: {},
-  clientModules: {},
-  entryCSSFiles: {}
-};
-`;
+// Create empty client reference manifest files if they don't exist
+const manifestFiles = [
+  '.next/server/app/(chat)/page_client-reference-manifest.js',
+  '.next/standalone/.next/server/app/(chat)/page_client-reference-manifest.js'
+];
 
-// Write the manifest files to both locations
-const serverManifestPath = path.join(serverManifestDir, 'page_client-reference-manifest.js');
-const standaloneManifestPath = path.join(standaloneManifestDir, 'page_client-reference-manifest.js');
+manifestFiles.forEach(file => {
+  const fullPath = path.join(process.cwd(), file);
+  if (!fs.existsSync(fullPath)) {
+    console.log(`Created client reference manifest at: ${fullPath}`);
+    fs.writeFileSync(fullPath, '// Auto-generated client reference manifest\n', 'utf8');
+  }
+});
 
+// Run the import fix script if it exists
 try {
-  fs.writeFileSync(serverManifestPath, manifestContent);
-  console.log(`Created client reference manifest at: ${serverManifestPath}`);
+  if (fs.existsSync(path.join(process.cwd(), 'scripts/fix-imports.js'))) {
+    console.log('Running import path fixer...');
+    execSync('node scripts/fix-imports.js', { stdio: 'inherit' });
+  }
 } catch (error) {
-  console.log(`Note: Could not write to ${serverManifestPath}: ${error.message}`);
-}
-
-try {
-  fs.writeFileSync(standaloneManifestPath, manifestContent);
-  console.log(`Created client reference manifest at: ${standaloneManifestPath}`);
-} catch (error) {
-  console.log(`Note: Could not write to ${standaloneManifestPath}: ${error.message}`);
+  console.error('Error running import fixer:', error);
 }
 
 console.log('Build fix script completed successfully!'); 

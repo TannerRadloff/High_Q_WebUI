@@ -27,14 +27,17 @@
       "@/*": [
         "./*"
       ],
+      "@/src/*": [
+        "./src/*"
+      ],
       "@/src/components": [
-        "src/components"
+        "./src/components"
       ],
       "@/src/components/*": [
-        "src/components/*"
+        "./src/components/*"
       ],
       "@/hooks": [
-        "src/hooks"
+        "./src/hooks"
       ],
       "@/hooks/*": [
         "./src/hooks/*"

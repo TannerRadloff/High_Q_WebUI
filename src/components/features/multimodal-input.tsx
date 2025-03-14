@@ -24,21 +24,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import { cn } from '@/utils/formatting';
 import { showUniqueErrorToast } from '@/lib/api-error-handler';
-import { ArrowUpIcon, PaperclipIcon, StopIcon, CrossIcon, BotIcon } from './icons';
-import { Button } from './ui/button';
-import { Textarea } from './ui/textarea';
+import { ArrowUpIcon, PaperclipIcon, StopIcon, CrossIcon, BotIcon } from '@/src/components/common/icons';
+import { Button } from '@/src/components/ui/button';
+import { Textarea } from '@/src/components/ui/textarea';
 import { 
   Select, 
   SelectContent, 
   SelectItem, 
   SelectTrigger, 
   SelectValue 
-} from './ui/select';
+} from '@/src/components/ui/select';
 import { 
   Tooltip,
   TooltipContent,
   TooltipTrigger 
-} from './ui/tooltip';
+} from '@/src/components/ui/tooltip';
 import { generateUUID } from '@/utils/auth';
 import { sanitizeUIMessages } from '@/utils/messages';
 

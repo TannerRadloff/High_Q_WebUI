@@ -23,6 +23,12 @@ const nextConfig = {
     config.resolve.alias = {
       ...config.resolve.alias,
       '@': require('path').resolve(__dirname, './'),
+      '@/components': './components',
+      '@/src/components': './src/components',
+      '@/lib': './lib',
+      '@/types': './types',
+      '@/hooks': './src/hooks',
+      '@/utils': './utils',
     };
     
     return config;
@@ -57,7 +63,8 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '2mb',
       allowedOrigins: ['*']
-    }
+    },
+    serverComponentsExternalPackages: ['sharp'],
   },
 };
 

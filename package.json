@@ -133,5 +133,8 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "glob": "^11.0.1"
+  }
 }

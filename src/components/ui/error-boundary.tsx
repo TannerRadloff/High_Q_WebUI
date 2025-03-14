@@ -1,8 +1,8 @@
 'use client';
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/src/components/ui/alert';
+import { Button } from '@/src/components/ui/button';
 import type { LucideIcon } from 'lucide-react';
 import { RefreshCw } from 'lucide-react';
 

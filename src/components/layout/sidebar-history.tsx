@@ -25,7 +25,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from '@/src/components/ui/alert-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,7 +35,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@/src/components/ui/dropdown-menu';
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -44,7 +44,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from '@/components/ui/sidebar';
+} from '@/src/components/ui/sidebar';
 import type { Chat } from '@/lib/db/schema';
 import { fetcher } from '@/lib/utils';
 import { useChatVisibility } from '@/hooks/use-chat-visibility';

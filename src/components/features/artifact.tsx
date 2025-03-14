@@ -23,7 +23,7 @@ import { VersionFooter } from './version-footer';
 import { ArtifactActions } from './artifact-actions';
 import { ArtifactCloseButton } from './artifact-close-button';
 import { ArtifactMessages } from './artifact-messages';
-import { useSidebar } from '@/components/ui/sidebar';
+import { useSidebar } from '@/src/components/ui/sidebar';
 import { useArtifact } from '../../hooks/use-artifact';
 import { imageArtifact } from '@/artifacts/image/client';
 import { codeArtifact } from '@/artifacts/code/client';

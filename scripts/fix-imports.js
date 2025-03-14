@@ -1,42 +1,51 @@
+/**
+ * This script fixes import paths in the project to ensure consistent path resolution
+ */
 const fs = require('fs');
 const path = require('path');
+const glob = require('glob');
 
-// Files to fix
-const filesToFix = [
-  'src/components/features/artifact-actions.tsx',
-  'src/components/features/artifact-close-button.tsx',
-  'src/components/features/artifact.tsx'
-];
-
-// Import mappings
-const importMappings = {
-  './ui/button': '@/components/ui/button',
-  './ui/tooltip': '@/components/ui/tooltip',
-  './toolbar': '@/components/features/toolbar',
-  './icons': '@/components/features/icons'
+// Path mappings to fix
+const pathMappings = {
+  // Fix relative imports in src/components/features
+  './ui/': '@/src/components/ui/',
+  './markdown': '@/src/components/common/markdown',
+  './icons': '@/src/components/common/icons',
+  
+  // Fix other common path issues
+  '@/components/ui/': '@/src/components/ui/',
+  '@/components/features/': '@/src/components/features/',
+  '@/components/common/': '@/src/components/common/',
 };
 
+// Find all TypeScript and TSX files in the src directory
+const files = glob.sync('src/**/*.{ts,tsx}');
+
+console.log(`Found ${files.length} files to process`);
+
 // Process each file
-filesToFix.forEach(filePath => {
-  try {
-    console.log(`Processing ${filePath}...`);
+files.forEach(file => {
+  let content = fs.readFileSync(file, 'utf8');
+  let hasChanges = false;
+  
+  // Apply each path mapping
+  Object.entries(pathMappings).forEach(([from, to]) => {
+    // Look for import statements with the path to replace
+    const importRegex = new RegExp(`import\\s+(?:{[^}]*}|[^{};]*)\\s+from\\s+['"]${from}`, 'g');
     
-    // Read the file
-    let content = fs.readFileSync(filePath, 'utf8');
-    
-    // Fix imports
-    for (const [oldImport, newImport] of Object.entries(importMappings)) {
-      const importRegex = new RegExp(`from\\s+['"]${oldImport}['"]`, 'g');
-      content = content.replace(importRegex, `from '${newImport}'`);
+    if (importRegex.test(content)) {
+      hasChanges = true;
+      content = content.replace(importRegex, match => {
+        return match.replace(from, to);
+      });
     }
-    
-    // Write the file
-    fs.writeFileSync(filePath, content, 'utf8');
-    
-    console.log(`Fixed imports in ${filePath}`);
-  } catch (error) {
-    console.error(`Error processing ${filePath}:`, error);
+  });
+  
+  // Save the file if changes were made
+  if (hasChanges) {
+    fs.writeFileSync(file, content, 'utf8');
+    console.log(`Fixed imports in ${file}`);
   }
 });
 
-console.log('Import paths fixed successfully!'); 
+console.log('Import path fixing completed!'); 

@@ -1,5 +1,5 @@
-import { Input } from './ui/input';
-import { Label } from './ui/label';
+import { Input } from '@/src/components/ui/input';
+import { Label } from '@/src/components/ui/label';
 
 export function AuthForm({
   action,

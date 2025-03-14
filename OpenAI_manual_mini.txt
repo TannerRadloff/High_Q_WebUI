@@ -1,0 +1,131 @@
+**Distilled Documentation for AI Agent Orchestration (.txt Reference)**
+
+--------------------------------------------------------------------------------
+1. **OVERVIEW**
+   - Use the OpenAI API to generate text from prompts, optionally integrating images (vision), PDF input, or structured data.
+   - Key concepts:
+     - **Models:** Each model has different capabilities (e.g. GPT-4, GPT-4o, o1 for advanced reasoning).
+     - **Responses API:** Allows text/vision input, function calling, streaming, and structured outputs.
+     - **Tools:** Built-in or custom. E.g., function calling, web search, file search, computer use.
+     - **Structured Outputs:** Return JSON adhering to a schema for guaranteed formatting.
+     - **Reasoning Models:** (o1, o3-mini) produce internal “chain of thought.” Include a `reasoning` parameter.
+
+--------------------------------------------------------------------------------
+2. **TEXT GENERATION BASICS**
+   - **Endpoint:** `/v1/responses` (the “Responses API”).
+   - **Simple Example** (JavaScript):
+     ```js
+     import OpenAI from "openai";
+     const client = new OpenAI();
+     const response = await client.responses.create({
+       model: "gpt-4o",
+       input: "Write a one-sentence bedtime story about a unicorn."
+     });
+     console.log(response.output_text);
+     ```
+   - **Prompts** can contain multiple messages with roles (`user`, `assistant`, `developer`, etc.).
+   - **instructions** parameter sets high-level model directives (tone, style) that override the prompt input.
+   - Common parameters:
+     - `model`: which model to use
+     - `input`: text or messages
+     - `instructions`: top-level instructions
+     - `max_output_tokens`: limit generated tokens
+     - `stream`: enable streaming
+     - `tools`: enable function calls or built-in tools
+     - `structured outputs`: specify a JSON schema
+
+--------------------------------------------------------------------------------
+3. **STRUCTURED OUTPUTS**
+   - Ensures responses follow a supplied JSON schema:
+     - **Usage:** 
+       ```json
+       text: {
+         "format": {
+           "type": "json_schema",
+           "name": "...",
+           "schema": {...},
+           "strict": true
+         }
+       }
+       ```
+     - Model output is guaranteed valid JSON matching the schema if `strict: true`.
+   - Avoid complicated or unsupported schema features.
+   - Watch for refusals; the model may return a `refusal` object if it decides it cannot fulfill the request.
+
+--------------------------------------------------------------------------------
+4. **MESSAGE ROLES & INSTRUCTION HIERARCHY**
+   - **developer** messages have higher priority than **user**.
+   - **assistant** messages are model responses.
+   - Multi-turn conversation is possible by providing prior messages as input or using `previous_response_id`.
+
+--------------------------------------------------------------------------------
+5. **VISION (IMAGE INPUTS)**
+   - Provide image inputs either by URL or Base64.
+   - Some models can accept images (e.g. “gpt-4o”).
+   - `detail` parameter can be `"low"`, `"high"`, or `"auto"`.
+   - Limits: up to 20MB, certain dimension constraints, no NSFW content, etc.
+
+--------------------------------------------------------------------------------
+6. **FUNCTION CALLING**
+   - Lets the model call custom functions or built-in tools.
+   - Provide `tools = [ { type: "function", ...schema... }, ... ]`.
+   - The model may return `type: "function_call"` with `name` and JSON `arguments`.
+   - Developer code parses and executes the function, returns a result. Then pass that result back to the model as a `function_call_output`.
+   - Great for hooking the model into application logic, data retrieval, or custom actions.
+
+--------------------------------------------------------------------------------
+7. **BUILT-IN TOOLS**
+   - **Web search**: add `tools: [{type: "web_search_preview"}]` to let model fetch recent info. Model will cite sources in output.
+   - **File search**: add `tools: [{type: "file_search", vector_store_ids: [...] }]` for semantic retrieval across user-uploaded docs.
+   - **Computer use**: (preview) let the model control a browser/OS environment. The model suggests actions (`click`, `type`, etc.); you run them and return screenshots. Loop until done. Must sandbox for safety.
+
+--------------------------------------------------------------------------------
+8. **CONVERSATION STATE & CONTEXT**
+   - For multi-turn usage, either:
+     - Provide all prior messages in `input[]` each time, or
+     - Use `previous_response_id` to chain responses automatically.
+   - Mind the **context window** (input + output + reasoning tokens must fit).
+
+--------------------------------------------------------------------------------
+9. **REASONING MODELS**
+   - E.g., `o1`, `o3-mini`. They produce *reasoning tokens* for complex tasks.
+   - Additional param `reasoning: { effort: "low" | "medium" | "high" }`.
+   - `chain_of_thought` is not exposed to the user but counts toward tokens. Plan enough `max_output_tokens`.
+
+--------------------------------------------------------------------------------
+10. **MODERATION & SAFETY**
+   - Responses may be refused (`type: "refusal"`).
+   - For “computer-use” tool, model may produce a `pending_safety_check`. Must explicitly acknowledge if you want to continue.
+
+--------------------------------------------------------------------------------
+11. **COST & PERFORMANCE**
+   - See [Pricing](https://openai.com/api/pricing) for token costs. 
+   - Large or advanced models cost more, but produce higher-quality outputs.
+   - Fine-tuning & caching can reduce costs if prompts are large or repeated.
+
+--------------------------------------------------------------------------------
+12. **STREAMING**
+   - Set `stream: true` to receive events chunk by chunk (like server-sent events).
+   - Helps show partial outputs earlier and handle large responses gracefully.
+
+--------------------------------------------------------------------------------
+13. **PDF & FILE INPUTS**
+   - Use `file_id` from the Files API or Base64-encoded PDF. The model interprets extracted text + page images.
+   - Up to 100 pages (32MB total) per request.
+
+--------------------------------------------------------------------------------
+14. **PROMPT ENGINEERING TIPS**
+   - For GPT models: Provide explicit instructions (step-by-step or examples).
+   - For Reasoning models: Give goals & constraints; they handle the plan internally.
+   - Use few-shot examples if needed.
+
+--------------------------------------------------------------------------------
+15. **PRODUCTION BEST PRACTICES**
+   - Securely store API keys; use environment variables or secrets management.
+   - Monitor usage & set monthly or spending limits.
+   - Manage rate limits & consider horizontally scaling your application.
+   - Evaluate performance & cost. Possibly cache repeated queries.
+   - Incorporate MLOps: track model performance, retrain or fine-tune as needed.
+
+--------------------------------------------------------------------------------
+**END**

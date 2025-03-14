@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Button } from '@/src/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/src/components/ui/tooltip';
 import { artifactDefinitions, type UIArtifact } from './artifact';
 import { type Dispatch, memo, type SetStateAction, useState } from 'react';
 import type { ArtifactActionContext } from './create-artifact';
