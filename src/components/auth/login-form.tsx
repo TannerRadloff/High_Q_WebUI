@@ -166,7 +166,15 @@ function LoginFormContent() {
     
     try {
       await signIn(email, password)
-      // Auth provider handles the success case
+      // Add a manual redirect as a fallback
+      setTimeout(() => {
+        console.log('Login form fallback redirect to home')
+        // Use direct location change instead of router
+        window.location.href = '/'
+        // Comment out router usage which might be causing issues
+        // router.push('/')
+        // router.refresh()
+      }, 1000)
     } catch (error: any) {
       showErrorNotification(error.message || 'Failed to sign in')
       setIsLoading(false)
@@ -208,6 +216,12 @@ function LoginFormContent() {
       showErrorNotification(error.message || 'Failed to sign in with Google')
       setIsGoogleLoading(false)
     }
+  }
+
+  // Add a test function for navigation
+  const testNavigation = () => {
+    console.log('Testing navigation to /profile')
+    router.push('/profile')
   }
 
   // If there are API key or DB configuration errors, show special message
@@ -286,20 +300,18 @@ function LoginFormContent() {
                       id="email"
                       type="email"
                       placeholder="name@example.com"
+                      autoComplete="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      autoComplete="email"
                       disabled={isLoading}
                       required
+                      className="bg-background/50"
                     />
                   </div>
                   <div className="grid gap-2">
-                    <div className="flex justify-between items-center">
+                    <div className="flex items-center justify-between">
                       <Label htmlFor="password">Password</Label>
-                      <Link 
-                        href="/forgot-password" 
-                        className="text-sm text-primary hover:underline"
-                      >
+                      <Link href="/forgot-password" className="text-sm text-primary hover:text-primary/90 transition-colors">
                         Forgot password?
                       </Link>
                     </div>
@@ -307,11 +319,12 @@ function LoginFormContent() {
                       id="password"
                       type="password"
                       placeholder="••••••••"
+                      autoComplete="current-password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      autoComplete="current-password"
                       disabled={isLoading}
                       required
+                      className="bg-background/50"
                     />
                   </div>
                   <Button 
@@ -319,7 +332,17 @@ function LoginFormContent() {
                     className="w-full"
                     disabled={isLoading}
                   >
-                    {isLoading ? 'Signing in...' : 'Sign in'}
+                    {isLoading ? (
+                      <>
+                        <span className="mr-2">Signing in</span>
+                        <span className="animate-spin">⟳</span>
+                      </>
+                    ) : 'Sign In'}
+                  </Button>
+                  
+                  {/* Test button */}
+                  <Button type="button" variant="outline" onClick={testNavigation} className="w-full">
+                    Test Navigation
                   </Button>
                 </div>
               </form>

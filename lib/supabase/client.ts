@@ -33,6 +33,8 @@ export const createClient = () => {
     // Get the consistent cookie domain using our helper
     const cookieDomain = getCookieDomain();
     console.log(`Using cookie domain: ${cookieDomain}`);
+    console.log('App URL from env:', process.env.NEXT_PUBLIC_APP_URL);
+    console.log('Current location:', isBrowser ? window.location.href : 'server-side');
     
     // Create the client with custom cookie settings to handle deployment URLs
     cachedClient = createClientComponentClient<Database>({

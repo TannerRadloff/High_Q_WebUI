@@ -84,6 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, currentSession: Session | null) => {
         console.log('[AuthProvider] Auth state changed:', event, 'Session:', !!currentSession)
+        console.log('[AuthProvider] Current pathname:', pathname)
         
         // Update the state with the new session
         setSession(currentSession)
@@ -95,12 +96,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // If we just signed in, redirect to home page if on auth page
             if (pathname?.includes('/login') || pathname?.includes('/register')) {
               console.log('[AuthProvider] Redirecting to home after sign in')
+              console.log('[AuthProvider] Redirect check - pathname includes /login or /register:', 
+                pathname?.includes('/login') || pathname?.includes('/register'))
               
               // Add a small delay to ensure cookies are set before redirect
               setTimeout(() => {
-                router.push('/')
-                router.refresh()
+                console.log('[AuthProvider] Executing redirect now')
+                // Try window.location.href directly instead of router.push
+                window.location.href = '/'
+                // Keeping this commented out for now as it might be causing issues
+                // router.push('/')
+                // router.refresh()
               }, 500)
+            } else {
+              console.log('[AuthProvider] Not redirecting, not on a login/register page. Current path:', pathname)
             }
             break
             
@@ -160,6 +169,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Update state with new session information
       console.log('[AuthProvider] Sign in successful')
       toast.success('Signed in successfully')
+      
+      // Manually redirect after successful login
+      if (pathname?.includes('/login') || pathname?.includes('/register')) {
+        console.log('[AuthProvider] Manually redirecting to home after sign in')
+        setTimeout(() => {
+          router.push('/')
+          router.refresh()
+        }, 500)
+      }
       
       return
     } catch (error) {
