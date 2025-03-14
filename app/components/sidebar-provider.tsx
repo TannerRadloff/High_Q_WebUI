@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '@/utils/formatting';
-import { SidebarContext, useIsMobile } from '../contexts/sidebar-context';
+import { SidebarContext } from '../contexts/sidebar-context';
+import { useIsMobile } from '@/src/hooks/use-mobile';
 
 interface SidebarProviderProps {
   children: React.ReactNode;

@@ -196,3 +196,14 @@ export const openaiResponses = {
     }
   }
 };
+
+// Add myProvider implementation for AI SDK integration
+export const myProvider = {
+  languageModel: (modelId: string) => {
+    return {
+      provider: 'openai',
+      model: getOpenAIModelName(modelId),
+      apiKey: process.env.OPENAI_API_KEY as string
+    };
+  }
+};
