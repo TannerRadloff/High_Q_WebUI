@@ -48,6 +48,8 @@ import { generateUUID } from '@/utils/auth';
 import { sanitizeUIMessages } from '@/utils/messages';
 import { agentTypeConfig } from '@/src/config/agent-types';
 import { AgentSelector } from '@/src/components/features/agent-selector';
+import { Switch } from '@/src/components/ui/switch';
+import { Label } from '@/src/components/ui/label';
 
 // Add an interface at the top of the file
 interface MessageWithDocument extends Message {
@@ -96,6 +98,10 @@ function PureMultimodalInput({
   const [isFocused, setIsFocused] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<string>('default');
   const { user } = useAuth();
+
+  // Add agent mode state
+  const [agentModeEnabled, setAgentModeEnabled] = useLocalStorage('agent-mode-enabled', false);
+  const [selectedAgentId, setSelectedAgentId] = useLocalStorage('selected-agent-id', 'delegation');
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -397,6 +403,26 @@ function PureMultimodalInput({
     [wrappedHandleSubmit]
   );
 
+  // Custom submit to handle agent mode
+  const handleAgentModeSubmit = (userInput: string) => {
+    // Here we would add implementation for handling agent mode submissions
+    // In a full implementation, this would make API calls to the agent backend
+    console.log(`[AGENT-MODE] Processing request with ${selectedAgentId} agent: "${userInput}"`);
+    
+    // For demonstration, we'll simulate agent handling by adding special system message
+    const agentType = agentTypeConfig.find(agent => agent.id === selectedAgentId)?.name || 'Agent';
+    
+    // Add a system message indicating agent processing
+    append({
+      id: generateUUID(),
+      role: 'system',
+      content: `Processing with ${agentType} Agent...`,
+    });
+    
+    // Submit normally, but we can add metadata to indicate agent mode
+    handleSubmit();
+  };
+
   return (
     <div
       className={cn(
@@ -409,7 +435,14 @@ function PureMultimodalInput({
       )}
     >
       <form
-        onSubmit={wrappedHandleSubmit}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (agentModeEnabled) {
+            handleAgentModeSubmit(input);
+          } else {
+            handleSubmit();
+          }
+        }}
         className="flex flex-1 flex-col items-start gap-2 relative"
       >
         <div className="flex w-full flex-row items-end gap-2">
@@ -458,22 +491,28 @@ function PureMultimodalInput({
                   }
                 }}
               >
-                {/* Agent selector */}
-                <div className="flex items-center gap-2">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <AgentSelector
-                        selectedAgentId={selectedAgent}
-                        onAgentChange={setSelectedAgent}
-                        buttonSize="sm"
-                        disabled={isLoading}
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      Select an AI agent type to process your request
-                    </TooltipContent>
-                  </Tooltip>
+                {/* Agent Mode Switch */}
+                <div className="absolute -top-12 right-0 flex-row-center gap-2">
+                  <Label htmlFor="agent-mode" className="text-sm">Agent Mode</Label>
+                  <Switch
+                    id="agent-mode"
+                    checked={agentModeEnabled}
+                    onCheckedChange={setAgentModeEnabled}
+                  />
                 </div>
+
+                {/* Agent Selector - Only shown when agent mode is enabled */}
+                {agentModeEnabled && (
+                  <div className="mb-2 flex-row-center gap-2">
+                    <AgentSelector
+                      selectedAgentId={selectedAgentId}
+                      onAgentChange={setSelectedAgentId}
+                      displayMode="buttons"
+                      buttonSize="sm"
+                      className="w-full"
+                    />
+                  </div>
+                )}
 
                 <div
                   className={cn(
