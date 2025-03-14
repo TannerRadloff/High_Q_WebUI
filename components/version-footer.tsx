@@ -7,7 +7,7 @@ import { useSWRConfig } from 'swr';
 import { useWindowSize } from 'usehooks-ts';
 
 import type { Document } from '@/lib/db/schema';
-import { getDocumentTimestampByIndex } from '@/lib/utils';
+import { getDocumentTimestampByIndex } from '@/utils/documents';
 
 import { LoaderIcon } from './icons';
 import { Button } from './ui/button';

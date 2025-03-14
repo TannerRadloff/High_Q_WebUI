@@ -88,7 +88,7 @@ git clone https://github.com/vercel/ai-chatbot.git
 ### Installing dependencies
 
 ```bash
-npm install
+pnpm install
 ```
 
 ### Configuration
@@ -124,13 +124,13 @@ EMAIL_FROM=
 3. Run the database migrations:
 
 ```bash
-npm run db:migrate
+pnpm run db:migrate
 ```
 
 ### Starting the app
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 ## License
@@ -146,11 +146,11 @@ This project uses TypeScript for type safety. We've added custom type declaratio
 Run the following command to install required TypeScript type packages:
 
 ```bash
-npm run setup:types
+pnpm run setup:types
 # or
 yarn setup:types
 # or
-pnpm setup:types
+npm setup:types
 ```
 
 ### Type Declarations

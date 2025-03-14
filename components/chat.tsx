@@ -11,7 +11,8 @@ import { toast } from 'sonner';
 
 import { ChatHeader } from '@/components/chat-header';
 import type { Vote } from '@/lib/db/schema';
-import { fetcher, generateUUID } from '@/lib/utils';
+import { fetcher } from '@/utils';
+import { generateUUID } from '@/utils/auth';
 import type { ExtendedAttachment } from '@/types';
 import { 
   showUniqueErrorToast, 

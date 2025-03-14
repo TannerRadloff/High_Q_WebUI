@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
-import { cn } from '@/lib/utils';
+import { cn } from '@/utils/formatting';
 import { Inter } from 'next/font/google';
 
 import { Analytics } from '@vercel/analytics/react';

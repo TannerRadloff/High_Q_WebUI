@@ -22,7 +22,7 @@ import { useLocalStorage, useWindowSize } from 'usehooks-ts';
 import equal from 'fast-deep-equal';
 import { motion, AnimatePresence } from 'framer-motion';
 
-import { sanitizeUIMessages, generateUUID, cn } from '@/lib/utils';
+import { cn } from '@/utils/formatting';
 import { showUniqueErrorToast } from '@/lib/api-error-handler';
 import { ArrowUpIcon, PaperclipIcon, StopIcon, CrossIcon, BotIcon } from './icons';
 import { Button } from './ui/button';
@@ -39,6 +39,8 @@ import {
   TooltipContent,
   TooltipTrigger 
 } from './ui/tooltip';
+import { generateUUID } from '@/utils/auth';
+import { sanitizeUIMessages } from '@/utils/messages';
 
 // Define agent types (from AgentType enum)
 const agentTypes = [

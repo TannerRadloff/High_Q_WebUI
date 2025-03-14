@@ -1,4 +1,4 @@
-import { generateUUID } from '@/lib/utils';
+import { generateUUID } from '@/utils/auth';
 import { type DataStreamWriter, tool } from 'ai';
 import { z } from 'zod';
 import type { Session } from '@supabase/supabase-js';
