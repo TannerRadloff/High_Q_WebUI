@@ -1,10 +1,8 @@
 'use server';
 
 import { z } from 'zod';
-import { genSaltSync, hashSync } from 'bcrypt-ts';
-import { randomBytes } from 'node:crypto';
-import { getSupabaseServerClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
+import { getSupabaseActionClient } from '@/lib/supabase/server';
 
 import { 
   createUser, 
@@ -47,8 +45,8 @@ export const login = async (
       password,
     });
 
-    // Use Supabase directly for authentication
-    const supabase = await getSupabaseServerClient();
+    // Use Supabase directly for authentication - specifically the action client
+    const supabase = await getSupabaseActionClient();
     
     const { data, error } = await supabase.auth.signInWithPassword({
       email: validatedData.email,
@@ -64,6 +62,9 @@ export const login = async (
     if (data.session) {
       // Log successful authentication
       console.log('User authenticated successfully, session created');
+      if (data.session.expires_at) {
+        console.log('Session expires at:', new Date(data.session.expires_at * 1000).toISOString());
+      }
     }
 
     return { status: 'success' };
@@ -102,17 +103,20 @@ export const register = async (
       return { status: 'user_exists' } as RegisterActionState;
     }
 
-    // Create user in your database
+    // Create user in your database first
     await createUser(validatedData.email, validatedData.password);
     
-    // Sign up with Supabase
-    const supabase = await getSupabaseServerClient();
+    // Then sign up with Supabase using the action client
+    const supabase = await getSupabaseActionClient();
+    
+    // Get the base URL from the environment or use a default
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     
     const { error } = await supabase.auth.signUp({
       email: validatedData.email,
       password: validatedData.password,
       options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`,
+        emailRedirectTo: `${baseUrl}/auth/callback`,
       }
     });
 
@@ -145,8 +149,8 @@ export const forgotPassword = async (
       return { status: 'invalid_data' };
     }
 
-    // Use Supabase's built-in password reset
-    const supabase = await getSupabaseServerClient();
+    // Use Supabase's built-in password reset with the action client
+    const supabase = await getSupabaseActionClient();
     
     // Get the base URL from the environment or use a default
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
@@ -181,8 +185,8 @@ export const resetPassword = async (
       confirmPassword: formData.get('confirmPassword'),
     });
 
-    // Use Supabase to update the password
-    const supabase = await getSupabaseServerClient();
+    // Use Supabase to update the password with the action client
+    const supabase = await getSupabaseActionClient();
     
     const { error } = await supabase.auth.updateUser({
       password: validatedData.password

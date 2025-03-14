@@ -28,7 +28,24 @@ export default function LoginPage() {
   const checkEnvironment = useCallback(async () => {
     try {
       setIsCheckingEnv(true)
-      const response = await fetch('/api/check-env')
+      
+      const response = await fetch('/api/check-env', {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      })
+      
+      // Check if we got a valid JSON response
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('[LoginPage] Non-JSON response from check-env API:', contentType)
+        // Continue with login page without blocking for env errors
+        setIsCheckingEnv(false)
+        return
+      }
+      
       const data: EnvCheckResult = await response.json()
       
       if (!data.isValid) {
@@ -40,7 +57,8 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error('[LoginPage] Error checking environment:', error)
-      setEnvError('Failed to check environment configuration. Please try again later.')
+      // Don't block login due to env check failures
+      // setEnvError('Failed to check environment configuration. Please try again later.')
     } finally {
       setIsCheckingEnv(false)
     }
@@ -48,7 +66,10 @@ export default function LoginPage() {
 
   // Handle authentication and redirection
   useEffect(() => {
-    checkEnvironment()
+    // Try to check environment but don't block if it fails
+    checkEnvironment().catch(() => {
+      setIsCheckingEnv(false)
+    })
 
     if (!isAuthLoading && user) {
       setIsRedirecting(true)
@@ -77,7 +98,7 @@ export default function LoginPage() {
           transition={{ duration: 0.3 }}
         >
           <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-muted-foreground">Checking environment...</p>
+          <p className="text-muted-foreground">Loading...</p>
         </motion.div>
       )}
       
