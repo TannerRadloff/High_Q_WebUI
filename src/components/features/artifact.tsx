@@ -24,11 +24,11 @@ import { ArtifactActions } from '@/src/components/features/artifact-actions';
 import { ArtifactCloseButton } from '@/src/components/features/artifact-close-button';
 import { ArtifactMessages } from '@/src/components/features/artifact-messages';
 import { useSidebar } from '@/src/components/ui/sidebar';
-import { useArtifact } from '../../hooks/use-artifact';
-import { imageArtifact } from '@/artifacts/image/client';
-import { codeArtifact } from '@/artifacts/code/client';
-import { sheetArtifact } from '@/artifacts/sheet/client';
-import { textArtifact } from '@/artifacts/text/client';
+import { useArtifact } from '@/hooks/use-artifact';
+import { imageArtifact } from '../../../artifacts/image/client';
+import { codeArtifact } from '../../../artifacts/code/client';
+import { sheetArtifact } from '../../../artifacts/sheet/client';
+import { textArtifact } from '../../../artifacts/text/client';
 import equal from 'fast-deep-equal';
 import type { ExtendedAttachment } from '@/types';
 

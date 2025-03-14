@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { useIsMobile } from '../../hooks/use-mobile';
+import { createContext, useContext } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Define sidebar state types
 export type SidebarState = 'expanded' | 'collapsed';
@@ -35,6 +35,4 @@ export const SidebarContext = createContext<SidebarContextType>({
 });
 
 // Hook for easy context consumption
-export const useSidebar = () => useContext(SidebarContext);
-
-// Function to detect mobile viewport is now imported from @/hooks/use-mobile 
+export const useSidebar = () => useContext(SidebarContext); 

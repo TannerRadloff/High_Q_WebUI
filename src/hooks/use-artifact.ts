@@ -1,7 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
-import type { UIArtifact, ArtifactKind } from '@/types/artifact';
+import type { UIArtifact, ArtifactKind } from '@/src/types/artifact';
 import { useCallback, useMemo } from 'react';
 
 export const initialArtifactData: UIArtifact = {
@@ -50,7 +50,7 @@ export function useArtifact() {
 
   const setArtifact = useCallback(
     (updaterFn: UIArtifact | ((currentArtifact: UIArtifact) => UIArtifact)) => {
-      setLocalArtifact((currentArtifact: UIArtifact | null | undefined) => {
+      setLocalArtifact((currentArtifact) => {
         const artifactToUpdate = currentArtifact || initialArtifactData;
 
         if (typeof updaterFn === 'function') {
