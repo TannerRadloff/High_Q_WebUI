@@ -11,4 +11,6 @@ export * from './user-auth-status';
 export * from './auth-provider';
 export * from './login-form';
 export * from './logout-button';
-export * from './register-form'; 
+export * from './register-form';
+export * from './forgot-password-form';
+export * from './reset-password-form'; 
