@@ -37,32 +37,57 @@ export function LoginForm() {
   const { signIn } = useAuth()
   const supabase = createClient()
 
-  // Debug function to check environment variables
-  useEffect(() => {
-    const checkEnv = async () => {
-      try {
-        const response = await fetch('/api/check-env');
-        if (!response.ok) {
-          console.error('Environment check API returned error:', response.status);
-          return;
-        }
-        
-        const data: EnvCheckResult = await response.json();
-        
-        if (!data.isValid) {
-          setApiKeyError(`Missing required environment variables. Please check your .env file.`);
-        }
-        
-        if (data.database && !data.database.isConnected) {
-          setDbError(`Database connection error: ${data.database.error || 'Unknown error'}. Please check your database configuration.`);
-        }
-      } catch (error) {
-        console.error('Error checking environment:', error);
-      }
-    };
-    
-    checkEnv();
-  }, []);
+  // Debug function to check environment variables - disabled to avoid redirect issues
+  // useEffect(() => {
+  //   const checkEnv = async () => {
+  //     try {
+  //       // Add a cache-busting parameter
+  //       const cacheBuster = new Date().getTime();
+  //       const response = await fetch(`/api/check-env?t=${cacheBuster}`, {
+  //         headers: {
+  //           'Cache-Control': 'no-cache, no-store, must-revalidate',
+  //           'Pragma': 'no-cache',
+  //           'Expires': '0'
+  //         }
+  //       });
+  //       
+  //       if (!response.ok) {
+  //         console.error('Environment check API returned error:', response.status);
+  //         return;
+  //       }
+  //       
+  //       // Check if we received JSON
+  //       const contentType = response.headers.get('content-type');
+  //       if (!contentType || !contentType.includes('application/json')) {
+  //         console.warn('Non-JSON response from check-env API:', contentType);
+  //         return;
+  //       }
+  //       
+  //       // Safely parse the response
+  //       const text = await response.text();
+  //       let data: EnvCheckResult;
+  //       
+  //       try {
+  //         data = JSON.parse(text);
+  //       } catch (jsonError) {
+  //         console.error('Failed to parse JSON response:', text.substring(0, 100));
+  //         return;
+  //       }
+  //       
+  //       if (!data.isValid) {
+  //         setApiKeyError(`Missing required environment variables. Please check your .env file.`);
+  //       }
+  //       
+  //       if (data.database && !data.database.isConnected) {
+  //         setDbError(`Database connection error: ${data.database.error || 'Unknown error'}. Please check your database configuration.`);
+  //       }
+  //     } catch (error) {
+  //       console.error('Error checking environment:', error);
+  //     }
+  //   };
+  //   
+  //   checkEnv();
+  // }, []);
 
   const showErrorNotification = (message: string) => {
     toast.error(message, {
@@ -128,10 +153,10 @@ export function LoginForm() {
         exit={{ opacity: 0, y: 10 }}
         transition={{ duration: 0.3 }}
       >
-        <div className="flex-col-center text-center">
+        <div className="flex flex-col items-center text-center">
           <h2 className="text-2xl font-bold tracking-tight text-red-400">Configuration Error</h2>
           
-          <div className="mt-4">
+          <div className="mt-4 w-full">
             {apiKeyError && (
               <ErrorMessage
                 type="server"
@@ -167,7 +192,7 @@ export function LoginForm() {
     >
       <Card className="mx-auto max-w-sm shadow-xl border-zinc-800/60 bg-gradient-to-b from-zinc-900/70 to-zinc-800/90 backdrop-blur-sm">
         <CardHeader className="space-y-1">
-          <div className="flex-center mb-2">
+          <div className="flex justify-center items-center mb-2">
             <LockIcon size={40} />
           </div>
           <CardTitle className="text-2xl text-center">Sign in</CardTitle>
@@ -194,7 +219,7 @@ export function LoginForm() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <div className="flex-between">
+                    <div className="flex justify-between items-center">
                       <Label htmlFor="password">Password</Label>
                       <Link 
                         href="/forgot-password" 

@@ -11,6 +11,14 @@ import postgres from 'postgres';
  * This consolidated endpoint replaces both check-env and check-db routes.
  */
 export async function GET() {
+  // Set proper headers to prevent caching and allow CORS
+  const headers = {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+  };
+
   try {
     // Check environment variables on server side
     const result = checkRequiredEnvVars();
@@ -65,12 +73,12 @@ export async function GET() {
       dbStatus.error = 'POSTGRES_URL environment variable is not set';
     }
     
-    // Return consolidated response
+    // Return consolidated response with proper headers
     return NextResponse.json({
       isValid: result.isValid,
       missingCount: result.missingVars.length,
       database: dbStatus
-    });
+    }, { headers });
   } catch (error: any) {
     console.error('Error checking environment variables:', error);
     return NextResponse.json(
@@ -83,7 +91,7 @@ export async function GET() {
           error: 'Unknown error'
         }
       },
-      { status: 500 }
+      { status: 500, headers }
     );
   }
 } 
