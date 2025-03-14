@@ -10,7 +10,8 @@ console.log('Running build fix script...');
 // Ensure required directories exist
 const requiredDirs = [
   '.next/server/app/(chat)',
-  '.next/standalone/.next/server/app/(chat)'
+  '.next/standalone/.next/server/app/(chat)',
+  'src/types'
 ];
 
 requiredDirs.forEach(dir => {
@@ -34,6 +35,37 @@ manifestFiles.forEach(file => {
     fs.writeFileSync(fullPath, '// Auto-generated client reference manifest\n', 'utf8');
   }
 });
+
+// Ensure the ArtifactKind type exists
+const artifactTypeFile = path.join(process.cwd(), 'src/types/artifact.ts');
+if (!fs.existsSync(artifactTypeFile)) {
+  console.log(`Creating artifact type definitions at: ${artifactTypeFile}`);
+  const artifactTypeContent = `export interface UIArtifact {
+  title: string;
+  documentId: string;
+  kind: string;
+  content: string;
+  isVisible: boolean;
+  status: 'streaming' | 'idle';
+  boundingBox: {
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+  };
+}
+
+export type ArtifactKind = string;
+`;
+  fs.writeFileSync(artifactTypeFile, artifactTypeContent, 'utf8');
+}
+
+// Ensure the types index file exists
+const typesIndexFile = path.join(process.cwd(), 'src/types/index.ts');
+if (!fs.existsSync(typesIndexFile)) {
+  console.log(`Creating types index at: ${typesIndexFile}`);
+  fs.writeFileSync(typesIndexFile, 'export * from "./artifact";\n', 'utf8');
+}
 
 // Run the import fix script if it exists
 try {

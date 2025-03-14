@@ -20,7 +20,7 @@ import {
   logError as logApiError 
 } from '@/lib/api-error-handler';
 
-import { Artifact } from './artifact';
+import { Artifact } from '@/src/components/features/artifact';
 import { Messages } from './messages';
 import { MultimodalInput } from '@/src/components/features';
 import type { VisibilityType } from './visibility-selector';

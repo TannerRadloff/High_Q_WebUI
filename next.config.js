@@ -63,9 +63,10 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '2mb',
       allowedOrigins: ['*']
-    },
-    serverComponentsExternalPackages: ['sharp'],
+    }
   },
+  // Move serverComponentsExternalPackages to the root level as serverExternalPackages
+  serverExternalPackages: ['sharp'],
 };
 
 module.exports = nextConfig; 

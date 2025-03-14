@@ -32,8 +32,9 @@ import {
   StopIcon,
   SummarizeIcon,
 } from '@/src/components/common/icons';
-import { artifactDefinitions, type ArtifactKind } from './artifact';
-import type { ArtifactToolbarItem } from './create-artifact';
+import { artifactDefinitions } from '@/src/components/features/artifact';
+import type { ArtifactKind } from '@/src/types/artifact';
+import type { ArtifactToolbarItem } from '@/src/components/features/create-artifact';
 import type { UseChatHelpers } from 'ai/react';
 
 type ToolProps = {
