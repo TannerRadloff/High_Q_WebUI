@@ -6,6 +6,7 @@ import {
   saveDocument,
 } from '@/lib/db/queries';
 import { generateUUID } from '@/lib/utils';
+import { NextResponse } from 'next/server';
 
 // Helper function to validate UUID format
 function isValidUUID(id: string): boolean {
@@ -18,23 +19,21 @@ export async function GET(request: Request) {
   const id = searchParams.get('id');
 
   if (!id) {
-    return new Response('Missing id', { status: 400 });
+    return NextResponse.json({ error: 'Missing id' }, { status: 400 });
   }
 
   // Validate UUID format
   if (!isValidUUID(id)) {
-    return new Response(
-      JSON.stringify({
-        error: 'Invalid document ID format. Expected a valid UUID.',
-      }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    return NextResponse.json(
+      { error: 'Invalid document ID format. Expected a valid UUID.' },
+      { status: 400 }
     );
   }
 
   const session = await getServerSession();
 
   if (!session || !session.user) {
-    return new Response('Unauthorized', { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const documents = await getDocumentsById({ id });
@@ -42,14 +41,14 @@ export async function GET(request: Request) {
   const [document] = documents;
 
   if (!document) {
-    return new Response('Not Found', { status: 404 });
+    return NextResponse.json({ error: 'Not Found' }, { status: 404 });
   }
 
   if (document.userId !== session.user.id) {
-    return new Response('Unauthorized', { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  return Response.json(documents, { status: 200 });
+  return NextResponse.json(documents, { status: 200 });
 }
 
 export async function POST(request: Request) {
@@ -57,7 +56,7 @@ export async function POST(request: Request) {
   const id = searchParams.get('id');
 
   if (!id) {
-    return new Response('Missing id', { status: 400 });
+    return NextResponse.json({ error: 'Missing id' }, { status: 400 });
   }
 
   // Handle special case for "new" - generate a proper UUID
@@ -65,18 +64,16 @@ export async function POST(request: Request) {
   
   // For regular IDs, validate UUID format
   if (id !== "new" && !isValidUUID(id)) {
-    return new Response(
-      JSON.stringify({
-        error: 'Invalid document ID format. Expected a valid UUID.',
-      }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    return NextResponse.json(
+      { error: 'Invalid document ID format. Expected a valid UUID.' },
+      { status: 400 }
     );
   }
 
   const session = await getServerSession();
 
   if (!session) {
-    return new Response('Unauthorized', { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const {
@@ -95,9 +92,9 @@ export async function POST(request: Request) {
       userId: session.user.id,
     });
 
-    return Response.json(document, { status: 200 });
+    return NextResponse.json(document, { status: 200 });
   }
-  return new Response('Unauthorized', { status: 401 });
+  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }
 
 export async function PATCH(request: Request) {
@@ -107,23 +104,21 @@ export async function PATCH(request: Request) {
   const { timestamp }: { timestamp: string } = await request.json();
 
   if (!id) {
-    return new Response('Missing id', { status: 400 });
+    return NextResponse.json({ error: 'Missing id' }, { status: 400 });
   }
 
   // Validate UUID format
   if (!isValidUUID(id)) {
-    return new Response(
-      JSON.stringify({
-        error: 'Invalid document ID format. Expected a valid UUID.',
-      }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    return NextResponse.json(
+      { error: 'Invalid document ID format. Expected a valid UUID.' },
+      { status: 400 }
     );
   }
 
   const session = await getServerSession();
 
   if (!session || !session.user) {
-    return new Response('Unauthorized', { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const documents = await getDocumentsById({ id });
@@ -131,7 +126,7 @@ export async function PATCH(request: Request) {
   const [document] = documents;
 
   if (document.userId !== session.user.id) {
-    return new Response('Unauthorized', { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   await deleteDocumentsByIdAfterTimestamp({
@@ -139,7 +134,7 @@ export async function PATCH(request: Request) {
     timestamp: new Date(timestamp),
   });
 
-  return new Response('Deleted', { status: 200 });
+  return NextResponse.json({ message: 'Deleted' }, { status: 200 });
 }
 
 

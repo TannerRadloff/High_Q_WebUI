@@ -1,5 +1,6 @@
 import { getServerSession } from '@/lib/auth';
 import { getSuggestionsByDocumentId } from '@/lib/db/queries';
+import { NextResponse } from 'next/server';
 
 // Helper function to validate UUID format
 function isValidUUID(id: string): boolean {
@@ -12,23 +13,21 @@ export async function GET(request: Request) {
   const documentId = searchParams.get('documentId');
 
   if (!documentId) {
-    return new Response('Not Found', { status: 404 });
+    return NextResponse.json({ error: 'Not Found' }, { status: 404 });
   }
 
   // Validate UUID format
   if (!isValidUUID(documentId)) {
-    return new Response(
-      JSON.stringify({
-        error: 'Invalid document ID format. Expected a valid UUID.',
-      }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    return NextResponse.json(
+      { error: 'Invalid document ID format. Expected a valid UUID.' },
+      { status: 400 }
     );
   }
 
   const session = await getServerSession();
 
   if (!session || !session.user) {
-    return new Response('Unauthorized', { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const suggestions = await getSuggestionsByDocumentId({
@@ -38,14 +37,14 @@ export async function GET(request: Request) {
   const [suggestion] = suggestions;
 
   if (!suggestion) {
-    return Response.json([], { status: 200 });
+    return NextResponse.json([], { status: 200 });
   }
 
   if (suggestion.userId !== session.user.id) {
-    return new Response('Unauthorized', { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  return Response.json(suggestions, { status: 200 });
+  return NextResponse.json(suggestions, { status: 200 });
 }
 
 
