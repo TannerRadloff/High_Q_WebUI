@@ -46,61 +46,66 @@ const logError = (error: any, context: string) => {
 const MAX_FILE_CONTENT_SIZE = 10000;
 
 export async function POST(request: Request) {
-  const {
-    id,
-    messages,
-    selectedChatModel,
-    experimental_attachments,
-    data
-  }: { 
-    id: string; 
-    messages: Array<Message>; 
-    selectedChatModel: string;
-    experimental_attachments?: ExtendedAttachment[];
-    data?: {
-      agentType?: string;
-    };
-  } = await request.json();
-
-  // Extract agent type from request data if present
-  const agentType = data?.agentType || 'default';
-  
-  console.log(`[API] Chat request with model: ${selectedChatModel}${agentType !== 'default' ? `, agent: ${agentType}` : ''}`);
-
-  const session = await getServerSession();
-
-  if (!session || !session.user || !session.user.id) {
-    return new Response('Unauthorized', { status: 401 });
-  }
-
-  // Validate the selected model
-  let modelToUse = DEFAULT_CHAT_MODEL;
   try {
-    console.log(`[API] Validating model: ${selectedChatModel}`);
-    const validModel = chatModels.some(model => model.id === selectedChatModel);
-    modelToUse = validModel ? selectedChatModel : DEFAULT_CHAT_MODEL;
-  } catch (validationError) {
-    console.error(`[API] Error during model validation:`, validationError);
-    modelToUse = DEFAULT_CHAT_MODEL;
-  }
+    const {
+      id,
+      messages = [], // Provide a default empty array if messages is undefined
+      selectedChatModel,
+      experimental_attachments,
+      data
+    }: { 
+      id: string; 
+      messages?: Array<Message>; // Make messages optional
+      selectedChatModel: string;
+      experimental_attachments?: ExtendedAttachment[];
+      data?: {
+        agentType?: string;
+      };
+    } = await request.json();
 
-  console.log(`[API] Using model: ${modelToUse} (selected: ${selectedChatModel})`);
+    // Validate that messages is an array
+    if (!Array.isArray(messages)) {
+      return new Response('Invalid messages format', { status: 400 });
+    }
 
-  // Check if there are any document artifact messages
-  const hasArtifacts = messages.some(message => 
-    message.role === 'system' && 'documentId' in message && message.documentId
-  );
+    // Extract agent type from request data if present
+    const agentType = data?.agentType || 'default';
+    
+    console.log(`[API] Chat request with model: ${selectedChatModel}${agentType !== 'default' ? `, agent: ${agentType}` : ''}`);
 
-  // Find the most recent user message
-  const userMessage = getMostRecentUserMessage(messages);
+    const session = await getServerSession();
 
-  // If there's no user message but there are artifacts, this is an initial artifact-only state
-  // We'll create a chat but won't require a user message yet
-  if (!userMessage && !hasArtifacts) {
-    return new Response('No user message found', { status: 400 });
-  }
+    if (!session || !session.user || !session.user.id) {
+      return new Response('Unauthorized', { status: 401 });
+    }
 
-  try {
+    // Validate the selected model
+    let modelToUse = DEFAULT_CHAT_MODEL;
+    try {
+      console.log(`[API] Validating model: ${selectedChatModel}`);
+      const validModel = chatModels.some(model => model.id === selectedChatModel);
+      modelToUse = validModel ? selectedChatModel : DEFAULT_CHAT_MODEL;
+    } catch (validationError) {
+      console.error(`[API] Error during model validation:`, validationError);
+      modelToUse = DEFAULT_CHAT_MODEL;
+    }
+
+    console.log(`[API] Using model: ${modelToUse} (selected: ${selectedChatModel})`);
+
+    // Check if there are any document artifact messages
+    const hasArtifacts = messages.some(message => 
+      message.role === 'system' && 'documentId' in message && message.documentId
+    );
+
+    // Find the most recent user message
+    const userMessage = getMostRecentUserMessage(messages);
+
+    // If there's no user message but there are artifacts, this is an initial artifact-only state
+    // We'll create a chat but won't require a user message yet
+    if (!userMessage && !hasArtifacts) {
+      return new Response('No user message found', { status: 400 });
+    }
+
     // Get or create the chat
     const chat = await getChatById({ id });
 
@@ -338,9 +343,15 @@ export async function POST(request: Request) {
         return `Oops, an error occurred while processing your request: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`;
       },
     });
-  } catch (error: unknown) {
+  } catch (error) {
     logError(error, 'Unexpected error in chat API');
-    return new Response(`An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`, { status: 500 });
+    return new Response(JSON.stringify({ 
+      error: 'An unexpected error occurred',
+      details: error instanceof Error ? error.message : String(error)
+    }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
 

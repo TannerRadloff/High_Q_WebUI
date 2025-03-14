@@ -17,9 +17,10 @@ import { Session } from '@supabase/supabase-js'
 export async function getServerSession(): Promise<Session | null> {
   try {
     // Create the Supabase client with the correct cookies implementation
-    // The cookies function should return the cookieStore directly, not a promise
+    // In Next.js 14+, cookies() needs to be awaited
+    const cookieStore = cookies()
     const supabase = createRouteHandlerClient<Database>({ 
-      cookies
+      cookies: () => cookieStore
     })
     
     const { data: { session }, error } = await supabase.auth.getSession()
@@ -57,8 +58,9 @@ export async function handleOAuthCallback(code: string) {
   try {
     // Create a Supabase client for server-side operations with the correct cookies implementation
     console.log('[handleOAuthCallback] Creating Supabase client')
+    const cookieStore = cookies()
     const supabase = createRouteHandlerClient<Database>({ 
-      cookies
+      cookies: () => cookieStore
     })
     
     // Exchange the code for a session

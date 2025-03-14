@@ -4,5 +4,6 @@ import { Database } from '@/types/supabase'
 
 export async function getSupabaseServerClient() {
   // Use the auth-helpers-nextjs package which has better compatibility
-  return createServerComponentClient<Database>({ cookies })
+  const cookieStore = cookies()
+  return createServerComponentClient<Database>({ cookies: () => cookieStore })
 } 

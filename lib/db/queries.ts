@@ -20,11 +20,7 @@ import {
 } from './schema';
 import type { ArtifactKind } from '@/components/artifact';
 
-// Optionally, if not using email/pass login, you can
-// use the Drizzle adapter for Auth.js / NextAuth
-// https://authjs.dev/reference/adapter/drizzle
-
-// Create a database connection with retry logic and error handling
+// Create a database connection
 let client: postgres.Sql | null = null;
 let dbInstance: ReturnType<typeof drizzle> | null = null;
 
@@ -33,7 +29,7 @@ function getDbConnection() {
   if (dbInstance) return dbInstance;
   
   if (!process.env.POSTGRES_URL) {
-    throw new Error('POSTGRES_URL environment variable is not set');
+    throw new Error('POSTGRES_URL environment variable is not set.');
   }
   
   try {
@@ -53,33 +49,22 @@ function getDbConnection() {
   }
 }
 
-// Wrapper function to handle database errors
-async function executeDbQuery<T>(queryFn: (db: ReturnType<typeof drizzle>) => Promise<T>): Promise<T> {
-  try {
-    const database = getDbConnection();
-    return await queryFn(database);
-  } catch (error: any) {
-    // Handle specific database errors
-    if (error.code === 'ECONNREFUSED') {
-      console.error('Database connection refused. Check if the database is running.');
-    }
-    throw error;
-  }
-}
-
 // Helper to ensure we have a database connection
 function ensureDbConnection() {
   if (!dbInstance) {
     getDbConnection();
   }
-  // At this point, either dbInstance is initialized or getDbConnection has thrown an error
   return dbInstance!;
 }
 
 export async function getUser(email: string): Promise<Array<User>> {
-  return executeDbQuery(async (db) => {
+  try {
+    const db = ensureDbConnection();
     return await db.select().from(user).where(eq(user.email, email));
-  });
+  } catch (error) {
+    console.error('Failed to get user from database:', error);
+    throw error;
+  }
 }
 
 export async function getUserByEmail(email: string): Promise<User | undefined> {
@@ -88,7 +73,7 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
     const [selectedUser] = await db.select().from(user).where(eq(user.email, email));
     return selectedUser;
   } catch (error) {
-    console.error('Failed to get user by email from database');
+    console.error('Failed to get user by email from database:', error);
     throw error;
   }
 }
@@ -109,7 +94,7 @@ export async function createOAuthUser(
       emailVerified: new Date()
     });
   } catch (error) {
-    console.error('Failed to create OAuth user in database');
+    console.error('Failed to create OAuth user in database:', error);
     throw error;
   }
 }
@@ -122,7 +107,7 @@ export async function createUser(email: string, password: string) {
     const db = ensureDbConnection();
     return await db.insert(user).values({ email, password: hash });
   } catch (error) {
-    console.error('Failed to create user in database');
+    console.error('Failed to create user in database:', error);
     throw error;
   }
 }
@@ -164,13 +149,17 @@ export async function deleteChatById({ id }: { id: string }) {
 }
 
 export async function getChatsByUserId({ id }: { id: string }) {
-  return executeDbQuery(async (db) => {
+  try {
+    const db = ensureDbConnection();
     return await db
       .select()
       .from(chat)
       .where(eq(chat.userId, id))
       .orderBy(desc(chat.createdAt));
-  });
+  } catch (error) {
+    console.error('Failed to get chats by user id from database:', error);
+    throw error;
+  }
 }
 
 export async function getChatById({ id }: { id: string }) {
@@ -242,9 +231,13 @@ export async function voteMessage({
 }
 
 export async function getVotesByChatId({ id }: { id: string }) {
-  return executeDbQuery(async (db) => {
+  try {
+    const db = ensureDbConnection();
     return await db.select().from(vote).where(eq(vote.chatId, id));
-  });
+  } catch (error) {
+    console.error('Failed to get votes by chat id from database:', error);
+    throw error;
+  }
 }
 
 export async function saveDocument({
