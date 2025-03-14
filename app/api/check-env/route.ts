@@ -6,7 +6,9 @@ import postgres from 'postgres';
  * API route to check environment variables and database connection
  * 
  * This allows client components to verify if required environment variables
- * are set properly and if the database connection is working
+ * are set properly and if the database connection is working.
+ * 
+ * This consolidated endpoint replaces both check-env and check-db routes.
  */
 export async function GET() {
   try {
@@ -17,7 +19,8 @@ export async function GET() {
     let dbStatus = {
       isConnected: false,
       error: null as string | null,
-      details: null as string | null
+      details: null as string | null,
+      code: null as string | null
     };
     
     if (process.env.POSTGRES_URL) {
@@ -43,7 +46,8 @@ export async function GET() {
         dbStatus.isConnected = true;
       } catch (dbError: any) {
         console.error('Database connection error:', dbError);
-        dbStatus.error = dbError.code || 'Unknown database error';
+        dbStatus.error = dbError.message || 'Unknown database error';
+        dbStatus.code = dbError.code || 'UNKNOWN';
         dbStatus.details = dbError.message || '';
         
         // Log more details for debugging
@@ -61,8 +65,7 @@ export async function GET() {
       dbStatus.error = 'POSTGRES_URL environment variable is not set';
     }
     
-    // Return only what the client needs to know, not the detailed messages
-    // which might contain sensitive information
+    // Return consolidated response
     return NextResponse.json({
       isValid: result.isValid,
       missingCount: result.missingVars.length,

@@ -6,7 +6,7 @@ import { useChat } from 'ai/react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { motion } from 'framer-motion';
-import { useAuth } from '@/components/auth/auth-provider';
+import { useAuth } from '@/src/components/auth/auth-provider';
 import { toast } from 'sonner';
 
 import { ChatHeader } from '@/src/components/layout/chat-header';
