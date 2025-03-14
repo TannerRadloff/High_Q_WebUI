@@ -29,6 +29,11 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Update with server-side initialization check
+if (!process.env.OPENAI_API_KEY) {
+  console.warn('[API Route] OpenAI API key is not set - this is expected during build time but should be set at runtime');
+}
+
 // Detailed error logging
 const logError = (error: any, context: string) => {
   console.error(`[ERROR] ${context}:`, error);

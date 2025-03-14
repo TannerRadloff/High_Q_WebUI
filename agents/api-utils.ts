@@ -2,10 +2,21 @@ import OpenAI from 'openai';
 import { Tool, agentAsTool } from './tools';
 import { Agent } from './agent';
 
-// Initialize OpenAI client
-export const openaiClient = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Helper to detect server environment
+function isServerEnvironment(): boolean {
+  return typeof window === 'undefined';
+}
+
+// Initialize OpenAI client only in server environment
+let openaiClient: OpenAI | null = null;
+
+if (isServerEnvironment()) {
+  openaiClient = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+}
+
+export { openaiClient };
 
 // Whether to include sensitive data in traces, defaults to true unless configured otherwise
 export const includeSensitiveData = process.env.OPENAI_AGENTS_DONT_LOG_TOOL_DATA !== '1';
@@ -147,6 +158,9 @@ export function prepareStreamingParams(params: OpenAIRequestParams, tools?: any[
  * Call the OpenAI API for non-streaming completions
  */
 export async function callOpenAI(params: any): Promise<any> {
+  if (!openaiClient) {
+    throw new Error('OpenAI client is not initialized. This function can only be called server-side.');
+  }
   return await openaiClient.chat.completions.create(params);
 }
 
@@ -154,5 +168,8 @@ export async function callOpenAI(params: any): Promise<any> {
  * Call the OpenAI API for streaming completions
  */
 export async function streamOpenAI(params: any): Promise<any> {
+  if (!openaiClient) {
+    throw new Error('OpenAI client is not initialized. This function can only be called server-side.');
+  }
   return await openaiClient.responses.create(params);
 } 

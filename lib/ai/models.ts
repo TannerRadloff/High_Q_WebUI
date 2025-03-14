@@ -1,22 +1,29 @@
 import { OpenAI } from 'openai';
 
-// Check if OpenAI API key is available
-const apiKey = process.env.OPENAI_API_KEY;
-if (!apiKey) {
-  console.error('OPENAI_API_KEY environment variable is missing or empty. Please set it in your .env.local file.');
+// Helper to detect server environment
+function isServerEnvironment(): boolean {
+  return typeof window === 'undefined';
 }
 
 // Initialize the OpenAI client with proper validation
 let openaiClient: OpenAI | null = null;
-try {
-  if (apiKey) {
-    openaiClient = new OpenAI({ apiKey });
-    console.log('OpenAI client initialized successfully');
-  } else {
-    console.warn('OpenAI client not initialized due to missing API key');
+
+// Only initialize the client on the server side
+if (isServerEnvironment()) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  
+  try {
+    if (apiKey) {
+      openaiClient = new OpenAI({ apiKey });
+      console.log('OpenAI client initialized successfully');
+    } else {
+      console.warn('OpenAI client not initialized due to missing API key');
+    }
+  } catch (error) {
+    console.error('Failed to initialize OpenAI client:', error);
   }
-} catch (error) {
-  console.error('Failed to initialize OpenAI client:', error);
+} else {
+  console.log('Skipping OpenAI client initialization on client side');
 }
 
 // Export the client

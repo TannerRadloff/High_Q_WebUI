@@ -39,11 +39,32 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   render() {
     if (this.state.hasError) {
+      // Check if we're in production mode
+      const isProd = process.env.NODE_ENV === 'production';
+      
       // Check for OpenAI API key error
       const isOpenAIError = this.state.error?.message?.includes('OPENAI_API_KEY') || 
                            this.state.error?.message?.includes('OpenAI');
       
-      if (isOpenAIError) {
+      // In production, don't show the OpenAI API error message to users
+      // This prevents exposing sensitive error details in production
+      if (isOpenAIError && isProd) {
+        return (
+          <div className="flex flex-col items-center justify-center min-h-[50vh] p-6 text-center">
+            <div className="w-full max-w-md p-6 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
+              <h2 className="text-xl font-bold text-amber-700 dark:text-amber-400 mb-3">
+                Something went wrong
+              </h2>
+              <p className="text-sm text-amber-600 dark:text-amber-300 mb-4">
+                An error occurred while connecting to our AI services. Please try again later.
+              </p>
+            </div>
+          </div>
+        );
+      }
+      
+      // For development environment or non-OpenAI errors, keep original error display
+      if (isOpenAIError && !isProd) {
         return (
           <div className="flex flex-col items-center justify-center min-h-[50vh] p-6 text-center">
             <div className="w-full max-w-md p-6 rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30">
