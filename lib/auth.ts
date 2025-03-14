@@ -27,12 +27,52 @@ export async function getServerSession(): Promise<Session | null> {
     
     if (error) {
       console.error('Error getting session:', error)
+      
+      // For development only: Return a mock session if no valid session exists
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Development mode: Using mock session for API requests')
+        return {
+          access_token: 'mock-token',
+          token_type: 'bearer',
+          expires_in: 3600,
+          refresh_token: 'mock-refresh',
+          user: {
+            id: 'dev-user-id',
+            email: 'dev@example.com',
+            app_metadata: {},
+            user_metadata: {},
+            aud: 'authenticated',
+            created_at: new Date().toISOString()
+          }
+        } as Session
+      }
+      
       return null
     }
     
     return session
   } catch (error) {
     console.error('Unexpected error in getServerSession:', error)
+    
+    // For development only: Return a mock session on error
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Development mode: Using mock session after error')
+      return {
+        access_token: 'mock-token',
+        token_type: 'bearer',
+        expires_in: 3600,
+        refresh_token: 'mock-refresh',
+        user: {
+          id: 'dev-user-id',
+          email: 'dev@example.com',
+          app_metadata: {},
+          user_metadata: {},
+          aud: 'authenticated',
+          created_at: new Date().toISOString()
+        }
+      } as Session
+    }
+    
     return null
   }
 }
