@@ -24,21 +24,67 @@ import type { ArtifactKind } from '@/components/artifact';
 // use the Drizzle adapter for Auth.js / NextAuth
 // https://authjs.dev/reference/adapter/drizzle
 
-// biome-ignore lint: Forbidden non-null assertion.
-const client = postgres(process.env.POSTGRES_URL!);
-const db = drizzle(client);
+// Create a database connection with retry logic and error handling
+let client: postgres.Sql | null = null;
+let dbInstance: ReturnType<typeof drizzle> | null = null;
 
-export async function getUser(email: string): Promise<Array<User>> {
+// Initialize database connection
+function getDbConnection() {
+  if (dbInstance) return dbInstance;
+  
+  if (!process.env.POSTGRES_URL) {
+    throw new Error('POSTGRES_URL environment variable is not set');
+  }
+  
   try {
-    return await db.select().from(user).where(eq(user.email, email));
+    // Configure postgres with connection options
+    client = postgres(process.env.POSTGRES_URL, {
+      max: 10, // Maximum number of connections
+      idle_timeout: 20, // Idle connection timeout in seconds
+      connect_timeout: 10, // Connection timeout in seconds
+      max_lifetime: 60 * 30, // Connection max lifetime in seconds (30 minutes)
+    });
+    
+    dbInstance = drizzle(client);
+    return dbInstance;
   } catch (error) {
-    console.error('Failed to get user from database');
+    console.error('Failed to initialize database connection:', error);
     throw error;
   }
 }
 
+// Wrapper function to handle database errors
+async function executeDbQuery<T>(queryFn: (db: ReturnType<typeof drizzle>) => Promise<T>): Promise<T> {
+  try {
+    const database = getDbConnection();
+    return await queryFn(database);
+  } catch (error: any) {
+    // Handle specific database errors
+    if (error.code === 'ECONNREFUSED') {
+      console.error('Database connection refused. Check if the database is running.');
+    }
+    throw error;
+  }
+}
+
+// Helper to ensure we have a database connection
+function ensureDbConnection() {
+  if (!dbInstance) {
+    getDbConnection();
+  }
+  // At this point, either dbInstance is initialized or getDbConnection has thrown an error
+  return dbInstance!;
+}
+
+export async function getUser(email: string): Promise<Array<User>> {
+  return executeDbQuery(async (db) => {
+    return await db.select().from(user).where(eq(user.email, email));
+  });
+}
+
 export async function getUserByEmail(email: string): Promise<User | undefined> {
   try {
+    const db = ensureDbConnection();
     const [selectedUser] = await db.select().from(user).where(eq(user.email, email));
     return selectedUser;
   } catch (error) {
@@ -54,6 +100,7 @@ export async function createOAuthUser(
   provider: string
 ) {
   try {
+    const db = ensureDbConnection();
     return await db.insert(user).values({ 
       email, 
       name: name || null,
@@ -72,6 +119,7 @@ export async function createUser(email: string, password: string) {
   const hash = hashSync(password, salt);
 
   try {
+    const db = ensureDbConnection();
     return await db.insert(user).values({ email, password: hash });
   } catch (error) {
     console.error('Failed to create user in database');
@@ -89,6 +137,7 @@ export async function saveChat({
   title: string;
 }) {
   try {
+    const db = ensureDbConnection();
     return await db.insert(chat).values({
       id,
       createdAt: new Date(),
@@ -103,6 +152,7 @@ export async function saveChat({
 
 export async function deleteChatById({ id }: { id: string }) {
   try {
+    const db = ensureDbConnection();
     await db.delete(vote).where(eq(vote.chatId, id));
     await db.delete(message).where(eq(message.chatId, id));
 
@@ -114,20 +164,18 @@ export async function deleteChatById({ id }: { id: string }) {
 }
 
 export async function getChatsByUserId({ id }: { id: string }) {
-  try {
+  return executeDbQuery(async (db) => {
     return await db
       .select()
       .from(chat)
       .where(eq(chat.userId, id))
       .orderBy(desc(chat.createdAt));
-  } catch (error) {
-    console.error('Failed to get chats by user from database');
-    throw error;
-  }
+  });
 }
 
 export async function getChatById({ id }: { id: string }) {
   try {
+    const db = ensureDbConnection();
     const [selectedChat] = await db.select().from(chat).where(eq(chat.id, id));
     return selectedChat;
   } catch (error) {
@@ -138,6 +186,7 @@ export async function getChatById({ id }: { id: string }) {
 
 export async function saveMessages({ messages }: { messages: Array<Message> }) {
   try {
+    const db = ensureDbConnection();
     return await db.insert(message).values(messages);
   } catch (error) {
     console.error('Failed to save messages in database', error);
@@ -147,6 +196,7 @@ export async function saveMessages({ messages }: { messages: Array<Message> }) {
 
 export async function getMessagesByChatId({ id }: { id: string }) {
   try {
+    const db = ensureDbConnection();
     return await db
       .select()
       .from(message)
@@ -168,6 +218,7 @@ export async function voteMessage({
   type: 'up' | 'down';
 }) {
   try {
+    const db = ensureDbConnection();
     const [existingVote] = await db
       .select()
       .from(vote)
@@ -191,12 +242,9 @@ export async function voteMessage({
 }
 
 export async function getVotesByChatId({ id }: { id: string }) {
-  try {
+  return executeDbQuery(async (db) => {
     return await db.select().from(vote).where(eq(vote.chatId, id));
-  } catch (error) {
-    console.error('Failed to get votes by chat id from database', error);
-    throw error;
-  }
+  });
 }
 
 export async function saveDocument({
@@ -213,6 +261,7 @@ export async function saveDocument({
   userId: string;
 }) {
   try {
+    const db = ensureDbConnection();
     return await db.insert(document).values({
       id,
       title,
@@ -229,6 +278,7 @@ export async function saveDocument({
 
 export async function getDocumentsById({ id }: { id: string }) {
   try {
+    const db = ensureDbConnection();
     const documents = await db
       .select()
       .from(document)
@@ -244,6 +294,7 @@ export async function getDocumentsById({ id }: { id: string }) {
 
 export async function getDocumentById({ id }: { id: string }) {
   try {
+    const db = ensureDbConnection();
     const [selectedDocument] = await db
       .select()
       .from(document)
@@ -265,6 +316,7 @@ export async function deleteDocumentsByIdAfterTimestamp({
   timestamp: Date;
 }) {
   try {
+    const db = ensureDbConnection();
     await db
       .delete(suggestion)
       .where(
@@ -291,6 +343,7 @@ export async function saveSuggestions({
   suggestions: Array<Suggestion>;
 }) {
   try {
+    const db = ensureDbConnection();
     return await db.insert(suggestion).values(suggestions);
   } catch (error) {
     console.error('Failed to save suggestions in database');
@@ -304,6 +357,7 @@ export async function getSuggestionsByDocumentId({
   documentId: string;
 }) {
   try {
+    const db = ensureDbConnection();
     return await db
       .select()
       .from(suggestion)
@@ -318,6 +372,7 @@ export async function getSuggestionsByDocumentId({
 
 export async function getMessageById({ id }: { id: string }) {
   try {
+    const db = ensureDbConnection();
     return await db.select().from(message).where(eq(message.id, id));
   } catch (error) {
     console.error('Failed to get message by id from database');
@@ -333,6 +388,7 @@ export async function deleteMessagesByChatIdAfterTimestamp({
   timestamp: Date;
 }) {
   try {
+    const db = ensureDbConnection();
     const messagesToDelete = await db
       .select({ id: message.id })
       .from(message)
@@ -371,6 +427,7 @@ export async function updateChatVisiblityById({
   visibility: 'private' | 'public';
 }) {
   try {
+    const db = ensureDbConnection();
     return await db.update(chat).set({ visibility }).where(eq(chat.id, chatId));
   } catch (error) {
     console.error('Failed to update chat visibility in database');
@@ -381,6 +438,7 @@ export async function updateChatVisiblityById({
 // Password reset functions
 export async function createPasswordResetToken(userId: string, token: string, expiresAt: Date) {
   try {
+    const db = ensureDbConnection();
     return await db.insert(passwordReset).values({
       userId,
       token,
@@ -396,6 +454,7 @@ export async function createPasswordResetToken(userId: string, token: string, ex
 
 export async function getPasswordResetByToken(token: string): Promise<PasswordReset | undefined> {
   try {
+    const db = ensureDbConnection();
     const [resetToken] = await db
       .select()
       .from(passwordReset)
@@ -410,6 +469,7 @@ export async function getPasswordResetByToken(token: string): Promise<PasswordRe
 
 export async function markPasswordResetTokenAsUsed(id: string) {
   try {
+    const db = ensureDbConnection();
     return await db
       .update(passwordReset)
       .set({ used: true })
@@ -422,6 +482,7 @@ export async function markPasswordResetTokenAsUsed(id: string) {
 
 export async function getUserById(id: string): Promise<User | undefined> {
   try {
+    const db = ensureDbConnection();
     const [selectedUser] = await db.select().from(user).where(eq(user.id, id));
     return selectedUser;
   } catch (error) {
@@ -432,6 +493,7 @@ export async function getUserById(id: string): Promise<User | undefined> {
 
 export async function updateUserPassword(userId: string, hashedPassword: string) {
   try {
+    const db = ensureDbConnection();
     return await db
       .update(user)
       .set({ password: hashedPassword })

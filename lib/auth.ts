@@ -16,8 +16,11 @@ import { Session } from '@supabase/supabase-js'
  */
 export async function getServerSession(): Promise<Session | null> {
   try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore })
+    // Create the Supabase client with the correct cookies implementation
+    // The cookies function should return the cookieStore directly, not a promise
+    const supabase = createRouteHandlerClient<Database>({ 
+      cookies
+    })
     
     const { data: { session }, error } = await supabase.auth.getSession()
     
@@ -52,12 +55,11 @@ export async function handleOAuthCallback(code: string) {
   }
 
   try {
-    // Get cookie store
-    const cookieStore = cookies()
-    
-    // Create a Supabase client for server-side operations
+    // Create a Supabase client for server-side operations with the correct cookies implementation
     console.log('[handleOAuthCallback] Creating Supabase client')
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore })
+    const supabase = createRouteHandlerClient<Database>({ 
+      cookies
+    })
     
     // Exchange the code for a session
     console.log('[handleOAuthCallback] Calling exchangeCodeForSession')

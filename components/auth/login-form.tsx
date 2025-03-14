@@ -14,6 +14,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input' 
 import { Label } from '@/components/ui/label'
 
+interface EnvCheckResult {
+  isValid: boolean;
+  missingCount: number;
+  database?: {
+    isConnected: boolean;
+    error: string | null;
+  };
+}
+
 export function LoginForm() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
@@ -21,6 +30,7 @@ export function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [apiKeyError, setApiKeyError] = useState<string | null>(null)
+  const [dbError, setDbError] = useState<string | null>(null)
   const { signIn } = useAuth()
   const supabase = createClient()
 
@@ -35,7 +45,6 @@ export function LoginForm() {
     
     // Instead of checking process.env.OPENAI_API_KEY, we let server components
     // do validation and pass the result to client
-    // We could also add a simple API endpoint to check if the key is available
     fetch('/api/check-env')
       .then(response => {
         if (!response.ok) {
@@ -43,9 +52,14 @@ export function LoginForm() {
         }
         return response.json();
       })
-      .then(data => {
+      .then((data: EnvCheckResult) => {
         if (!data.isValid) {
           setApiKeyError('The application is missing an OpenAI API key. Please add a valid API key to your .env.local file.');
+        }
+        
+        // Check database connection status
+        if (data.database && !data.database.isConnected) {
+          setDbError(`Database connection error: ${data.database.error || 'Unknown error'}. Please check your database configuration.`);
         }
       })
       .catch(error => {
@@ -60,6 +74,12 @@ export function LoginForm() {
     // Prevent login attempt if API key is missing
     if (apiKeyError) {
       toast.error(apiKeyError)
+      return
+    }
+    
+    // Prevent login attempt if database connection is failing
+    if (dbError) {
+      toast.error(dbError)
       return
     }
     
@@ -80,6 +100,18 @@ export function LoginForm() {
   const handleGoogleLogin = async (e: React.MouseEvent) => {
     e.preventDefault()
     console.log('Google login button clicked')
+    
+    // Prevent login attempt if API key is missing
+    if (apiKeyError) {
+      toast.error(apiKeyError)
+      return
+    }
+    
+    // Prevent login attempt if database connection is failing
+    if (dbError) {
+      toast.error(dbError)
+      return
+    }
     
     try {
       setIsGoogleLoading(true)
@@ -148,6 +180,14 @@ export function LoginForm() {
         </div>
       )}
 
+      {dbError && (
+        <div className="p-4 mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+          <p className="text-sm text-red-600 dark:text-red-400">
+            {dbError}
+          </p>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">
           <Label
@@ -201,7 +241,7 @@ export function LoginForm() {
 
         <Button 
           type="submit" 
-          disabled={isLoading}
+          disabled={isLoading || !!apiKeyError || !!dbError}
           className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition duration-150 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900"
         >
           {isLoading ? (
@@ -234,7 +274,7 @@ export function LoginForm() {
       <Button
         variant="outline"
         onClick={handleGoogleLogin}
-        disabled={isGoogleLoading}
+        disabled={isGoogleLoading || !!apiKeyError || !!dbError}
         className="w-full bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 py-2.5 rounded-lg transition duration-150 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-zinc-900"
       >
         {isGoogleLoading ? (
