@@ -66,7 +66,7 @@ export default function LoginPage() {
   }, [user, isAuthLoading, router, checkEnvironment])
 
   return (
-    <div className="flex flex-col items-center justify-center w-full min-h-screen py-12 px-4 bg-gradient-to-b from-gray-900 to-black">
+    <div className="flex flex-col items-center justify-center w-full min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-gray-900 to-black">
       <div className="w-full max-w-md mb-8">
         <motion.div 
           className="text-center"

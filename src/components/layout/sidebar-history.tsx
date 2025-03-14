@@ -175,12 +175,13 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
       
       // Clear any existing error toasts before showing a new one
       // to prevent stacking of error messages
-      toast.dismiss();
+      toast.dismiss('sidebar-history-error');
       
       // Show a clear error message to the user
       toast.error('Failed to load chat history. Please try refreshing the page.', {
         duration: 5000,
-        id: 'history-error' // Using an ID prevents duplicate toasts
+        id: 'sidebar-history-error', // Using a unique ID prevents duplicate toasts
+        position: 'top-center',
       });
     },
     revalidateOnFocus: false, // Change to false to reduce unnecessary requests when tab is focused
