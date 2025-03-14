@@ -26,6 +26,7 @@ import { useAutoResizeTextarea } from '@/hooks/use-auto-resize-textarea';
 import { useDidUpdate } from '@/hooks/use-did-update';
 import { useAuth } from '@/components/auth/auth-provider';
 import { handleAPIError } from '@/src/utils/auth-checks';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 import { cn } from '@/utils/formatting';
 import { showUniqueErrorToast } from '@/lib/api-error-handler';
@@ -96,12 +97,12 @@ function PureMultimodalInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
   const [isFocused, setIsFocused] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState<string>('default');
   const { user } = useAuth();
+  const isMobile = width < 768; // Define isMobile based on window width
+  const lockInput = isLoading; // Define lockInput based on isLoading state
 
-  // Add agent mode state
-  const [agentModeEnabled, setAgentModeEnabled] = useLocalStorage('agent-mode-enabled', false);
-  const [selectedAgentId, setSelectedAgentId] = useLocalStorage('selected-agent-id', 'delegation');
+  // Direct agent integration - no longer behind a toggle
+  const [selectedAgentId, setSelectedAgentId] = useLocalStorage('selected-agent-id', 'default');
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -268,160 +269,54 @@ function PureMultimodalInput({
     [setAttachments, uploadFile]
   );
   
-  // Wrap the original handleSubmit to process attachments
-  const wrappedHandleSubmit = useCallback(
-    async (event?: { preventDefault?: () => void }, chatRequestOptions?: ChatRequestOptions) => {
-      if (event?.preventDefault) {
-        event.preventDefault();
-      }
-      
-      // Handle pending uploads
-      if (uploadQueue.length > 0) {
-        toast.info('Please wait for all files to upload');
-        return;
-      }
-      
-      // Check if there is already a loading state (prevents duplicate submissions)
-      if (isLoading) {
-        console.log('[MultimodalInput] Prevented submission during loading state');
-        return;
-      }
-      
-      // If there is no input and no attachments, don't submit
-      if (!input.trim() && attachments.length === 0) {
-        console.log('[MultimodalInput] Prevented submission with no input and no attachments');
-        return;
-      }
-      
-      // Check for excessively large input to avoid API errors
-      const inputLength = input.trim().length;
-      if (inputLength > 100000) { // 100K chars is excessive
-        showUniqueErrorToast('Your message is too long. Please shorten it or split into multiple messages.');
-        console.warn(`[MultimodalInput] Input length (${inputLength}) exceeds reasonable limits.`);
-        return;
-      }
-      
-      // Check for network connectivity
-      if (!navigator.onLine) {
-        showUniqueErrorToast('You appear to be offline. Please check your internet connection and try again.');
-        console.warn('[MultimodalInput] Prevented submission while offline');
-        return;
-      }
-      
-      // Check authentication status before submitting
-      if (!user) {
-        handleAPIError({ status: 401, message: 'Authentication required' }, 'MultimodalInput submission');
-        console.warn('[MultimodalInput] Prevented submission - authentication required');
-        return;
-      }
-      
-      console.log(`[MultimodalInput] Submitting with agent: ${selectedAgent} | Input length: ${inputLength} | Attachments: ${attachments.length}`);
-      
-      try {
-        // Create a new options object with agent type and attachments
-        const options: ChatRequestOptions = {};
-        
-        // Add experimental attachments
-        if (attachments.length > 0) {
-          // Verify attachments are valid before submitting
-          const validAttachments = attachments.filter(att => 
-            att && att.url && att.contentType
-          );
-          
-          if (validAttachments.length !== attachments.length) {
-            console.warn('[MultimodalInput] Some attachments were invalid and removed');
-          }
-          
-          options.experimental_attachments = validAttachments;
+  // Handle form submission with agent metadata
+  const handleAgentSubmit = (userInput: string) => {
+    console.log(`[CHAT] Processing request with agent: ${selectedAgentId}`);
+    
+    // Get the agent type name from config if not using default
+    const agentConfig = agentTypeConfig.find(agent => agent.id === selectedAgentId);
+    
+    // Only add agent metadata if a non-default agent is selected
+    if (selectedAgentId !== 'default' && agentConfig) {
+      // Add metadata to indicate which agent to use
+      const options: ChatRequestOptions = {
+        data: {
+          agentId: selectedAgentId,
+          agentType: agentConfig.name
         }
-        
-        // Add agent type to data
-        options.data = { 
-          agentType: selectedAgent,
-          input: input.trim() // Add input to data to ensure it's available for validation
-        };
-        
-        // Handle the submission with safety timeout
-        let isSubmissionResolved = false;
-        
-        const timeoutPromise = new Promise<void>((_, reject) => {
-          setTimeout(() => {
-            if (!isSubmissionResolved) {
-              reject(new Error('Request timed out after 30 seconds'));
-            }
-          }, 30000); // 30 second timeout
-        });
-        
-        // Use Promise.race to implement timeout with cleaner handling
-        try {
-          await Promise.race([
-            // Wrap handleSubmit to mark when it's done
-            (async () => {
-              try {
-                await handleSubmit(event, options);
-              } finally {
-                isSubmissionResolved = true;
-              }
-            })(),
-            timeoutPromise
-          ]);
-          
-          // Only clear if submission was successful
-          setAttachments([]);
-          setLocalStorageInput('');
-          resetHeight();
-          
-          if (width && width > 768) {
-            textareaRef.current?.focus();
-          }
-        } catch (raceError) {
-          // Handle timeout or other errors from the race
-          console.error('[MultimodalInput] Error in Promise.race:', raceError);
-          
-          const errorMessage = raceError instanceof Error ? raceError.message : String(raceError);
-          if (errorMessage.includes('timed out')) {
-            showUniqueErrorToast('Request timed out. Please try again or check your network connection.');
-          } else {
-            throw raceError; // Re-throw non-timeout errors to be handled by outer catch
-          }
-        }
-      } catch (error) {
-        console.error('[MultimodalInput] Error during submission:', error);
-        
-        // Use the error handler to handle all error types consistently
-        showUniqueErrorToast(error);
-      }
-    },
-    [handleSubmit, attachments, setAttachments, uploadQueue, input, setLocalStorageInput, resetHeight, width, selectedAgent, isLoading, user]
-  );
-  
-  // Function to handle agent submission
-  const handleAgentSubmit = useCallback(
-    (event?: { preventDefault?: () => void }) => {
-      wrappedHandleSubmit(event);
-    },
-    [wrappedHandleSubmit]
-  );
-
-  // Custom submit to handle agent mode
-  const handleAgentModeSubmit = (userInput: string) => {
-    // Here we would add implementation for handling agent mode submissions
-    // In a full implementation, this would make API calls to the agent backend
-    console.log(`[AGENT-MODE] Processing request with ${selectedAgentId} agent: "${userInput}"`);
-    
-    // For demonstration, we'll simulate agent handling by adding special system message
-    const agentType = agentTypeConfig.find(agent => agent.id === selectedAgentId)?.name || 'Agent';
-    
-    // Add a system message indicating agent processing
-    append({
-      id: generateUUID(),
-      role: 'system',
-      content: `Processing with ${agentType} Agent...`,
-    });
-    
-    // Submit normally, but we can add metadata to indicate agent mode
-    handleSubmit();
+      };
+      
+      // Submit with agent metadata
+      handleSubmit(undefined, options);
+    } else {
+      // Regular submission for default agent
+      handleSubmit();
+    }
   };
+
+  // Fix the function signature for these calls
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Submit on Enter (without Shift)
+      if (
+        !lockInput &&
+        event.key === 'Enter' &&
+        !event.shiftKey &&
+        !event.metaKey &&
+        !event.ctrlKey
+      ) {
+        event.preventDefault();
+        
+        // Only submit if there's input or attachments
+        if (input.trim() || attachments.length > 0) {
+          handleAgentSubmit(input);
+        } else {
+          console.log('[CHAT] No input or attachments to submit');
+        }
+      }
+    },
+    [lockInput, isMobile, handleAgentSubmit, input, attachments]
+  );
 
   return (
     <div
@@ -437,14 +332,21 @@ function PureMultimodalInput({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (agentModeEnabled) {
-            handleAgentModeSubmit(input);
-          } else {
-            handleSubmit();
-          }
+          handleAgentSubmit(input);
         }}
         className="flex flex-1 flex-col items-start gap-2 relative"
       >
+        {/* Agent Selector - Always shown */}
+        <div className="w-full mb-2">
+          <AgentSelector
+            selectedAgentId={selectedAgentId}
+            onAgentChange={setSelectedAgentId}
+            displayMode="buttons"
+            buttonSize="sm"
+            className="w-full"
+          />
+        </div>
+
         <div className="flex w-full flex-row items-end gap-2">
           <div className="relative flex-1">
             <Textarea
@@ -458,22 +360,7 @@ function PureMultimodalInput({
               autoFocus={width >= 1024}
               value={input}
               onChange={handleInput}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
-                  e.preventDefault();
-                  
-                  // Only submit if there's either input or attachments
-                  if (input.trim() || attachments.length > 0) {
-                    const usedAttachments = [...attachments];
-                    handleAgentSubmit();
-                    setAttachments([]);
-                    // Reset height only if no shift key
-                    resetHeight();
-                  } else {
-                    console.log('[MultimodalInput] Prevented keyboard submission with no input and no attachments');
-                  }
-                }
-              }}
+              onKeyDown={handleKeyDown}
             >
               <form 
                 className="flex flex-col gap-3"
@@ -483,7 +370,7 @@ function PureMultimodalInput({
                   // Only submit if there's either input or attachments
                   if (input.trim() || attachments.length > 0) {
                     const usedAttachments = [...attachments];
-                    handleAgentSubmit();
+                    handleAgentSubmit(input);
                     setAttachments([]);
                     resetHeight();
                   } else {
@@ -491,29 +378,6 @@ function PureMultimodalInput({
                   }
                 }}
               >
-                {/* Agent Mode Switch */}
-                <div className="absolute -top-12 right-0 flex-row-center gap-2">
-                  <Label htmlFor="agent-mode" className="text-sm">Agent Mode</Label>
-                  <Switch
-                    id="agent-mode"
-                    checked={agentModeEnabled}
-                    onCheckedChange={setAgentModeEnabled}
-                  />
-                </div>
-
-                {/* Agent Selector - Only shown when agent mode is enabled */}
-                {agentModeEnabled && (
-                  <div className="mb-2 flex-row-center gap-2">
-                    <AgentSelector
-                      selectedAgentId={selectedAgentId}
-                      onAgentChange={setSelectedAgentId}
-                      displayMode="buttons"
-                      buttonSize="sm"
-                      className="w-full"
-                    />
-                  </div>
-                )}
-
                 <div
                   className={cn(
                     'flex relative w-full font-sans group/input border rounded-md overflow-hidden',
@@ -528,9 +392,9 @@ function PureMultimodalInput({
                     ref={textareaRef}
                     tabIndex={0}
                     name="message"
-                    placeholder={selectedAgent === 'default' ? 
+                    placeholder={selectedAgentId === 'default' ? 
                       "Message..." : 
-                      `Ask the ${agentTypeConfig.find((a) => a.id === selectedAgent)?.name || 'selected'} agent...`
+                      `Ask the ${agentTypeConfig.find((a) => a.id === selectedAgentId)?.name || 'selected'} agent...`
                     }
                     className={cn(
                       'max-h-64 min-h-[98px] grow whitespace-break-spaces text-secondary-foreground resize-none',
@@ -690,7 +554,7 @@ function PureSendButton({
   input,
   uploadQueue,
 }: {
-  submitForm: () => void;
+  submitForm: (userInput: string) => void;
   input: string;
   uploadQueue: Array<string>;
 }) {
@@ -701,7 +565,7 @@ function PureSendButton({
       variant="ghost"
       className="absolute bottom-1 right-1 size-8 rounded-xl hover:bg-primary/10 hover:text-primary"
       disabled={!input.trim() && uploadQueue.length === 0}
-      onClick={submitForm}
+      onClick={() => submitForm(input)}
     >
       <ArrowUpIcon />
     </Button>

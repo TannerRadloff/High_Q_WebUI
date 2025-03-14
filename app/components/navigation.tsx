@@ -15,7 +15,7 @@ export default function Navigation() {
         Chat
       </Link>
       
-      {/* Agent Mode link removed - functionality now integrated into main chat interface */}
+      {/* Additional navigation links can be added here */}
     </nav>
   );
 } 

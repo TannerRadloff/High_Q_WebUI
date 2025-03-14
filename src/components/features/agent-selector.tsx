@@ -14,6 +14,23 @@ export interface AgentSelectorProps {
   displayMode?: 'dropdown' | 'buttons';
 }
 
+// Helper conversion functions
+export function agentTypeToId(agentType: AgentType): string {
+  return agentType.toLowerCase();
+}
+
+// Convert string ID to enum type for agent processing
+export function idToAgentType(id: string): AgentType {
+  switch (id) {
+    case 'delegation': return AgentType.DELEGATION;
+    case 'research': return AgentType.RESEARCH;
+    case 'report': return AgentType.REPORT;
+    case 'triage': return AgentType.TRIAGE;
+    case 'judge': return AgentType.JUDGE;
+    default: return AgentType.DELEGATION;
+  }
+}
+
 /**
  * A unified agent selector component that can be used in any context
  * Leverages the AIModelSelector component for dropdown mode
@@ -32,18 +49,6 @@ export function AgentSelector({
     onAgentChange(agentId);
   }, [onAgentChange]);
 
-  // For AgentModeInterface, convert string ID to enum type 
-  const getAgentTypeFromId = useCallback((id: string): AgentType => {
-    switch (id) {
-      case 'delegation': return AgentType.DELEGATION;
-      case 'research': return AgentType.RESEARCH;
-      case 'report': return AgentType.REPORT;
-      case 'triage': return AgentType.TRIAGE;
-      case 'judge': return AgentType.JUDGE;
-      default: return AgentType.DELEGATION;
-    }
-  }, []);
-
   if (displayMode === 'dropdown') {
     return (
       <AIModelSelector
@@ -57,7 +62,7 @@ export function AgentSelector({
     );
   }
 
-  // Button mode for AgentModeInterface
+  // Button mode display
   return (
     <div className={`flex items-center gap-2 overflow-x-auto ${className}`}>
       {agentTypeConfig
@@ -84,20 +89,4 @@ export function AgentSelector({
       }
     </div>
   );
-}
-
-// Helper conversion functions
-export function agentTypeToId(agentType: AgentType): string {
-  return agentType.toLowerCase();
-}
-
-export function idToAgentType(id: string): AgentType {
-  switch (id) {
-    case 'delegation': return AgentType.DELEGATION;
-    case 'research': return AgentType.RESEARCH;
-    case 'report': return AgentType.REPORT;
-    case 'triage': return AgentType.TRIAGE;
-    case 'judge': return AgentType.JUDGE;
-    default: return AgentType.DELEGATION;
-  }
 } 

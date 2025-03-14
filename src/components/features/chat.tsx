@@ -20,6 +20,7 @@ import { ErrorMessage } from '@/src/components/ui/error-message';
 
 import { Artifact } from '@/src/components/features/artifact';
 import { Messages } from './messages';
+// Agent mode functionality is now integrated directly into the MultimodalInput component
 import { MultimodalInput } from '@/src/components/features';
 import type { VisibilityType } from './visibility-selector';
 import { useArtifactSelector } from '@/hooks/use-artifact';
@@ -31,8 +32,6 @@ declare global {
     generateRandomStars?: () => HTMLElement;
   }
 }
-
-// Agent mode functionality is now integrated directly into the MultimodalInput component
 
 // Interface to help type the error messages from the API
 interface StreamErrorMessage {
