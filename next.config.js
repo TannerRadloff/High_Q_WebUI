@@ -13,10 +13,8 @@ const nextConfig = {
         zlib: false,
       };
       
-      // Ensure proper loading of client-side scripts
-      if (dev) {
-        config.output.publicPath = '/_next/';
-      }
+      // Remove development-specific publicPath to avoid asset loading issues
+      // Let Next.js handle this automatically
     }
     
     // Explicitly add alias configuration
@@ -43,8 +41,9 @@ const nextConfig = {
       },
     ],
   },
-  // Add the assetPrefix configuration for development
-  assetPrefix: process.env.NODE_ENV === 'development' ? '' : undefined,
+  // Remove assetPrefix to allow assets to be loaded from the current domain
+  // This ensures assets are loaded from wherever the app is deployed
+  
   // Add proper output configurations
   output: 'standalone',
   poweredByHeader: false,

@@ -166,15 +166,7 @@ function LoginFormContent() {
     
     try {
       await signIn(email, password)
-      // Add a manual redirect as a fallback
-      setTimeout(() => {
-        console.log('Login form fallback redirect to home')
-        // Use direct location change instead of router
-        window.location.href = '/'
-        // Comment out router usage which might be causing issues
-        // router.push('/')
-        // router.refresh()
-      }, 1000)
+      // Auth provider will handle redirect
     } catch (error: any) {
       showErrorNotification(error.message || 'Failed to sign in')
       setIsLoading(false)
@@ -192,7 +184,6 @@ function LoginFormContent() {
     try {
       // Use the helper function to get a consistent redirect URL
       const redirectUrl = getOAuthRedirectUrl();
-      console.log('[Login] Using OAuth redirect URL:', redirectUrl);
       
       // Use Supabase OAuth with Google
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -216,12 +207,6 @@ function LoginFormContent() {
       showErrorNotification(error.message || 'Failed to sign in with Google')
       setIsGoogleLoading(false)
     }
-  }
-
-  // Add a test function for navigation
-  const testNavigation = () => {
-    console.log('Testing navigation to /profile')
-    router.push('/profile')
   }
 
   // If there are API key or DB configuration errors, show special message
@@ -338,11 +323,6 @@ function LoginFormContent() {
                         <span className="animate-spin">⟳</span>
                       </>
                     ) : 'Sign In'}
-                  </Button>
-                  
-                  {/* Test button */}
-                  <Button type="button" variant="outline" onClick={testNavigation} className="w-full">
-                    Test Navigation
                   </Button>
                 </div>
               </form>

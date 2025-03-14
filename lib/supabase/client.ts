@@ -14,27 +14,18 @@ export const createClient = () => {
   // Check if we're in a browser environment
   const isBrowser = typeof window !== 'undefined';
   
-  // Debug Supabase environment variables
+  // Validate required environment variables
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL
   
   if (!supabaseUrl || !supabaseKey) {
-    console.error('Supabase environment variables are missing:', {
-      urlAvailable: !!supabaseUrl,
-      keyAvailable: !!supabaseKey,
-      appUrlAvailable: !!appUrl
-    })
-  } else {
-    console.log('Supabase client initialized with env variables')
+    console.error('Supabase environment variables are missing')
+    throw new Error('Missing Supabase configuration')
   }
   
   try {
-    // Get the consistent cookie domain using our helper
+    // Get the cookie domain using the helper (always from current location)
     const cookieDomain = getCookieDomain();
-    console.log(`Using cookie domain: ${cookieDomain}`);
-    console.log('App URL from env:', process.env.NEXT_PUBLIC_APP_URL);
-    console.log('Current location:', isBrowser ? window.location.href : 'server-side');
     
     // Create the client with custom cookie settings to handle deployment URLs
     cachedClient = createClientComponentClient<Database>({
@@ -46,33 +37,6 @@ export const createClient = () => {
         secure: isBrowser ? window.location.protocol === 'https:' : true
       }
     });
-    
-    // Log the session status on client creation
-    if (cachedClient && isBrowser) {
-      cachedClient.auth.getSession().then(({ data, error }) => {
-        if (error) {
-          console.error('Error checking session:', error)
-        } else {
-          console.log('Session available on client creation:', !!data.session)
-          if (data.session && data.session.expires_at) {
-            // Print debug information about the session
-            console.log('Session expires at:', new Date(data.session.expires_at * 1000).toISOString())
-            console.log('Current time:', new Date().toISOString())
-            console.log('Cookie domain being used:', cookieDomain)
-            
-            // Log cookie information if in browser
-            if (typeof document !== 'undefined') {
-              const cookies = document.cookie.split(';').map(cookie => cookie.trim());
-              console.log('Browser cookies:', cookies.filter(c => 
-                c.startsWith('sb-') || c.includes('supabase') || c.includes('auth')
-              ));
-            }
-          }
-        }
-      }).catch(err => {
-        console.error('Unexpected error checking session:', err)
-      });
-    }
     
     return cachedClient;
   } catch (error) {

@@ -4,8 +4,7 @@
 
 /**
  * Get the base URL for the application
- * Uses the NEXT_PUBLIC_APP_URL environment variable if available,
- * otherwise falls back to the current origin
+ * Uses the browser's current location when available, avoiding dependency on environment variables
  */
 export function getBaseUrl(): string {
   if (typeof window === 'undefined') {
@@ -13,8 +12,8 @@ export function getBaseUrl(): string {
     return process.env.NEXT_PUBLIC_APP_URL || '';
   }
   
-  // Client-side: use environment variable or fall back to window.location.origin
-  return process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+  // Client-side: always use the current window location origin to avoid mismatches
+  return window.location.origin;
 }
 
 /**
@@ -38,7 +37,7 @@ export function createUrl(path: string): string {
 
 /**
  * Get the appropriate domain for cookies
- * For non-localhost environments, extracts the domain from NEXT_PUBLIC_APP_URL
+ * Uses the current hostname to avoid domain mismatches
  * @returns The domain to use for cookies
  */
 export function getCookieDomain(): string {
@@ -54,17 +53,8 @@ export function getCookieDomain(): string {
     return hostname;
   }
   
-  // For deployed environments, try to use the main domain from APP_URL
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    try {
-      const url = new URL(process.env.NEXT_PUBLIC_APP_URL);
-      return url.hostname;
-    } catch (e) {
-      console.warn('Failed to parse NEXT_PUBLIC_APP_URL:', e);
-    }
-  }
-  
-  // Fall back to the current hostname
+  // For deployed environments, just use the current hostname directly
+  // to ensure domain matches and avoid cross-domain cookie issues
   return hostname;
 }
 
