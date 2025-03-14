@@ -66,8 +66,8 @@ export default function LoginPage() {
   }, [user, isAuthLoading, router, checkEnvironment])
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center py-12 sm:px-6 lg:px-8 bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-black">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md mb-8">
+    <div className="flex flex-col items-center justify-center w-full min-h-screen py-12 px-4 bg-gradient-to-b from-gray-900 to-black">
+      <div className="w-full max-w-md mb-8">
         <motion.div 
           className="text-center"
           initial={{ opacity: 0, y: -20 }}
@@ -77,10 +77,10 @@ export default function LoginPage() {
           <Link href="/" className="flex items-center justify-center">
             <span className="text-5xl mb-2">✨</span>
           </Link>
-          <h2 className="text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+          <h2 className="text-center text-3xl font-extrabold text-white">
             NextJS AI Chatbot
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+          <p className="mt-2 text-center text-sm text-gray-400">
             Welcome back! Please sign in to your account
           </p>
         </motion.div>
@@ -96,7 +96,7 @@ export default function LoginPage() {
         >
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto" />
-            <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="mt-4 text-sm text-zinc-400">
               {isRedirecting 
                 ? 'Redirecting to your dashboard...' 
                 : 'Preparing your login...'}
@@ -108,23 +108,23 @@ export default function LoginPage() {
       {/* Error state */}
       {!isAuthLoading && !isCheckingEnv && !isRedirecting && (envError || dbError) && (
         <motion.div 
-          className="w-full mx-auto max-w-md space-y-6 rounded-xl bg-gradient-to-b from-zinc-50/70 to-white/90 p-8 shadow-2xl shadow-red-500/10 dark:from-zinc-900/70 dark:to-zinc-800/90 dark:shadow-zinc-900/30 backdrop-blur-sm border border-zinc-200/80 dark:border-zinc-800/80"
+          className="w-full mx-auto max-w-md space-y-6 rounded-xl bg-gradient-to-b from-zinc-900/70 to-zinc-800/90 p-8 shadow-2xl shadow-zinc-900/30 backdrop-blur-sm border border-zinc-800/80"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 10 }}
           transition={{ duration: 0.3 }}
         >
           <div className="flex flex-col text-center">
-            <h2 className="text-2xl font-bold tracking-tight text-red-600 dark:text-red-400">Configuration Error</h2>
+            <h2 className="text-2xl font-bold tracking-tight text-red-400">Configuration Error</h2>
             
             {envError && (
               <motion.div 
-                className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md"
+                className="mt-4 p-4 bg-red-900/20 border border-red-800 rounded-md"
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
               >
-                <p className="text-sm text-red-600 dark:text-red-400">
+                <p className="text-sm text-red-400">
                   {envError}
                 </p>
               </motion.div>
@@ -132,18 +132,18 @@ export default function LoginPage() {
             
             {dbError && (
               <motion.div 
-                className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md"
+                className="mt-4 p-4 bg-red-900/20 border border-red-800 rounded-md"
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
               >
-                <p className="text-sm text-red-600 dark:text-red-400">
+                <p className="text-sm text-red-400">
                   {dbError}
                 </p>
               </motion.div>
             )}
             
-            <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="mt-4 text-sm text-zinc-400">
               Please check your environment configuration before continuing.
             </p>
           </div>

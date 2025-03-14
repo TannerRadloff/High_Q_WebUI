@@ -173,7 +173,7 @@ export function LoginForm() {
       variants={formVariants}
       className="w-full mx-auto max-w-md"
     >
-      <Card className="backdrop-blur-sm border border-zinc-200/80 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/80 shadow-xl">
+      <Card className="w-full backdrop-blur-sm border border-zinc-800/80 bg-zinc-900/80 shadow-xl">
         {(apiKeyError || dbError) && (
           <motion.div 
             className="mx-6 mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md"
@@ -194,7 +194,7 @@ export function LoginForm() {
             <motion.div className="space-y-2" variants={itemVariants} custom={1}>
               <Label
                 htmlFor="email"
-                className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                className="text-sm font-medium text-zinc-300"
               >
                 Email
               </Label>
@@ -209,7 +209,7 @@ export function LoginForm() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="pl-10 bg-white dark:bg-zinc-800/50 border-zinc-300 dark:border-zinc-700 focus:border-blue-500 focus:ring-blue-500"
+                  className="pl-10 bg-zinc-800/50 border-zinc-700 focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
             </motion.div>
@@ -218,13 +218,13 @@ export function LoginForm() {
               <div className="flex items-center justify-between">
                 <Label
                   htmlFor="password"
-                  className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                  className="text-sm font-medium text-zinc-300"
                 >
                   Password
                 </Label>
                 <Link
                   href="/forgot-password"
-                  className="text-xs font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                  className="text-xs font-medium text-blue-400 hover:text-blue-300"
                 >
                   Forgot password?
                 </Link>
@@ -240,7 +240,7 @@ export function LoginForm() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="pl-10 bg-white dark:bg-zinc-800/50 border-zinc-300 dark:border-zinc-700 focus:border-blue-500 focus:ring-blue-500"
+                  className="pl-10 bg-zinc-800/50 border-zinc-700 focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
             </motion.div>
@@ -276,7 +276,7 @@ export function LoginForm() {
           >
             <Separator />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="bg-white dark:bg-zinc-900 px-2 text-xs text-zinc-500 dark:text-zinc-400">
+              <span className="bg-zinc-900 px-2 text-xs text-zinc-400">
                 Or continue with
               </span>
             </div>
@@ -288,11 +288,11 @@ export function LoginForm() {
               variant="outline" 
               onClick={handleGoogleLogin}
               disabled={isGoogleLoading || !!apiKeyError || !!dbError}
-              className="w-full border-zinc-300 dark:border-zinc-700 flex items-center justify-center gap-2"
+              className="w-full border-zinc-700 text-zinc-300 flex items-center justify-center gap-2"
             >
               {isGoogleLoading ? (
                 <>
-                  <svg className="animate-spin h-4 w-4 text-zinc-700 dark:text-zinc-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-4 w-4 text-zinc-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
@@ -310,14 +310,14 @@ export function LoginForm() {
         
         <CardFooter className="flex justify-center">
           <motion.p 
-            className="text-sm text-zinc-600 dark:text-zinc-400"
+            className="text-sm text-zinc-400"
             variants={itemVariants}
             custom={6}
           >
             Don't have an account?{' '}
             <Link 
               href="/register" 
-              className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+              className="font-medium text-blue-400 hover:text-blue-300"
             >
               Create an account
             </Link>
