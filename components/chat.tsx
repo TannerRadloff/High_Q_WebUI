@@ -1,8 +1,9 @@
 'use client';
 
 import type { Message } from 'ai';
+import type { ChatRequestOptions } from 'ai';
 import { useChat } from 'ai/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/components/auth/auth-provider';
@@ -74,11 +75,17 @@ export function Chat({
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const { user } = useAuth();
   const [hasShownError, setHasShownError] = useState(false);
+  const [apiErrorCount, setApiErrorCount] = useState(0); // Track consecutive API errors
+  const [isOnline, setIsOnline] = useState(true);
   
   // Reset error state when chat ID changes or component unmounts
   useEffect(() => {
     setHasShownError(false);
-    return () => setHasShownError(false);
+    setApiErrorCount(0);
+    return () => {
+      setHasShownError(false);
+      setApiErrorCount(0);
+    };
   }, [id]);
 
   // Handle new chat creation
@@ -147,6 +154,7 @@ export function Chat({
     generateId: generateUUID,
     onFinish: (message) => {
       console.log(`[CHAT] Chat completed successfully with model: ${selectedChatModel}`);
+      setApiErrorCount(0); // Reset error count on successful completion
       
       if (message.content.includes('fallback model')) {
         console.log('[CHAT] Using fallback model detected');
@@ -162,9 +170,34 @@ export function Chat({
     onError: (error) => {
       logError(error, `Chat error with model ${selectedChatModel}`);
       
+      // Track consecutive errors
+      setApiErrorCount(prev => prev + 1);
+      
+      // Check for specific error types
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Handle rate limit errors
+      if (errorMessage.toLowerCase().includes('rate limit') || errorMessage.toLowerCase().includes('quota')) {
+        toast.error('Rate limit reached. Please try again in a moment.');
+        return;
+      }
+      
+      // Handle authentication errors
+      if (errorMessage.toLowerCase().includes('auth') || errorMessage.toLowerCase().includes('api key')) {
+        toast.error('Authentication error. Please check your API settings.');
+        return;
+      }
+      
+      // If we've had multiple consecutive errors, show a more detailed error
+      if (apiErrorCount >= 2) {
+        toast.error('Multiple errors encountered. The service may be experiencing issues.');
+        console.error('Multiple consecutive errors:', apiErrorCount, error);
+        return;
+      }
+      
       // Only show error toast if we haven't shown one yet and it's not a chat creation error
-      if (!hasShownError && !error.message?.includes('create-new')) {
-        toast.error(error instanceof Error ? error.message : 'An error occurred during chat');
+      if (!hasShownError && !errorMessage.includes('create-new')) {
+        toast.error(`Error: ${errorMessage || 'An unexpected error occurred'}`);
         setHasShownError(true);
       }
     },
@@ -361,36 +394,74 @@ export function Chat({
     console.log(`Generated ${clusterStarCount + scatteredStarCount + brightStarCount} random stars`);
   };
 
-  // Function to handle form submission with logging
-  const handleSubmitWithLogging = (
-    event?: { preventDefault?: () => void } | undefined,
-    chatRequestOptions?: any
-  ) => {
-    console.log(`[CHAT] Submitting chat with model: ${selectedChatModel}`);
+  // Network connectivity monitoring
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      console.log('[Chat] Network connection restored');
+      toast.success('Network connection restored');
+    };
     
-    try {
-      // Create a new options object
-      const options: any = chatRequestOptions || {};
+    const handleOffline = () => {
+      setIsOnline(false);
+      console.log('[Chat] Network connection lost');
+      toast.error('Network connection lost. Messages may not be sent until connection is restored.');
+    };
+    
+    // Listen for network status changes
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    // Initial check
+    setIsOnline(navigator.onLine);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Function to handle form submission with logging
+  const handleSubmitWithLogging = useCallback(
+    async (
+      event?: { preventDefault?: () => void } | undefined,
+      chatRequestOptions?: ChatRequestOptions
+    ) => {
+      console.log(`[CHAT] Submitting chat with model: ${selectedChatModel}`);
       
-      // Ensure data property exists and contains agentType
-      if (!options.data) {
-        options.data = { agentType: 'default' };
-      } else if (!options.data.agentType) {
-        options.data.agentType = 'default';
+      // Reset error state on new submission
+      setHasShownError(false);
+      
+      // Check for network connectivity
+      if (!navigator.onLine) {
+        toast.error('You are offline. Please check your internet connection and try again.');
+        return;
       }
       
       // Don't submit if there's no input and no attachments
-      if (options.data && !options.data.input && (!options.experimental_attachments || options.experimental_attachments.length === 0)) {
-        console.log('[CHAT] Prevented submission with no input and no attachments');
-        return Promise.resolve();
+      if (chatRequestOptions?.data && 
+          typeof chatRequestOptions.data === 'object' &&
+          'input' in chatRequestOptions.data &&
+          !chatRequestOptions.data.input && 
+          (!chatRequestOptions?.experimental_attachments || 
+           chatRequestOptions.experimental_attachments.length === 0)) {
+        console.log('[CHAT] Prevented empty submission');
+        return;
       }
       
-      return handleSubmit(event, options);
-    } catch (error) {
-      logError(error, 'Error submitting message');
-      return Promise.resolve();
-    }
-  };
+      try {
+        setApiErrorCount(0); // Reset error count on new submission
+        await handleSubmit(event, chatRequestOptions);
+      } catch (error) {
+        logError(error, 'Error submitting message');
+        if (!hasShownError) {
+          toast.error('Failed to send message. Please try again.');
+          setHasShownError(true);
+        }
+      }
+    },
+    [handleSubmit, hasShownError, logError, selectedChatModel, setHasShownError, setApiErrorCount]
+  );
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">

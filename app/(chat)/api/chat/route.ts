@@ -42,6 +42,14 @@ const logError = (error: any, context: string) => {
   }
 };
 
+// At the top of the file after the imports, add these type definitions
+interface ResponseInputItem {
+  role: 'user' | 'assistant' | 'system';
+  content: string | { type: string; [key: string]: any }[];
+}
+
+type ResponseInput = ResponseInputItem[];
+
 export async function POST(request: Request) {
   try {
     const {
@@ -164,17 +172,27 @@ export async function POST(request: Request) {
     return createDataStreamResponse({
       execute: async (dataStream) => {
         try {
-          // Convert messages to the format expected by OpenAI Responses API
+          // Format messages for the OpenAI Responses API properly
+          // This uses the string format for compatibility with the Responses API
+          
+          // Convert to a simple string format since the Responses API
+          // has specific requirements for the input format
           let promptText = "";
           
-          // Add system prompt if available
+          // Add system message if available
           const systemInstructions = systemPrompt({ selectedChatModel });
           if (systemInstructions) {
             promptText += `System: ${systemInstructions}\n\n`;
           }
           
-          // Add conversation history
+          // Add all conversation messages with proper roles
           for (const message of messages) {
+            // Skip system messages with documentId as they are for internal use
+            if (message.role === 'system' && 'documentId' in message) {
+              continue;
+            }
+            
+            // Add all other messages with their proper roles
             if (message.role === 'user') {
               promptText += `User: ${message.content}\n\n`;
             } else if (message.role === 'assistant') {
@@ -182,7 +200,7 @@ export async function POST(request: Request) {
             }
           }
           
-          console.log(`[API] Using model: ${modelToUse}`);
+          console.log(`[API] Using model: ${modelToUse}, with formatted prompt of length: ${promptText.length}`);
           
           // Setup tools based on agent type
           const tools = agentType === 'research' ? 
@@ -190,16 +208,28 @@ export async function POST(request: Request) {
             undefined;
           
           try {
-            // Use the OpenAI Responses API without streaming for simplicity
-            const response = await openai.responses.create({
-              model: modelToUse === 'gpt-o1' ? 'gpt-4o' : 
+            // Map our internal model names to OpenAI model names
+            const openaiModel = modelToUse === 'gpt-o1' ? 'gpt-4o' : 
                     modelToUse === 'gpt-40' ? 'gpt-4o' : 
-                    'gpt-4o-mini',
-              input: promptText,
-              tools
+                    'gpt-4o-mini';
+                    
+            console.log(`[API] Calling OpenAI with model: ${openaiModel}`);
+            
+            // Use the OpenAI Responses API with the properly formatted input
+            // For streaming, we'll manually handle the chunks to match our expected format
+            const response = await openai.responses.create({
+              model: openaiModel,
+              input: promptText, // Use the string format as documented
+              tools,
+              stream: false // We'll handle our own streaming simulation
             });
             
+            if (!response.output_text) {
+              throw new Error('No output received from the model');
+            }
+            
             const responseText = response.output_text;
+            console.log(`[API] Received response with length: ${responseText.length}`);
             
             // Simulate streaming by sending chunks of text
             const chunkSize = 10;
@@ -235,13 +265,23 @@ export async function POST(request: Request) {
           } catch (error) {
             logError(error, 'Error with OpenAI API');
             
+            // Check if this is a rate limit or quota error
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            const isRateLimit = errorMessage.toLowerCase().includes('rate limit') || 
+                               errorMessage.toLowerCase().includes('quota');
+            
+            // Show a more specific error message
+            const userErrorMessage = isRateLimit
+              ? 'Rate limit exceeded. Please try again in a moment.'
+              : `Error: ${errorMessage}`;
+            
             // Notify the client about the error
             dataStream.writeData({
               type: 'message',
               message: {
                 id: generateUUID(),
                 role: 'system',
-                content: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
+                content: userErrorMessage,
               }
             });
             
@@ -249,14 +289,21 @@ export async function POST(request: Request) {
             try {
               console.log('[API] Attempting fallback with gpt-4o-mini');
               
+              // Use the same properly formatted input for the fallback
               const fallbackResponse = await openai.responses.create({
                 model: 'gpt-4o-mini',
-                input: promptText
+                input: promptText // Use the string format
               });
+              
+              if (!fallbackResponse.output_text) {
+                throw new Error('No output received from fallback model');
+              }
               
               const responseText = fallbackResponse.output_text;
               
               if (responseText) {
+                console.log(`[API] Fallback successful with response length: ${responseText.length}`);
+                
                 // Stream the fallback response to the client
                 dataStream.writeData({
                   type: 'message',
@@ -281,12 +328,16 @@ export async function POST(request: Request) {
               
             } catch (fallbackError) {
               logError(fallbackError, 'Fallback also failed');
+              const fallbackErrorMessage = fallbackError instanceof Error 
+                ? fallbackError.message 
+                : 'Unknown error';
+                
               dataStream.writeData({
                 type: 'message',
                 message: {
                   id: generateUUID(),
                   role: 'system',
-                  content: 'All models failed. Please try again later.',
+                  content: `All models failed. Please try again later. (Error: ${fallbackErrorMessage})`,
                 }
               });
             }
@@ -294,19 +345,25 @@ export async function POST(request: Request) {
           
         } catch (error) {
           logError(error, 'Unexpected error in stream handling');
+          
+          // Create a more user-friendly error message
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          const userMessage = `An error occurred while processing your request. Please try again. (${errorMessage})`;
+          
           dataStream.writeData({
             type: 'message',
             message: {
               id: generateUUID(),
               role: 'system',
-              content: `An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              content: userMessage,
             }
           });
         }
       },
       onError: (error: unknown) => {
         logError(error, 'Chat API error in dataStream');
-        return `Oops, an error occurred while processing your request: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`;
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return `Sorry, an error occurred while processing your request: ${errorMessage}. Please try again.`;
       },
     });
   } catch (error) {

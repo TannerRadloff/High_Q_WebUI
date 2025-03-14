@@ -149,11 +149,31 @@ function PureMultimodalInput({
     fileInputRef.current?.click();
   }, []);
 
-  const uploadFile = async (file: File) => {
+  const uploadFile = useCallback(async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
 
     try {
+      console.log(`[MultimodalInput] Uploading file: ${file.name} (${file.size} bytes)`);
+      
+      // Validate file size
+      if (file.size > 20 * 1024 * 1024) { // 20MB limit
+        toast.error(`File ${file.name} is too large. Maximum size is 20MB.`);
+        return null;
+      }
+      
+      // Validate file type - add common allowable types
+      const allowedTypes = [
+        'image/', 'application/pdf', 'text/', 'application/json', 
+        'application/vnd.openxmlformats-officedocument', 'application/vnd.ms-'
+      ];
+      
+      const isAllowedType = allowedTypes.some(type => file.type.startsWith(type));
+      if (!isAllowedType && file.type) {
+        console.warn(`[MultimodalInput] Potentially unsupported file type: ${file.type}`);
+        // Just a warning, still allow upload
+      }
+      
       const response = await fetch('/api/files/upload', {
         method: 'POST',
         body: formData,
@@ -162,46 +182,83 @@ function PureMultimodalInput({
       if (response.ok) {
         const data = await response.json();
         const { url, pathname, contentType } = data;
-
-        // Simply return the file data for attachment
-        // We'll process it further when the user submits
+        
+        console.log(`[MultimodalInput] File uploaded successfully: ${pathname}`);
+        
         return {
           url,
           name: pathname,
           contentType: contentType,
         };
       }
-      const { error } = await response.json();
-      toast.error(error);
+      
+      const responseData = await response.json().catch(() => ({ error: 'Invalid server response' }));
+      const errorMessage = responseData.error || 'Unknown upload error';
+      console.error(`[MultimodalInput] Upload error: ${errorMessage}`);
+      toast.error(`Failed to upload ${file.name}: ${errorMessage}`);
+      return null;
     } catch (error) {
-      toast.error('Failed to upload file, please try again!');
+      console.error(`[MultimodalInput] Upload exception:`, error);
+      toast.error(`Failed to upload ${file.name}. Please try again!`);
+      return null;
     }
-  };
+  }, []);
 
   const handleFileChange = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(event.target.files || []);
-
+      
+      if (files.length === 0) return;
+      
+      console.log(`[MultimodalInput] Processing ${files.length} files`);
       setUploadQueue(files.map((file) => file.name));
-
+      
       try {
-        const uploadPromises = files.map((file) => uploadFile(file));
+        // Filter out files that are too large before attempting upload
+        const validFiles = files.filter(file => {
+          if (file.size > 20 * 1024 * 1024) { // 20MB limit
+            toast.error(`File ${file.name} is too large. Maximum size is 20MB.`);
+            return false;
+          }
+          return true;
+        });
+        
+        if (validFiles.length === 0) {
+          setUploadQueue([]);
+          return;
+        }
+        
+        const uploadPromises = validFiles.map((file) => uploadFile(file));
         const uploadedAttachments = await Promise.all(uploadPromises);
         const successfullyUploadedAttachments = uploadedAttachments.filter(
-          (attachment) => attachment !== undefined && attachment !== null,
+          (attachment): attachment is NonNullable<typeof attachment> => 
+            attachment !== undefined && attachment !== null
         );
-
-        setAttachments((currentAttachments) => [
-          ...currentAttachments,
-          ...successfullyUploadedAttachments,
-        ]);
+        
+        console.log(`[MultimodalInput] Successfully uploaded ${successfullyUploadedAttachments.length}/${validFiles.length} files`);
+        
+        if (successfullyUploadedAttachments.length > 0) {
+          setAttachments((currentAttachments) => [
+            ...currentAttachments,
+            ...successfullyUploadedAttachments,
+          ]);
+        } else if (validFiles.length > 0) {
+          // If we had valid files but none uploaded successfully
+          toast.error('Failed to upload files. Please try again.');
+        }
       } catch (error) {
-        console.error('Error uploading files!', error);
+        console.error('[MultimodalInput] Error processing files:', error);
+        toast.error('Error uploading files. Please try again.');
       } finally {
         setUploadQueue([]);
+        
+        // Reset the file input so the same file can be selected again
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
     },
-    [setAttachments],
+    [setAttachments, uploadFile]
   );
   
   // Wrap the original handleSubmit to process attachments
@@ -211,6 +268,7 @@ function PureMultimodalInput({
         event.preventDefault();
       }
       
+      // Handle pending uploads
       if (uploadQueue.length > 0) {
         toast.info('Please wait for all files to upload');
         return;
@@ -222,32 +280,58 @@ function PureMultimodalInput({
         return;
       }
       
-      console.log(`[MultimodalInput] Submitting with agent: ${selectedAgent} | Input: ${input ? 'present' : 'empty'} | Attachments: ${attachments.length}`);
-      
-      // Create a new options object with agent type and attachments
-      const options: ChatRequestOptions = {};
-      
-      // Add experimental attachments
-      if (attachments.length > 0) {
-        options.experimental_attachments = attachments;
+      // Check for excessively large input to avoid API errors
+      const inputLength = input.trim().length;
+      if (inputLength > 100000) { // 100K chars is excessive
+        toast.error('Your message is too long. Please shorten it or split into multiple messages.');
+        console.warn(`[MultimodalInput] Input length (${inputLength}) exceeds reasonable limits.`);
+        return;
       }
       
-      // Add agent type to data
-      options.data = { 
-        agentType: selectedAgent,
-        input: input.trim() // Add input to data to ensure it's available for validation
-      };
+      console.log(`[MultimodalInput] Submitting with agent: ${selectedAgent} | Input length: ${inputLength} | Attachments: ${attachments.length}`);
       
-      // Handle the submission
-      handleSubmit(event, options);
-      
-      // Clear attachments after submission
-      setAttachments([]);
-      setLocalStorageInput('');
-      resetHeight();
-      
-      if (width && width > 768) {
-        textareaRef.current?.focus();
+      try {
+        // Create a new options object with agent type and attachments
+        const options: ChatRequestOptions = {};
+        
+        // Add experimental attachments
+        if (attachments.length > 0) {
+          options.experimental_attachments = attachments;
+        }
+        
+        // Add agent type to data
+        options.data = { 
+          agentType: selectedAgent,
+          input: input.trim() // Add input to data to ensure it's available for validation
+        };
+        
+        // Handle the submission with timeout
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Request timed out')), 30000); // 30 second timeout
+        });
+        
+        await Promise.race([
+          handleSubmit(event, options),
+          timeoutPromise
+        ]);
+        
+        // Only clear if submission was successful
+        setAttachments([]);
+        setLocalStorageInput('');
+        resetHeight();
+        
+        if (width && width > 768) {
+          textareaRef.current?.focus();
+        }
+      } catch (error) {
+        console.error('[MultimodalInput] Error during submission:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        
+        if (errorMessage.includes('timed out')) {
+          toast.error('Request timed out. Please try again.');
+        } else {
+          toast.error(`Failed to send message: ${errorMessage}`);
+        }
       }
     },
     [handleSubmit, attachments, setAttachments, uploadQueue, input, setLocalStorageInput, resetHeight, width, selectedAgent]
