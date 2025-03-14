@@ -11,6 +11,9 @@ export const createClient = () => {
     return cachedClient;
   }
   
+  // Check if we're in a browser environment
+  const isBrowser = typeof window !== 'undefined';
+  
   // Debug Supabase environment variables
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -38,12 +41,12 @@ export const createClient = () => {
         domain: cookieDomain,
         path: '/',
         sameSite: 'lax',
-        secure: window.location.protocol === 'https:'
+        secure: isBrowser ? window.location.protocol === 'https:' : true
       }
     });
     
     // Log the session status on client creation
-    if (cachedClient) {
+    if (cachedClient && isBrowser) {
       cachedClient.auth.getSession().then(({ data, error }) => {
         if (error) {
           console.error('Error checking session:', error)
@@ -55,11 +58,13 @@ export const createClient = () => {
             console.log('Current time:', new Date().toISOString())
             console.log('Cookie domain being used:', cookieDomain)
             
-            // Log cookie information
-            const cookies = document.cookie.split(';').map(cookie => cookie.trim());
-            console.log('Browser cookies:', cookies.filter(c => 
-              c.startsWith('sb-') || c.includes('supabase') || c.includes('auth')
-            ));
+            // Log cookie information if in browser
+            if (typeof document !== 'undefined') {
+              const cookies = document.cookie.split(';').map(cookie => cookie.trim());
+              console.log('Browser cookies:', cookies.filter(c => 
+                c.startsWith('sb-') || c.includes('supabase') || c.includes('auth')
+              ));
+            }
           }
         }
       }).catch(err => {
