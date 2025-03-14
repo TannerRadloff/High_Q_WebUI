@@ -42,6 +42,55 @@ interface StreamErrorMessage {
   error: string;
 }
 
+// Helper to check if an error is auth-related
+const isAuthenticationError = (error: any): boolean => {
+  if (!error) return false;
+  
+  // Check common patterns for auth errors
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+    return message.includes('auth') || 
+           message.includes('unauthorized') || 
+           message.includes('unauthenticated') ||
+           message.includes('permission') ||
+           message.includes('forbidden') ||
+           message.includes('login') ||
+           message.includes('sign in');
+  }
+  
+  if (typeof error === 'string') {
+    const message = error.toLowerCase();
+    return message.includes('auth') || 
+           message.includes('unauthorized') || 
+           message.includes('unauthenticated') ||
+           message.includes('permission') ||
+           message.includes('forbidden') ||
+           message.includes('login') ||
+           message.includes('sign in');
+  }
+  
+  // Check for status codes
+  if (error.status === 401 || error.status === 403) {
+    return true;
+  }
+  
+  return false;
+};
+
+// Helper to dispatch global error event
+const dispatchGlobalErrorEvent = (errorType: 'loading-error' | 'authentication-required', errorMessage?: string) => {
+  if (typeof window === 'undefined') return;
+  
+  const errorEvent = new CustomEvent('historyLoadError', { 
+    detail: { 
+      type: errorType,
+      message: errorMessage || 'An error occurred',
+      timestamp: new Date().toISOString()
+    } 
+  });
+  document.dispatchEvent(errorEvent);
+};
+
 export function Chat({
   id,
   initialMessages,
@@ -214,7 +263,14 @@ export function Chat({
         const status = response.status;
         console.error(`[CHAT] HTTP Error (${status}): ${response.statusText}`);
         
-        // Basic error handling
+        // Handle auth errors
+        if (status === 401 || status === 403) {
+          dispatchGlobalErrorEvent('authentication-required', response.statusText);
+          setHasError(true);
+          return;
+        }
+        
+        // Handle other errors
         toast.error(`API error: ${response.statusText || 'Request failed'}`);
         setHasError(true);
       } else {
@@ -243,15 +299,19 @@ export function Chat({
       mutate('/api/history');
       
       // Scroll to bottom of chat
-      if (messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-      }
+      scrollToBottom();
     },
     onError: (error) => {
       console.error(`[CHAT] Error with model ${selectedChatModel}:`, error);
       
-      // Simple error handling
-      toast.error('An error occurred while processing your message. Please try again.');
+      // Check if this is an auth error
+      if (isAuthenticationError(error)) {
+        dispatchGlobalErrorEvent('authentication-required', error instanceof Error ? error.message : String(error));
+      } else {
+        // Simple error handling for non-auth errors
+        toast.error('An error occurred while processing your message. Please try again.');
+      }
+      
       setHasError(true);
     },
   });
@@ -485,8 +545,8 @@ export function Chat({
         </div>
       )}
         
-      {/* Error Message */}
-      {hasError && (
+      {/* Error Message - only show for non-auth errors since auth errors use the global overlay */}
+      {hasError && !isAuthenticationError && (
         <div className="p-4 mb-4 bg-destructive/10 border border-destructive rounded-lg max-w-2xl mx-auto" role="alert">
           <p className="text-sm text-destructive">An error occurred. Please try again or refresh the page.</p>
           <div className="mt-2 flex gap-2">

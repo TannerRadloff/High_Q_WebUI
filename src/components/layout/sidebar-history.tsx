@@ -163,7 +163,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     onError: (err) => {
       console.error('Error fetching chat history:', err);
       
-      // Debug the error with more details
+      // Enhanced error logging with more details
       console.log('Chat history fetch error details:', {
         error: err,
         errorMessage: err instanceof Error ? err.message : String(err),
@@ -174,26 +174,50 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
       });
       
       // Clear any existing error toasts before showing a new one
-      // to prevent stacking of error messages
       toast.dismiss('sidebar-history-error');
       
-      // Show a clear error message to the user
-      toast.error('Failed to load chat history. Please try refreshing the page.', {
-        duration: 5000,
-        id: 'sidebar-history-error', // Using a unique ID prevents duplicate toasts
-        position: 'top-center',
-      });
+      // Check specifically for authentication errors
+      const isAuthError = 
+        (err instanceof Error && err.message.toLowerCase().includes('authentication')) ||
+        (typeof err === 'string' && err.toLowerCase().includes('authentication')) ||
+        (err && (err as any).status === 401);
+      
+      if (isAuthError) {
+        // For auth errors, we'll use the global error overlay instead of a toast
+        dispatchErrorEvent('authentication-required');
+      } else {
+        // Only show toast for non-auth errors
+        toast.error('Failed to load chat history. Please try refreshing the page.', {
+          duration: 5000,
+          id: 'sidebar-history-error', // Using a unique ID prevents duplicate toasts
+          position: 'top-center',
+        });
+      }
     },
-    revalidateOnFocus: false, // Change to false to reduce unnecessary requests when tab is focused
+    revalidateOnFocus: false,
     revalidateOnReconnect: true,
-    dedupingInterval: 10000, // Increase to 10 seconds to reduce API load
+    dedupingInterval: 10000,
     shouldRetryOnError: true,
-    errorRetryCount: 3, // Limit retry attempts
-    errorRetryInterval: 3000, // Retry every 3 seconds
+    errorRetryCount: 3, 
+    errorRetryInterval: 3000,
     onLoadingSlow: () => {
       console.log('Chat history loading is taking longer than expected');
     },
   });
+
+  // Helper function to dispatch error events with proper type
+  const dispatchErrorEvent = useCallback((errorType: 'loading-error' | 'authentication-required') => {
+    if (typeof window === 'undefined') return;
+    
+    const errorEvent = new CustomEvent('historyLoadError', { 
+      detail: { 
+        type: errorType,
+        message: error instanceof Error ? error.message : 'Failed to load chat history',
+        timestamp: new Date().toISOString()
+      } 
+    });
+    document.dispatchEvent(errorEvent);
+  }, [error]);
 
   // Add a manual retry function with debounce
   const retryLoadHistory = useCallback(() => {
@@ -210,13 +234,30 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
         .catch(err => {
           toast.dismiss('retry-history');
           console.error('Manual retry failed:', err);
-          toast.error('Retry failed. Please try again later.');
+          
+          // Check if this is an auth error
+          const isAuthError = 
+            (err instanceof Error && err.message.toLowerCase().includes('authentication')) ||
+            (typeof err === 'string' && err.toLowerCase().includes('authentication')) ||
+            (err && (err as any).status === 401);
+          
+          if (isAuthError) {
+            // For auth errors, use the global error overlay
+            dispatchErrorEvent('authentication-required');
+          } else {
+            toast.error('Retry failed. Please try again later.');
+          }
         });
     }, 300);
-  }, [mutate]);
+  }, [mutate, dispatchErrorEvent]);
 
   // Check for errors and show retry button if needed
   const hasError = error !== undefined;
+  const isAuthError = 
+    hasError && 
+    ((error instanceof Error && error.message.toLowerCase().includes('authentication')) ||
+    (typeof error === 'string' && error.toLowerCase().includes('authentication')) ||
+    (error && (error as any).status === 401));
 
   useEffect(() => {
     if (user) {
@@ -226,6 +267,16 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
       });
       mutate().catch(error => {
         console.error('Error in initial history load:', error);
+        
+        // Check if this is an auth error on initial load
+        const isAuthErr = 
+          (error instanceof Error && error.message.toLowerCase().includes('authentication')) ||
+          (typeof error === 'string' && error.toLowerCase().includes('authentication')) ||
+          (error && (error as any).status === 401);
+        
+        if (isAuthErr) {
+          dispatchErrorEvent('authentication-required');
+        }
       });
     }
     
@@ -234,7 +285,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
       toast.dismiss('sidebar-history-error');
       toast.dismiss('retry-history');
     };
-  }, [pathname, mutate, user]);
+  }, [pathname, mutate, user, dispatchErrorEvent]);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -277,41 +328,48 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
   }
 
   if (error) {
-    // Dispatch custom event for global error handling
-    if (typeof window !== 'undefined') {
-      const errorEvent = new CustomEvent('historyLoadError', { 
-        detail: { 
-          message: error instanceof Error ? error.message : 'Failed to load chat history',
-          timestamp: new Date().toISOString()
-        } 
-      });
-      document.dispatchEvent(errorEvent);
-    }
-    
-    return (
-      <div className="error-loading-history p-4">
-        <div className="py-4 text-center">
-          <div className="text-destructive mb-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-            <p>Error loading chat history</p>
+    // Only show the error UI for non-auth errors
+    // Auth errors will be handled by the global overlay
+    if (!isAuthError) {
+      // Dispatch custom event for global error handling for non-auth errors
+      dispatchErrorEvent('loading-error');
+      
+      return (
+        <div className="error-loading-history p-4">
+          <div className="py-4 text-center">
+            <div className="text-destructive mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <p>Error loading chat history</p>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              We couldn't load your chat history. Please try again.
+            </p>
+            <button 
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 transition-colors"
+              onClick={retryLoadHistory}
+              aria-label="Retry loading chat history"
+            >
+              Try again
+            </button>
           </div>
-          <p className="text-sm text-muted-foreground mb-3">
-            We couldn't load your chat history. Please try again.
-          </p>
-          <button 
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 transition-colors"
-            onClick={retryLoadHistory}
-            aria-label="Retry loading chat history"
-          >
-            Try again
-          </button>
         </div>
-      </div>
-    );
+      );
+    } else {
+      // For auth errors, show a simpler UI that doesn't duplicate the global overlay message
+      return (
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <div className="px-2 text-zinc-500 w-full flex flex-col justify-center items-center text-sm gap-2 py-4">
+              <p>Sign in to view your chat history</p>
+            </div>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      );
+    }
   }
 
   if (isLoading) {

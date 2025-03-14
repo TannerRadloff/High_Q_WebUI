@@ -2,6 +2,7 @@
 // @ts-ignore
 import { useRouter } from 'next/navigation';
 import { useWindowSize } from 'usehooks-ts';
+import { useCallback } from 'react';
 
 import { ModelSelector } from '@/src/components/features/model-selector';
 import { SidebarToggle } from '@/src/components/layout/sidebar-toggle';
@@ -31,6 +32,15 @@ function ChatHeaderComponent({
   const { width: windowWidth } = useWindowSize();
   // Default title for new chats
   const title = chatId === 'create-new' ? 'New Chat' : '';
+
+  // Handle retry of authentication
+  const handleAuthRetry = useCallback(() => {
+    if (typeof window !== 'undefined' && window.dismissErrorOverlay) {
+      window.dismissErrorOverlay();
+    }
+    // Redirect to login page or trigger login flow
+    router.push('/login');
+  }, [router]);
 
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background/95 px-4 backdrop-blur-sm">

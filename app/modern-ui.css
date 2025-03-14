@@ -39,6 +39,49 @@ a:focus-visible {
   outline: none;
 }
 
+/* Consolidated error message styling */
+.error-container {
+  border-radius: 0.5rem;
+  background-color: hsl(var(--destructive) / 0.05);
+  border: 1px solid hsl(var(--destructive) / 0.2);
+  padding: 1rem;
+  margin: 1rem;
+  transition: all 0.2s ease;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.error-container button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.error-container button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.error-container button:active {
+  transform: translateY(0);
+}
+
+/* Authentication error specific styles */
+.auth-error-container {
+  text-align: center;
+}
+
+.auth-error-container .auth-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 1rem;
+  color: hsl(var(--destructive) / 0.8);
+}
+
 /* Error recovery UI */
 #error-recovery-overlay {
   display: none;
@@ -72,7 +115,7 @@ a:focus-visible {
   to { opacity: 1; }
 }
 
-#retry-button {
+#retry-button, #login-button {
   position: relative;
   overflow: hidden;
   transition: all 0.3s ease;
@@ -80,10 +123,28 @@ a:focus-visible {
   background-image: linear-gradient(to right, hsl(var(--primary)), hsl(var(--primary) / 0.8), hsl(var(--primary)));
 }
 
-#retry-button:hover {
+#retry-button:hover, #login-button:hover {
   background-position: right center;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Toast notification improvements */
+[data-sonner-toast] {
+  max-width: 90% !important;
+  width: auto !important;
+}
+
+[data-sonner-toast][data-type="error"] {
+  background-color: hsl(var(--destructive) / 0.1) !important;
+  border-color: hsl(var(--destructive) / 0.2) !important;
+  color: hsl(var(--destructive)) !important;
+}
+
+[data-sonner-toast][data-type="success"] {
+  background-color: hsl(var(--success) / 0.1) !important;
+  border-color: hsl(var(--success) / 0.2) !important;
+  color: hsl(var(--success)) !important;
 }
 
 /* Enhanced Message UI */
@@ -193,7 +254,7 @@ a:focus-visible {
   transition: opacity 0.3s;
 }
 
-/* Error loading history styles */
+/* Error loading history styles - converting to use consolidated styles */
 .error-loading-history {
   border-radius: 0.5rem;
   background-color: hsl(var(--destructive) / 0.05);
@@ -232,5 +293,15 @@ a:focus-visible {
     transform: none;
     box-shadow: none;
     background-color: hsl(var(--primary) / 0.05);
+  }
+  
+  .error-container {
+    margin: 0.5rem;
+    padding: 0.75rem;
+  }
+  
+  [data-sonner-toast] {
+    max-width: 95% !important;
+    margin: 0.5rem !important;
   }
 } 
