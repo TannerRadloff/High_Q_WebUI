@@ -991,13 +991,13 @@
 /* Ensure message bubbles are above animations */
 .message-bubble {
   position: relative;
-  z-index: 1;
+  z-index: 5;
 }
 
 /* Ensure chat header is above animations */
 .chat-header {
   position: relative;
-  z-index: 1;
+  z-index: 20;
   background-color: rgba(var(--background-start-rgb), 0.7) !important;
   backdrop-filter: blur(8px);
 }
@@ -1005,7 +1005,7 @@
 /* Ensure input area is above animations */
 .input-area {
   position: relative;
-  z-index: 1;
+  z-index: 15;
 }
 
 /* Make the layer behind the input message box completely transparent */

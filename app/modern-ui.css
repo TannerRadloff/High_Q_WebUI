@@ -222,7 +222,7 @@ a:focus-visible {
 /* Enhanced input area */
 .enhanced-input {
   position: relative;
-  z-index: 10;
+  z-index: 15;
   border: 1px solid hsl(var(--border));
   background-color: hsl(var(--background));
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
@@ -233,6 +233,7 @@ a:focus-visible {
 .enhanced-input:focus-within {
   border-color: hsl(var(--primary));
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 0 0 2px hsl(var(--primary) / 0.1);
+  z-index: 16;
 }
 
 /* Smooth page transitions */
