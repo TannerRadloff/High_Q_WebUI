@@ -55,6 +55,8 @@ export function Chat({
   
   // Simplify error state management - this was overcomplicated before
   const [hasError, setHasError] = useState(false);
+  // Add back isOnline state for network connectivity monitoring
+  const [isOnline, setIsOnline] = useState(true);
   
   useEffect(() => {
     // Clear error state when chat ID changes
