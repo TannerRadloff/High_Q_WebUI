@@ -38,18 +38,18 @@ export default function ProfilePage() {
   return (
     <div className="flex h-dvh w-screen items-start pt-12 md:pt-0 md:items-center justify-center bg-background">
       <Card className="w-full max-w-md">
-        <CardHeader className="flex flex-row items-center gap-4">
+        <CardHeader className="flex-row-center gap-4">
           <Avatar className="h-16 w-16">
             <AvatarImage src={user.user_metadata?.avatar_url || ''} alt={username} />
             <AvatarFallback>{initials}</AvatarFallback>
           </Avatar>
           <div className="flex-1">
-            <div className="flex items-center justify-between">
+            <div className="flex-between">
               <CardTitle>{username}</CardTitle>
               <Button 
                 size="sm" 
                 variant="ghost" 
-                className="flex items-center gap-1"
+                className="flex-row-center gap-1"
                 onClick={() => router.push('/profile/edit')}
               >
                 <span aria-hidden="true" className="text-sm">✏️</span>

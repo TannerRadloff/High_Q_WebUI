@@ -41,7 +41,7 @@ export function ErrorMessage({
       className={`error-container ${className}`}
       role="alert"
     >
-      <div className="flex items-start">
+      <div className="flex-row-center justify-start">
         <div className="flex-1">
           <p className="text-sm text-destructive font-medium">{displayMessage}</p>
         </div>
@@ -60,7 +60,7 @@ export function ErrorMessage({
       </div>
       
       {(onRetry || onLogin) && (
-        <div className="mt-2 flex gap-2">
+        <div className="mt-2 flex-row gap-2">
           {onRetry && (
             <Button
               variant="default"

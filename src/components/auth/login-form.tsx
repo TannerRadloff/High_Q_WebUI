@@ -128,7 +128,7 @@ export function LoginForm() {
         exit={{ opacity: 0, y: 10 }}
         transition={{ duration: 0.3 }}
       >
-        <div className="flex flex-col text-center">
+        <div className="flex-col-center text-center">
           <h2 className="text-2xl font-bold tracking-tight text-red-400">Configuration Error</h2>
           
           <div className="mt-4">
@@ -167,7 +167,7 @@ export function LoginForm() {
     >
       <Card className="mx-auto max-w-sm shadow-xl border-zinc-800/60 bg-gradient-to-b from-zinc-900/70 to-zinc-800/90 backdrop-blur-sm">
         <CardHeader className="space-y-1">
-          <div className="flex justify-center mb-2">
+          <div className="flex-center mb-2">
             <LockIcon size={40} />
           </div>
           <CardTitle className="text-2xl text-center">Sign in</CardTitle>
@@ -194,7 +194,7 @@ export function LoginForm() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex-between">
                       <Label htmlFor="password">Password</Label>
                       <Link 
                         href="/forgot-password" 

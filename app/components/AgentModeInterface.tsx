@@ -138,8 +138,8 @@ export default function AgentModeInterface() {
       >
         {/* Welcome message */}
         {agentRequests.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center p-4">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+          <div className="flex-center-col h-full text-center p-4">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex-center mb-4">
               <BotIcon size={32} />
             </div>
             <h3 className="text-xl font-semibold mb-2">Welcome to Agent Mode</h3>
@@ -156,7 +156,7 @@ export default function AgentModeInterface() {
         {agentRequests.map(request => (
           <div key={request.id} id={`request-${request.id}`} className="space-y-4">
             {/* User message */}
-            <div className="flex items-start gap-3">
+            <div className="flex-start gap-3">
               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <span className="text-sm font-medium">You</span>
               </div>
@@ -173,7 +173,7 @@ export default function AgentModeInterface() {
             
             {/* Agent response */}
             {(request.status === 'completed' || request.status === 'failed') && (
-              <div className="flex items-start gap-3">
+              <div className="flex-start gap-3">
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
                   <BotIcon size={16} />
                 </div>
@@ -220,7 +220,7 @@ export default function AgentModeInterface() {
             
             {/* Processing indicator */}
             {request.status === 'in-progress' && (
-              <div className="flex items-start gap-3">
+              <div className="flex-start gap-3">
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
                   <BotIcon size={16} />
                 </div>

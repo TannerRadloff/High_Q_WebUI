@@ -24,7 +24,7 @@ const initGlobalErrorHandlers = () => {
 function isAuthPage(pathname: string | null) {
   if (!pathname) return false;
   return pathname.startsWith('/login') || 
-         pathname.startsWith('/register') || 
+         pathname.startsWith('/signup') || 
          pathname.startsWith('/forgot-password') ||
          pathname.startsWith('/reset-password');
 }
@@ -68,7 +68,7 @@ export default function ClientLayout({
     <ErrorBoundary>
       <div className={cn(
         "w-full", 
-        isAuth && "flex flex-col items-center justify-center min-h-[calc(100vh-3.5rem)]",
+        isAuth && "flex-center-col min-h-[calc(100vh-3.5rem)]",
         isChat && "h-full" // Chat pages (including home) don't need extra height adjustment
       )}>
         {children}

@@ -48,8 +48,8 @@ export const Suggestion = ({
           exit={{ opacity: 0, y: -10 }}
           whileHover={{ scale: 1.05 }}
         >
-          <div className="flex flex-row items-center justify-between">
-            <div className="flex flex-row items-center gap-2">
+          <div className="flex-between">
+            <div className="flex-row-center gap-2">
               <div className="size-4 bg-muted-foreground/25 rounded-full" />
               <div className="font-medium">Assistant</div>
             </div>

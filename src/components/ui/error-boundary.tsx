@@ -50,7 +50,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       // This prevents exposing sensitive error details in production
       if (isOpenAIError && isProd) {
         return (
-          <div className="flex flex-col items-center justify-center min-h-[50vh] p-6 text-center">
+          <div className="flex-center-col min-h-[50vh] p-6 text-center">
             <div className="w-full max-w-md p-6 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
               <h2 className="text-xl font-bold text-amber-700 dark:text-amber-400 mb-3">
                 Something went wrong
@@ -66,7 +66,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       // For development environment or non-OpenAI errors, keep original error display
       if (isOpenAIError && !isProd) {
         return (
-          <div className="flex flex-col items-center justify-center min-h-[50vh] p-6 text-center">
+          <div className="flex-center-col min-h-[50vh] p-6 text-center">
             <div className="w-full max-w-md p-6 rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30">
               <h2 className="text-xl font-bold text-red-700 dark:text-red-400 mb-3">
                 OpenAI API Configuration Error

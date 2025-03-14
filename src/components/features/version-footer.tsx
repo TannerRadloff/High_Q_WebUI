@@ -21,12 +21,12 @@ export function VersionFooter({
   return (
     <AnimatePresence>
       <motion.div 
-        className="flex flex-row items-center justify-between border-t bg-background p-2 dark:border-zinc-700 border-zinc-200"
+        className="flex-between border-t bg-background p-2 dark:border-zinc-700 border-zinc-200"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 20 }}
       >
-        <div className="flex flex-row gap-2 items-center">
+        <div className="flex-row-center gap-2">
           <div className="text-sm text-muted-foreground">
             Viewing version from{' '}
             {formatDistance(new Date(currentDocument.createdAt), new Date(), {

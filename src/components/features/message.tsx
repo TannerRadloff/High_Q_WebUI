@@ -66,7 +66,7 @@ const PurePreviewMessage = ({
       >
         <div
           className={cn(
-            'flex gap-4 w-full group-data-[role=user]/message:ml-auto group-data-[role=user]/message:max-w-2xl',
+            'flex-row gap-4 w-full group-data-[role=user]/message:ml-auto group-data-[role=user]/message:max-w-2xl',
             {
               'w-full': mode === 'edit',
               'group-data-[role=user]/message:w-fit': mode !== 'edit',
@@ -74,16 +74,16 @@ const PurePreviewMessage = ({
           )}
         >
           {message.role === 'assistant' && (
-            <div className="size-8 flex items-center rounded-full justify-center ring-1 shrink-0 ring-border bg-background">
+            <div className="size-8 flex-center rounded-full ring-1 shrink-0 ring-border bg-background">
               <div className="translate-y-px">
                 <SparklesIcon size={14} />
               </div>
             </div>
           )}
 
-          <div className="flex flex-col gap-4 w-full">
+          <div className="flex-col gap-4 w-full">
             {message.experimental_attachments && (
-              <div className="flex flex-row justify-end gap-2">
+              <div className="flex-row-center justify-end gap-2">
                 {message.experimental_attachments.map((attachment) => (
                   <PreviewAttachment
                     key={attachment.url}
@@ -101,7 +101,7 @@ const PurePreviewMessage = ({
             )}
 
             {(message.content || message.reasoning) && mode === 'view' && (
-              <div className="flex flex-row gap-2 items-start">
+              <div className="flex-row-center items-start gap-2">
                 {message.role === 'user' && !isReadonly && (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -120,7 +120,7 @@ const PurePreviewMessage = ({
                 )}
 
                 <div
-                  className={cn('flex flex-col gap-4 message-bubble', {
+                  className={cn('flex-col gap-4 message-bubble', {
                     'bg-primary text-primary-foreground px-3 py-2 rounded-xl':
                       message.role === 'user',
                     'bg-secondary text-secondary-foreground px-3 py-2 rounded-xl backdrop-blur-sm border border-secondary/30 shadow-md':
@@ -133,7 +133,7 @@ const PurePreviewMessage = ({
             )}
 
             {message.content && mode === 'edit' && (
-              <div className="flex flex-row gap-2 items-start">
+              <div className="flex-row-center items-start gap-2">
                 <div className="size-8" />
 
                 <MessageEditor
@@ -147,7 +147,7 @@ const PurePreviewMessage = ({
             )}
 
             {message.toolInvocations && message.toolInvocations.length > 0 && (
-              <div className="flex flex-col gap-4">
+              <div className="flex-col gap-4">
                 {message.toolInvocations.map((toolInvocation) => {
                   const { toolName, toolCallId, state, args } = toolInvocation;
 
@@ -258,17 +258,17 @@ export const ThinkingMessage = () => {
       data-role={role}
     >
       <div
-        className="flex gap-4 w-full"
+        className="flex-row gap-4 w-full"
       >
-        <div className="size-8 flex items-center rounded-full justify-center ring-1 shrink-0 ring-border bg-secondary/30 backdrop-blur-sm shadow-sm">
+        <div className="size-8 flex-center rounded-full ring-1 shrink-0 ring-border bg-secondary/30 backdrop-blur-sm shadow-sm">
           <div className="animate-pulse text-secondary-foreground">
             <SparklesIcon size={14} />
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 w-full">
-          <div className="flex flex-col gap-4 bg-secondary/30 text-secondary-foreground px-3 py-2 rounded-xl backdrop-blur-sm border border-secondary/30 shadow-md w-fit message-bubble">
-            <div className="flex space-x-2">
+        <div className="flex-col gap-2 w-full">
+          <div className="flex-col gap-4 bg-secondary/30 text-secondary-foreground px-3 py-2 rounded-xl backdrop-blur-sm border border-secondary/30 shadow-md w-fit message-bubble">
+            <div className="flex-row space-x-2">
               <div className="size-2 rounded-full bg-primary animate-pulse" />
               <div className="size-2 rounded-full bg-primary animate-pulse delay-150" />
               <div className="size-2 rounded-full bg-primary animate-pulse delay-300" />

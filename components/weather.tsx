@@ -284,7 +284,7 @@ export function Weather({
 
       <div className="flex flex-row justify-between">
         {displayTimes.map((time, index) => (
-          <div key={time} className="flex flex-col items-center gap-1">
+          <div key={time} className="flex-col-center gap-1">
             <div className="text-blue-100 text-xs">
               {format(new Date(time), 'ha')}
             </div>
@@ -298,7 +298,8 @@ export function Weather({
                   'bg-indigo-200': !isDay,
                 },
               )}
-            />
+            >
+            </div>
             <div className="text-blue-50 text-sm">
               {n(displayTemperatures[index])}
               {weatherAtLocation.hourly_units.temperature_2m}

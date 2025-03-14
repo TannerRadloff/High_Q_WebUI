@@ -1,5 +1,19 @@
 /* HighQ - Modern UI Enhancements */
 
+/* Unified layout system */
+.layout-container {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.layout-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Enhanced Chat UI */
 .chat-sending-pulse {
   animation: pulse 0.3s ease-in-out;
@@ -11,20 +25,11 @@
   100% { transform: scale(1); }
 }
 
-.sparkles-container {
+/* Simplified container system */
+.overlay-container {
   position: absolute;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   pointer-events: none;
-  overflow: hidden;
-}
-
-.sparkle {
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  opacity: 0;
 }
 
 /* Improved focus styles for accessibility */
@@ -50,23 +55,55 @@ a:focus-visible {
   animation: slideIn 0.3s ease;
 }
 
+/* Shared animations */
 @keyframes slideIn {
   from { transform: translateY(-10px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
 
-.error-container button {
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Button hover effects */
+.hover-transform {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-transform:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.hover-transform:active {
+  transform: translateY(0);
+}
+
+/* Standardized error container */
+.error-container button,
+#retry-button, 
+#login-button {
   position: relative;
   overflow: hidden;
   transition: all 0.3s ease;
 }
 
-.error-container button:hover {
+.error-container button:hover,
+#retry-button:hover, 
+#login-button:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.error-container button:active {
+.error-container button:active,
+#retry-button:active, 
+#login-button:active {
   transform: translateY(0);
 }
 
@@ -82,8 +119,8 @@ a:focus-visible {
   color: hsl(var(--destructive) / 0.8);
 }
 
-/* Error recovery UI */
-#error-recovery-overlay {
+/* Standard modal overlay */
+.modal-overlay {
   display: none;
   position: fixed;
   inset: 0;
@@ -96,37 +133,13 @@ a:focus-visible {
   opacity: 0;
 }
 
-#error-recovery-overlay.visible {
+.modal-overlay.visible {
   display: flex;
   animation: fadeIn 0.3s ease forwards;
 }
 
-#error-recovery-overlay .bg-card {
+.modal-overlay .bg-card {
   animation: slideUp 0.3s ease;
-}
-
-@keyframes slideUp {
-  from { transform: translateY(10px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-#retry-button, #login-button {
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
-  background-size: 200% auto;
-  background-image: linear-gradient(to right, hsl(var(--primary)), hsl(var(--primary) / 0.8), hsl(var(--primary)));
-}
-
-#retry-button:hover, #login-button:hover {
-  background-position: right center;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 /* Toast notification improvements */
@@ -281,7 +294,7 @@ a:focus-visible {
 
 /* Mobile optimizations */
 @media (max-width: 640px) {
-  #error-recovery-overlay .bg-card {
+  .modal-overlay .bg-card {
     max-width: 90%;
     margin: 0 auto;
   }

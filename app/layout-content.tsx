@@ -7,13 +7,13 @@ import { ThemeProvider } from '@/src/components/common/theme-provider';
 import { Providers } from './providers';
 import { ErrorBoundary } from '@/src/components/ui/error-boundary';
 import { NavBar } from '@/src/components/layout/nav-bar';
-import { SidebarProvider } from '@/src/components/ui/sidebar';
+import { SidebarProvider } from './components/sidebar-provider';
 import ClientLayout from './client-layout';
 
 function isAuthPage(pathname: string | null) {
   if (!pathname) return false;
   return pathname.startsWith('/login') || 
-         pathname.startsWith('/register') || 
+         pathname.startsWith('/signup') || 
          pathname.startsWith('/forgot-password') ||
          pathname.startsWith('/reset-password');
 }
@@ -40,14 +40,14 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
         >
           <SidebarProvider defaultWidth={280} defaultOpen={false}>
             <div className={cn(
-              "flex min-h-screen",
-              isAuth ? "flex-col" : "flex-row"
+              "min-h-screen",
+              isAuth ? "flex-center-col" : "flex-row"
             )}>
               {!isAuth && !isChat && <NavBar />}
               <main className={cn(
                 "flex-1",
                 !isAuth && !isChat && "pl-4",
-                isAuth && "flex items-center justify-center"
+                isAuth && "flex-center"
               )}>
                 <ClientLayout>
                   {children}

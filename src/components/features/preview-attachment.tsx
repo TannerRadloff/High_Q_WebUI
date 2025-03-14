@@ -14,7 +14,7 @@ export const PreviewAttachment = ({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="w-20 h-16 aspect-video bg-muted rounded-md relative flex flex-col items-center justify-center">
+      <div className="w-20 h-16 aspect-video bg-muted rounded-md relative flex-col-center">
         {contentType ? (
           contentType.startsWith('image') ? (
             // NOTE: it is recommended to use next/image for images
@@ -30,7 +30,7 @@ export const PreviewAttachment = ({
               href={url} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="flex items-center justify-center size-full"
+              className="flex-center size-full"
             >
               <FileIcon size={32} />
             </a>
@@ -39,7 +39,7 @@ export const PreviewAttachment = ({
               href={url} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="flex items-center justify-center size-full"
+              className="flex-center size-full"
             >
               <FileText className="size-8 text-blue-500" />
             </a>

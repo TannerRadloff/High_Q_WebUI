@@ -4,9 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { LoginForm } from '@/src/components/auth/login-form'
 import { useAuth } from '@/components/auth/auth-provider'
-import { Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
-import Link from 'next/link'
 import { ErrorMessage } from '@/src/components/ui/error-message'
 
 interface EnvCheckResult {
@@ -67,18 +65,12 @@ export default function LoginPage() {
   }, [user, isAuthLoading, router, checkEnvironment])
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen py-2 bg-gradient-to-b from-black via-slate-900 to-slate-950">
-      {/* Background animations */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 bg-black opacity-80"></div>
-        <div className="cosmic-animation-container"></div>
-      </div>
-      
+    <div className="flex-center-col min-h-screen py-2 bg-gradient-to-b from-black via-slate-900 to-slate-950">
       {/* Loading state */}
       {(isAuthLoading || isCheckingEnv) && (
         <motion.div 
           key="loading"
-          className="w-full max-w-md flex flex-col items-center justify-center space-y-4"
+          className="w-full max-w-md flex-center-col space-y-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -92,14 +84,13 @@ export default function LoginPage() {
       {/* Redirect indicator */}
       {isRedirecting && (
         <motion.div 
-          className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center"
+          className="modal-overlay visible" 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
         >
           <div className="bg-background p-4 rounded-md shadow-xl">
-            <div className="flex items-center space-x-2">
+            <div className="flex-row-center space-x-2">
               <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
               <p>Redirecting to dashboard...</p>
             </div>
@@ -116,7 +107,7 @@ export default function LoginPage() {
           exit={{ opacity: 0, y: 10 }}
           transition={{ duration: 0.3 }}
         >
-          <div className="flex flex-col text-center">
+          <div className="flex-col-center text-center">
             <h2 className="text-2xl font-bold tracking-tight text-red-400">Configuration Error</h2>
             
             <div className="mt-4">

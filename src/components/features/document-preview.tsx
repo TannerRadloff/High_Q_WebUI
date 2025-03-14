@@ -118,8 +118,8 @@ export function DocumentPreview({
 
 const LoadingSkeleton = ({ artifactKind }: { artifactKind: ArtifactKind }) => (
   <div className="w-full">
-    <div className="p-4 border rounded-t-2xl flex flex-row gap-2 items-center justify-between dark:bg-muted h-[57px] dark:border-zinc-700 border-b-0">
-      <div className="flex flex-row items-center gap-3">
+    <div className="p-4 border rounded-t-2xl flex-between dark:bg-muted h-[57px] dark:border-zinc-700 border-b-0">
+      <div className="flex-row-center gap-3">
         <div className="text-muted-foreground">
           <div className="animate-pulse rounded-md size-4 bg-muted-foreground/20" />
         </div>
@@ -185,7 +185,7 @@ const PureHitboxLayer = ({
       role="presentation"
       aria-hidden="true"
     >
-      <div className="w-full p-4 flex justify-end items-center">
+      <div className="w-full p-4 flex-end">
         <div className="absolute right-[9px] top-[13px] p-2 hover:bg-primary/10 hover:text-primary rounded-md">
           <FullscreenIcon />
         </div>
@@ -208,8 +208,8 @@ const PureDocumentHeader = ({
   kind: ArtifactKind;
   isStreaming: boolean;
 }) => (
-  <div className="p-4 border rounded-t-2xl flex flex-row gap-2 items-start sm:items-center justify-between dark:bg-muted border-b-0 dark:border-zinc-700">
-    <div className="flex flex-row items-start sm:items-center gap-3">
+  <div className="p-4 border rounded-t-2xl flex-between items-start sm:items-center dark:bg-muted border-b-0 dark:border-zinc-700">
+    <div className="flex-row-center items-start sm:items-center gap-3">
       <div className="text-muted-foreground">
         {isStreaming ? (
           <div className="animate-spin">
@@ -259,13 +259,13 @@ const DocumentContent = ({ document }: { document: Document }) => {
       {document.kind === 'text' ? (
         <Editor {...commonProps} onSaveContent={() => {}} />
       ) : document.kind === 'code' ? (
-        <div className="flex flex-1 relative w-full">
+        <div className="flex-1 relative w-full">
           <div className="absolute inset-0">
             <CodeEditor {...commonProps} onSaveContent={() => {}} />
           </div>
         </div>
       ) : document.kind === 'sheet' ? (
-        <div className="flex flex-1 relative size-full p-4">
+        <div className="flex-1 relative size-full p-4">
           <div className="absolute inset-0">
             <SpreadsheetEditor {...commonProps} />
           </div>

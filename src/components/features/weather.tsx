@@ -251,7 +251,7 @@ export function Weather({
   return (
     <div
       className={cx(
-        'flex flex-col gap-4 rounded-2xl p-4 skeleton-bg max-w-[500px]',
+        'flex-col gap-4 rounded-2xl p-4 skeleton-bg max-w-[500px]',
         {
           'bg-blue-400': isDay,
         },
@@ -260,8 +260,8 @@ export function Weather({
         },
       )}
     >
-      <div className="flex flex-row justify-between items-center">
-        <div className="flex flex-row gap-2 items-center">
+      <div className="flex-between items-center">
+        <div className="flex-row-center gap-2">
           <div
             className={cx(
               'size-10 rounded-full skeleton-div',
@@ -282,9 +282,9 @@ export function Weather({
         <div className="text-blue-50">{`H:${n(currentHigh)}° L:${n(currentLow)}°`}</div>
       </div>
 
-      <div className="flex flex-row justify-between">
+      <div className="flex-between">
         {displayTimes.map((time, index) => (
-          <div key={time} className="flex flex-col items-center gap-1">
+          <div key={time} className="flex-col-center gap-1">
             <div className="text-blue-100 text-xs">
               {format(new Date(time), 'ha')}
             </div>
@@ -299,7 +299,7 @@ export function Weather({
                 },
               )}
             />
-            <div className="text-blue-50 text-sm">
+            <div className="text-blue-50 text-xs">
               {n(displayTemperatures[index])}
               {weatherAtLocation.hourly_units.temperature_2m}
             </div>

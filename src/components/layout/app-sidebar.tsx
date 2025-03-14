@@ -83,14 +83,14 @@ export function AppSidebar({ user }: { user: User | undefined }) {
     <Sidebar className="group-data-[side=left]:border-r-0 bg-sidebar/95 backdrop-blur-sm">
       <SidebarHeader>
         <SidebarMenu>
-          <div className="flex flex-row justify-between items-center">
+          <div className="flex-between">
             <Link
               href="/"
               onClick={(e) => {
                 setOpenMobile(false);
                 handleLogoClick();
               }}
-              className="flex flex-row gap-3 items-center"
+              className="flex-row-center gap-3"
             >
               <AnimatePresence>
                 {showEasterEgg ? (
@@ -111,13 +111,13 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                 )}
               </AnimatePresence>
             </Link>
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex-row-center gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 w-8 p-0 flex items-center justify-center"
+                    className="h-8 w-8 p-0 flex-center"
                     onClick={() => {
                       setOpenMobile(false);
                       router.push('/');
@@ -135,7 +135,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 w-8 p-0 flex items-center justify-center md:hidden"
+                    className="h-8 w-8 p-0 flex-center md:hidden"
                     onClick={() => setOpenMobile(!openMobile)}
                   >
                     <MenuIcon size={16} />
@@ -147,7 +147,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
           </div>
           
           {/* Quick access buttons */}
-          <div className="flex items-center gap-1 mt-4 mb-2 px-2">
+          <div className="flex-row-center gap-1 mt-4 mb-2 px-2">
             <Button 
               variant="ghost" 
               size="sm" 
@@ -184,8 +184,8 @@ export function AppSidebar({ user }: { user: User | undefined }) {
           
           {/* Loading indicator overlay for history */}
           {isRetrying && (
-            <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center">
-              <div className="flex flex-col items-center">
+            <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex-center">
+              <div className="flex-col-center">
                 <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mb-2"></div>
                 <span className="text-xs">Refreshing chats...</span>
               </div>
