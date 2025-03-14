@@ -4,57 +4,129 @@ import type { NextRequest } from 'next/server'
 // This middleware handles authentication routing for the application
 export function middleware(request: NextRequest) {
   try {
-    // Log request details
+    // Get URL information
     const url = new URL(request.url)
     const pathname = url.pathname
-    console.log('[Middleware] Processing request:', {
-      pathname,
-      method: request.method,
-      headers: Object.fromEntries(request.headers.entries())
-    })
+    
+    // Only log in development to reduce noise in production
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Middleware] Processing request:', {
+        pathname,
+        method: request.method
+      })
+    }
 
-    // Check auth status
+    // Check for session and auth cookie
     const sessionCookie = request.cookies.get('sb-access-token')
-    console.log('[Middleware] Auth check:', {
-      hasCookie: !!sessionCookie,
-      cookieValue: sessionCookie ? 'present' : 'missing'
-    })
+    const refreshCookie = request.cookies.get('sb-refresh-token')
+    
+    const hasAuthCookies = !!sessionCookie || !!refreshCookie
+    
+    // Only log auth details in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Middleware] Auth check:', {
+        hasSessionCookie: !!sessionCookie,
+        hasRefreshCookie: !!refreshCookie
+      })
+    }
 
     // Define public routes that don't require authentication
     const publicPaths = [
       '/_next',
-      '/api',
+      '/api/auth',  // Allow auth API endpoints
+      '/api/register',
       '/login',
       '/register',
       '/forgot-password',
       '/reset-password',
-      '/auth/callback'
+      '/auth/callback',
+      '/auth/signin',
+      '/static',
+      '/images',
+      '/fonts'
     ]
 
     // Check if current path is public
     const isPublicPath = publicPaths.some(path => 
       pathname.startsWith(path) || pathname.includes('.')
     )
-
-    console.log('[Middleware] Route check:', {
-      pathname,
-      isPublicPath,
-      matchedPublicPath: publicPaths.find(path => pathname.startsWith(path))
-    })
+    
+    // Check for API routes - special handling for auth vs non-auth APIs
+    const isApiRoute = pathname.startsWith('/api/')
+    const isAuthRelatedApi = pathname.startsWith('/api/auth/') || 
+                            pathname.startsWith('/api/register')
+    
+    // Special handling for homepage
+    const isHomePage = pathname === '/'
+    
+    // Special case for login page with redirects
+    const isLoginPage = pathname === '/login'
+    const hasRedirectParam = url.searchParams.has('redirect')
+    
+    // Only log path info in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Middleware] Route check:', {
+        pathname,
+        isPublicPath,
+        isApiRoute,
+        isAuthRelatedApi,
+        matchedPublicPath: publicPaths.find(path => pathname.startsWith(path))
+      })
+    }
 
     // Always allow public routes and root path
-    if (isPublicPath || pathname === '/') {
-      console.log('[Middleware] Allowing access to public route:', pathname)
+    if (isPublicPath || isHomePage) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Middleware] Allowing access to public route:', pathname)
+      }
+      return NextResponse.next()
+    }
+    
+    // Special handling for API routes
+    if (isApiRoute) {
+      // Allow auth-related APIs regardless of auth status
+      if (isAuthRelatedApi) {
+        return NextResponse.next()
+      }
+      
+      // For other APIs, check authentication
+      if (!hasAuthCookies) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Middleware] API auth failed, returning 401')
+        }
+        // Return proper status code instead of redirecting
+        return new NextResponse(
+          JSON.stringify({ error: 'Authentication required' }), 
+          { 
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+          }
+        )
+      }
+      
+      // Authenticated API request
       return NextResponse.next()
     }
 
-    // Check authentication
-    if (!sessionCookie) {
-      console.log('[Middleware] Redirecting to login - no session cookie')
-      return NextResponse.redirect(new URL('/login', request.url))
+    // For non-public web routes, check authentication
+    if (!hasAuthCookies) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Middleware] Redirecting to login - no auth cookies')
+      }
+      
+      // Save the original URL to redirect back after login
+      const redirectUrl = new URL('/login', request.url)
+      // Add the current path as a redirect parameter (excluding login page)
+      if (pathname !== '/login') {
+        redirectUrl.searchParams.set('redirect', pathname)
+      }
+      
+      return NextResponse.redirect(redirectUrl)
     }
 
-    console.log('[Middleware] Allowing authenticated access to:', pathname)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Middleware] Allowing authenticated access to:', pathname)
+    }
     return NextResponse.next()
   } catch (error) {
     console.error('[Middleware] Error:', {
@@ -63,8 +135,14 @@ export function middleware(request: NextRequest) {
       url: request.url
     })
     
-    // On error, redirect to login for safety
-    return NextResponse.redirect(new URL('/login', request.url))
+    // On error, redirect to login for safety, but don't cause a loop
+    const isLoginPage = new URL(request.url).pathname === '/login'
+    if (!isLoginPage) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    } else {
+      // If already on login page, just proceed
+      return NextResponse.next()
+    }
   }
 }
 
@@ -73,11 +151,10 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api (API routes)
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 } 

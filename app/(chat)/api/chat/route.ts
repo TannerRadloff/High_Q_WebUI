@@ -52,6 +52,21 @@ type ResponseInput = ResponseInputItem[];
 
 export async function POST(request: Request) {
   try {
+    // Validate request body exists
+    if (!request.body) {
+      console.error('[API] Error: Missing request body');
+      return NextResponse.json({ error: 'Missing request body' }, { status: 400 });
+    }
+
+    // Parse request with error handling
+    let requestData;
+    try {
+      requestData = await request.json();
+    } catch (error) {
+      console.error('[API] Error parsing request JSON:', error);
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 });
+    }
+
     const {
       id,
       messages = [], // Provide a default empty array if messages is undefined
@@ -65,11 +80,19 @@ export async function POST(request: Request) {
       experimental_attachments?: ExtendedAttachment[];
       data?: {
         agentType?: string;
+        input?: string;
       };
-    } = await request.json();
+    } = requestData;
+
+    // Validate critical parameters
+    if (!id) {
+      console.error('[API] Error: Missing chat ID');
+      return NextResponse.json({ error: 'Missing chat ID' }, { status: 400 });
+    }
 
     // Validate that messages is an array
     if (!Array.isArray(messages)) {
+      console.error('[API] Error: Invalid messages format - not an array');
       return NextResponse.json({ error: 'Invalid messages format' }, { status: 400 });
     }
 
@@ -78,10 +101,16 @@ export async function POST(request: Request) {
     
     console.log(`[API] Chat request with model: ${selectedChatModel}${agentType !== 'default' ? `, agent: ${agentType}` : ''}`);
 
+    // Verify authentication with clear error messages
     const session = await getServerSession();
-
-    if (!session || !session.user || !session.user.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!session) {
+      console.error('[API] Error: No session found');
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+    
+    if (!session.user || !session.user.id) {
+      console.error('[API] Error: Invalid session - missing user ID');
+      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
 
     // Validate the selected model
@@ -90,9 +119,13 @@ export async function POST(request: Request) {
       console.log(`[API] Validating model: ${selectedChatModel}`);
       const validModel = chatModels.some(model => model.id === selectedChatModel);
       modelToUse = validModel ? selectedChatModel : DEFAULT_CHAT_MODEL;
+      
+      if (!validModel) {
+        console.warn(`[API] Warning: Invalid model requested (${selectedChatModel}), falling back to ${DEFAULT_CHAT_MODEL}`);
+      }
     } catch (validationError) {
       console.error(`[API] Error during model validation:`, validationError);
-      modelToUse = DEFAULT_CHAT_MODEL;
+      // Continue with default model but log the error
     }
 
     console.log(`[API] Using model: ${modelToUse} (selected: ${selectedChatModel})`);
@@ -119,31 +152,47 @@ export async function POST(request: Request) {
     }
 
     // Get or create the chat
-    const chat = await getChatById({ id });
+    let chat;
+    try {
+      chat = await getChatById({ id });
+    } catch (dbError) {
+      console.error('[API] Database error when fetching chat:', dbError);
+      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+    }
 
     if (!chat) {
-      // For new chats with only artifacts, use a generic title
-      let title = 'New Document';
-      if (userMessage) {
-        title = await generateTitleFromUserMessage({ message: userMessage });
-      } else if (hasArtifacts) {
-        // Try to use the artifact title if available
-        const artifactMessage = messages.find(message => 
-          message.role === 'system' && 'artifactTitle' in message
-        );
-        if (artifactMessage && 'artifactTitle' in artifactMessage) {
-          title = `Document: ${artifactMessage.artifactTitle}`;
+      try {
+        // For new chats with only artifacts, use a generic title
+        let title = 'New Chat';
+        if (userMessage) {
+          title = await generateTitleFromUserMessage({ message: userMessage });
+        } else if (hasArtifacts) {
+          // Try to use the artifact title if available
+          const artifactMessage = messages.find(message => 
+            message.role === 'system' && 'artifactTitle' in message
+          );
+          if (artifactMessage && 'artifactTitle' in artifactMessage) {
+            title = `Document: ${artifactMessage.artifactTitle}`;
+          }
         }
+        
+        await saveChat({ id, userId: session.user.id, title });
+      } catch (saveError) {
+        console.error('[API] Error saving new chat:', saveError);
+        return NextResponse.json({ error: 'Failed to create chat' }, { status: 500 });
       }
-      
-      await saveChat({ id, userId: session.user.id, title });
     }
 
     // Save the user message to the database (if any)
     if (userMessage) {
-      await saveMessages({
-        messages: [{ ...userMessage, createdAt: new Date(), chatId: id }],
-      });
+      try {
+        await saveMessages({
+          messages: [{ ...userMessage, createdAt: new Date(), chatId: id }],
+        });
+      } catch (saveError) {
+        console.error('[API] Error saving user message:', saveError);
+        // Continue despite the error to attempt to get a response
+      }
     }
 
     // Find document artifacts in messages and save them if they're new
@@ -152,13 +201,18 @@ export async function POST(request: Request) {
     );
     
     if (documentMessages.length > 0) {
-      await saveMessages({
-        messages: documentMessages.map(message => ({
-          ...message,
-          chatId: id,
-          createdAt: new Date(),
-        })),
-      });
+      try {
+        await saveMessages({
+          messages: documentMessages.map(message => ({
+            ...message,
+            chatId: id,
+            createdAt: new Date(),
+          })),
+        });
+      } catch (saveError) {
+        console.error('[API] Error saving document messages:', saveError);
+        // Continue despite the error to attempt to get a response
+      }
     }
 
     // If there's no user message yet (just artifacts), we're done
@@ -215,6 +269,11 @@ export async function POST(request: Request) {
                     
             console.log(`[API] Calling OpenAI with model: ${openaiModel}`);
             
+            // Validate OpenAI API key
+            if (!process.env.OPENAI_API_KEY) {
+              throw new Error('OpenAI API key is missing');
+            }
+            
             // Use the OpenAI Responses API with the properly formatted input
             // For streaming, we'll manually handle the chunks to match our expected format
             const response = await openai.responses.create({
@@ -250,17 +309,22 @@ export async function POST(request: Request) {
             }
             
             // Save the complete response
-            await saveMessages({
-              messages: [{
-                id: generateUUID(),
-                role: 'assistant',
-                content: responseText,
-                createdAt: new Date(),
-                chatId: id,
-              }],
-            });
-            
-            console.log(`[API] Saved response with length: ${responseText.length}`);
+            try {
+              await saveMessages({
+                messages: [{
+                  id: generateUUID(),
+                  role: 'assistant',
+                  content: responseText,
+                  createdAt: new Date(),
+                  chatId: id,
+                }],
+              });
+              
+              console.log(`[API] Saved response with length: ${responseText.length}`);
+            } catch (saveError) {
+              console.error('[API] Error saving response message:', saveError);
+              // Continue anyway since the user already got the response in the UI
+            }
             
           } catch (error) {
             logError(error, 'Error with OpenAI API');
@@ -269,20 +333,31 @@ export async function POST(request: Request) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             const isRateLimit = errorMessage.toLowerCase().includes('rate limit') || 
                                errorMessage.toLowerCase().includes('quota');
+            const isAuthError = errorMessage.toLowerCase().includes('auth') || 
+                               errorMessage.toLowerCase().includes('api key') ||
+                               errorMessage.toLowerCase().includes('invalid key');
+                               
+            // Use a descriptive error message based on error type
+            let userErrorMessage;
+            if (isRateLimit) {
+              userErrorMessage = 'Rate limit exceeded. Please try again in a moment.';
+            } else if (isAuthError) {
+              userErrorMessage = 'Authentication error with AI provider. Please check your account.';
+            } else {
+              userErrorMessage = `Error: ${errorMessage}`;
+            }
             
-            // Show a more specific error message
-            const userErrorMessage = isRateLimit
-              ? 'Rate limit exceeded. Please try again in a moment.'
-              : `Error: ${errorMessage}`;
+            // Log detailed error information
+            console.error('[API] OpenAI API error:', {
+              message: errorMessage,
+              isRateLimit,
+              isAuthError
+            });
             
             // Notify the client about the error
             dataStream.writeData({
-              type: 'message',
-              message: {
-                id: generateUUID(),
-                role: 'system',
-                content: userErrorMessage,
-              }
+              type: 'error',
+              error: userErrorMessage
             });
             
             // Try again with fallback model
@@ -315,15 +390,20 @@ export async function POST(request: Request) {
                 });
                 
                 // Save the fallback response
-                await saveMessages({
-                  messages: [{
-                    id: generateUUID(),
-                    role: 'assistant',
-                    content: responseText,
-                    createdAt: new Date(),
-                    chatId: id,
-                  }],
-                });
+                try {
+                  await saveMessages({
+                    messages: [{
+                      id: generateUUID(),
+                      role: 'assistant',
+                      content: responseText,
+                      createdAt: new Date(),
+                      chatId: id,
+                    }],
+                  });
+                } catch (saveError) {
+                  console.error('[API] Error saving fallback response:', saveError);
+                  // Continue anyway since the user already got the response in the UI
+                }
               }
               
             } catch (fallbackError) {
@@ -331,14 +411,11 @@ export async function POST(request: Request) {
               const fallbackErrorMessage = fallbackError instanceof Error 
                 ? fallbackError.message 
                 : 'Unknown error';
-                
+              
+              // Send a clear error to the client
               dataStream.writeData({
-                type: 'message',
-                message: {
-                  id: generateUUID(),
-                  role: 'system',
-                  content: `All models failed. Please try again later. (Error: ${fallbackErrorMessage})`,
-                }
+                type: 'error',
+                error: `All models failed. Please try again later. (Error: ${fallbackErrorMessage})` 
               });
             }
           }
@@ -350,13 +427,10 @@ export async function POST(request: Request) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           const userMessage = `An error occurred while processing your request. Please try again. (${errorMessage})`;
           
+          // Send a clear error to the client
           dataStream.writeData({
-            type: 'message',
-            message: {
-              id: generateUUID(),
-              role: 'system',
-              content: userMessage,
-            }
+            type: 'error',
+            error: userMessage
           });
         }
       },

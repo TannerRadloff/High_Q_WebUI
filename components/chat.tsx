@@ -7,54 +7,32 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/components/auth/auth-provider';
+import { toast } from 'sonner';
 
 import { ChatHeader } from '@/components/chat-header';
 import type { Vote } from '@/lib/db/schema';
 import { fetcher, generateUUID } from '@/lib/utils';
 import type { ExtendedAttachment } from '@/types';
+import { 
+  showUniqueErrorToast, 
+  resetErrorTracking, 
+  logError as logApiError 
+} from '@/lib/api-error-handler';
 
 import { Artifact } from './artifact';
 import { MultimodalInput } from './multimodal-input';
 import { Messages } from './messages';
 import type { VisibilityType } from './visibility-selector';
 import { useArtifactSelector } from '@/hooks/use-artifact';
-import { toast } from 'sonner';
 import dynamic from 'next/dynamic';
 
 // Agent mode functionality is now integrated directly into the MultimodalInput component
 
-// Add detailed logging function
-const logError = (error: any, context: string) => {
-  console.error(`[ERROR] ${context}:`, error);
-  console.error(`Error type: ${typeof error}`);
-  console.error(`Error message: ${error.message}`);
-  console.error(`Error stack: ${error.stack}`);
-  
-  if (error.response) {
-    console.error(`Response status: ${error.response.status}`);
-    console.error(`Response data:`, error.response.data);
-  }
-  
-  if (error.cause) {
-    console.error(`Error cause: ${error.cause}`);
-  }
-  
-  // Handle message channel errors
-  if (error.message && error.message.includes('message channel closed')) {
-    console.error('Message channel closed prematurely. This could be due to:');
-    console.error('1. Network instability');
-    console.error('2. Server timeout');
-    console.error('3. Client navigation away from page');
-  }
-  
-  // Handle specific API errors
-  if (error.message && error.message.includes('No user message found')) {
-    console.error('No user message found error. This could be due to:');
-    console.error('1. Submitting an empty form');
-    console.error('2. Message format issues');
-    console.error('3. API expecting user message but receiving none');
-  }
-};
+// Add this interface to help type the error messages from the API
+interface StreamErrorMessage {
+  type: 'error';
+  error: string;
+}
 
 export function Chat({
   id,
@@ -77,14 +55,33 @@ export function Chat({
   const [hasShownError, setHasShownError] = useState(false);
   const [apiErrorCount, setApiErrorCount] = useState(0); // Track consecutive API errors
   const [isOnline, setIsOnline] = useState(true);
+  const lastErrorRef = useRef<string>(''); // Track last error message to avoid duplicates
+  const errorToastIdRef = useRef<string | number | null>(null); // Track toast ID to avoid dupes
   
   // Reset error state when chat ID changes or component unmounts
   useEffect(() => {
     setHasShownError(false);
     setApiErrorCount(0);
+    resetErrorTracking(); // Use centralized error tracking reset
+    lastErrorRef.current = '';
+    
+    // Clear any existing error toasts when changing chats
+    if (errorToastIdRef.current) {
+      toast.dismiss(errorToastIdRef.current);
+      errorToastIdRef.current = null;
+    }
+    
     return () => {
       setHasShownError(false);
       setApiErrorCount(0);
+      resetErrorTracking(); // Use centralized error tracking reset
+      lastErrorRef.current = '';
+      
+      // Clear any existing error toasts on unmount
+      if (errorToastIdRef.current) {
+        toast.dismiss(errorToastIdRef.current);
+        errorToastIdRef.current = null;
+      }
     };
   }, [id]);
 
@@ -121,7 +118,7 @@ export function Chat({
             throw new Error('No chat ID returned from server');
           }
         } catch (error) {
-          logError(error, 'Failed to create new chat');
+          logApiError(error, 'Failed to create new chat');
           if (!hasShownError) {
             toast.error(error instanceof Error ? error.message : 'Failed to create new chat. Please try again.');
             setHasShownError(true);
@@ -152,6 +149,17 @@ export function Chat({
     experimental_throttle: 100,
     sendExtraMessageFields: true,
     generateId: generateUUID,
+    onResponse(response) {
+      // Check for HTTP errors
+      if (!response.ok) {
+        const status = response.status;
+        console.error(`[CHAT] HTTP Error (${status}): ${response.statusText}`);
+        
+        // Use the error handler with appropriate error context
+        const error = new Error(`HTTP ${status}: ${response.statusText || 'Request failed'}`);
+        showUniqueErrorToast(error);
+      }
+    },
     onFinish: (message) => {
       console.log(`[CHAT] Chat completed successfully with model: ${selectedChatModel}`);
       setApiErrorCount(0); // Reset error count on successful completion
@@ -168,40 +176,49 @@ export function Chat({
       mutate('/api/history');
     },
     onError: (error) => {
-      logError(error, `Chat error with model ${selectedChatModel}`);
+      logApiError(error, `Chat error with model ${selectedChatModel}`);
       
       // Track consecutive errors
       setApiErrorCount(prev => prev + 1);
       
-      // Check for specific error types
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      // Handle rate limit errors
-      if (errorMessage.toLowerCase().includes('rate limit') || errorMessage.toLowerCase().includes('quota')) {
-        toast.error('Rate limit reached. Please try again in a moment.');
-        return;
-      }
-      
-      // Handle authentication errors
-      if (errorMessage.toLowerCase().includes('auth') || errorMessage.toLowerCase().includes('api key')) {
-        toast.error('Authentication error. Please check your API settings.');
-        return;
-      }
-      
-      // If we've had multiple consecutive errors, show a more detailed error
+      // If we've had multiple consecutive errors, add that context
       if (apiErrorCount >= 2) {
-        toast.error('Multiple errors encountered. The service may be experiencing issues.');
-        console.error('Multiple consecutive errors:', apiErrorCount, error);
-        return;
-      }
-      
-      // Only show error toast if we haven't shown one yet and it's not a chat creation error
-      if (!hasShownError && !errorMessage.includes('create-new')) {
-        toast.error(`Error: ${errorMessage || 'An unexpected error occurred'}`);
-        setHasShownError(true);
+        console.error('[CHAT] Multiple consecutive errors:', apiErrorCount, error);
+        showUniqueErrorToast(
+          new Error('Multiple errors encountered. The service may be experiencing issues.')
+        );
+      } else if (!error.message?.includes('create-new')) {
+        // Only show errors that aren't related to chat creation
+        showUniqueErrorToast(error);
       }
     },
   });
+  
+  // Function to show error toast only if it's different from the last one
+  const showUniqueErrorToast = useCallback((message: string) => {
+    // Don't show duplicate errors in succession
+    if (message === lastErrorRef.current) {
+      return;
+    }
+    
+    // Update last error message
+    lastErrorRef.current = message;
+    
+    // Dismiss any existing error toast
+    if (errorToastIdRef.current) {
+      toast.dismiss(errorToastIdRef.current);
+    }
+    
+    // Show new error toast and store its ID
+    errorToastIdRef.current = toast.error(message, {
+      duration: 5000,
+      onDismiss: () => {
+        errorToastIdRef.current = null;
+      }
+    });
+    
+    setHasShownError(true);
+  }, []);
 
   // Reset error state when the error is resolved
   useEffect(() => {
@@ -210,23 +227,29 @@ export function Chat({
     }
   }, [isLoading, messages.length]);
 
-  // Handle errors from the API
+  // Handle errors from the API using the new error format
   useEffect(() => {
-    const handleApiError = (event: MessageEvent) => {
+    // Custom message handler to process data events from the stream
+    const processStreamMessages = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === 'error' && !hasShownError) {
-          toast.error(data.error || 'An error occurred');
-          setHasShownError(true);
+        
+        // Handle explicit error messages with the new format
+        if (data.type === 'error' && data.error) {
+          console.error('[CHAT] Stream error:', data.error);
+          showUniqueErrorToast(new Error(data.error));
+          return;
         }
       } catch (error) {
         // Ignore parsing errors for non-error messages
+        // This is normal for streaming chunks
       }
     };
 
-    window.addEventListener('message', handleApiError);
-    return () => window.removeEventListener('message', handleApiError);
-  }, [hasShownError]);
+    // Add event listener for SSE messages
+    window.addEventListener('message', processStreamMessages);
+    return () => window.removeEventListener('message', processStreamMessages);
+  }, []);
 
   const { data: votes } = useSWR<Array<Vote>>(
     `/api/vote?chatId=${chatId}`,
@@ -421,7 +444,7 @@ export function Chat({
     };
   }, []);
 
-  // Function to handle form submission with logging
+  // Function to handle form submission with logging and improved error handling
   const handleSubmitWithLogging = useCallback(
     async (
       event?: { preventDefault?: () => void } | undefined,
@@ -429,12 +452,16 @@ export function Chat({
     ) => {
       console.log(`[CHAT] Submitting chat with model: ${selectedChatModel}`);
       
-      // Reset error state on new submission
+      // Clear any existing error state on new submission
       setHasShownError(false);
+      resetErrorTracking();
+      setApiErrorCount(0);
       
       // Check for network connectivity
       if (!navigator.onLine) {
-        toast.error('You are offline. Please check your internet connection and try again.');
+        showUniqueErrorToast(
+          new Error('You are offline. Please check your internet connection and try again.')
+        );
         return;
       }
       
@@ -450,17 +477,15 @@ export function Chat({
       }
       
       try {
-        setApiErrorCount(0); // Reset error count on new submission
         await handleSubmit(event, chatRequestOptions);
       } catch (error) {
-        logError(error, 'Error submitting message');
+        logApiError(error, 'Error submitting message');
         if (!hasShownError) {
-          toast.error('Failed to send message. Please try again.');
-          setHasShownError(true);
+          showUniqueErrorToast(error);
         }
       }
     },
-    [handleSubmit, hasShownError, logError, selectedChatModel, setHasShownError, setApiErrorCount]
+    [handleSubmit, selectedChatModel, hasShownError]
   );
 
   return (

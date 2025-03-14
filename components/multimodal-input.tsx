@@ -23,6 +23,7 @@ import equal from 'fast-deep-equal';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { sanitizeUIMessages, generateUUID, cn } from '@/lib/utils';
+import { showUniqueErrorToast } from '@/lib/api-error-handler';
 import { ArrowUpIcon, PaperclipIcon, StopIcon, CrossIcon, BotIcon } from './icons';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
@@ -158,7 +159,7 @@ function PureMultimodalInput({
       
       // Validate file size
       if (file.size > 20 * 1024 * 1024) { // 20MB limit
-        toast.error(`File ${file.name} is too large. Maximum size is 20MB.`);
+        showUniqueErrorToast(`File ${file.name} is too large. Maximum size is 20MB.`);
         return null;
       }
       
@@ -195,11 +196,11 @@ function PureMultimodalInput({
       const responseData = await response.json().catch(() => ({ error: 'Invalid server response' }));
       const errorMessage = responseData.error || 'Unknown upload error';
       console.error(`[MultimodalInput] Upload error: ${errorMessage}`);
-      toast.error(`Failed to upload ${file.name}: ${errorMessage}`);
+      showUniqueErrorToast(`Failed to upload ${file.name}: ${errorMessage}`);
       return null;
     } catch (error) {
       console.error(`[MultimodalInput] Upload exception:`, error);
-      toast.error(`Failed to upload ${file.name}. Please try again!`);
+      showUniqueErrorToast(`Failed to upload ${file.name}. Please try again!`);
       return null;
     }
   }, []);
@@ -274,6 +275,12 @@ function PureMultimodalInput({
         return;
       }
       
+      // Check if there is already a loading state (prevents duplicate submissions)
+      if (isLoading) {
+        console.log('[MultimodalInput] Prevented submission during loading state');
+        return;
+      }
+      
       // If there is no input and no attachments, don't submit
       if (!input.trim() && attachments.length === 0) {
         console.log('[MultimodalInput] Prevented submission with no input and no attachments');
@@ -283,8 +290,15 @@ function PureMultimodalInput({
       // Check for excessively large input to avoid API errors
       const inputLength = input.trim().length;
       if (inputLength > 100000) { // 100K chars is excessive
-        toast.error('Your message is too long. Please shorten it or split into multiple messages.');
+        showUniqueErrorToast('Your message is too long. Please shorten it or split into multiple messages.');
         console.warn(`[MultimodalInput] Input length (${inputLength}) exceeds reasonable limits.`);
+        return;
+      }
+      
+      // Check for network connectivity
+      if (!navigator.onLine) {
+        showUniqueErrorToast('You appear to be offline. Please check your internet connection and try again.');
+        console.warn('[MultimodalInput] Prevented submission while offline');
         return;
       }
       
@@ -296,7 +310,16 @@ function PureMultimodalInput({
         
         // Add experimental attachments
         if (attachments.length > 0) {
-          options.experimental_attachments = attachments;
+          // Verify attachments are valid before submitting
+          const validAttachments = attachments.filter(att => 
+            att && att.url && att.contentType
+          );
+          
+          if (validAttachments.length !== attachments.length) {
+            console.warn('[MultimodalInput] Some attachments were invalid and removed');
+          }
+          
+          options.experimental_attachments = validAttachments;
         }
         
         // Add agent type to data
@@ -305,36 +328,58 @@ function PureMultimodalInput({
           input: input.trim() // Add input to data to ensure it's available for validation
         };
         
-        // Handle the submission with timeout
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Request timed out')), 30000); // 30 second timeout
+        // Handle the submission with safety timeout
+        let isSubmissionResolved = false;
+        
+        const timeoutPromise = new Promise<void>((_, reject) => {
+          setTimeout(() => {
+            if (!isSubmissionResolved) {
+              reject(new Error('Request timed out after 30 seconds'));
+            }
+          }, 30000); // 30 second timeout
         });
         
-        await Promise.race([
-          handleSubmit(event, options),
-          timeoutPromise
-        ]);
-        
-        // Only clear if submission was successful
-        setAttachments([]);
-        setLocalStorageInput('');
-        resetHeight();
-        
-        if (width && width > 768) {
-          textareaRef.current?.focus();
+        // Use Promise.race to implement timeout with cleaner handling
+        try {
+          await Promise.race([
+            // Wrap handleSubmit to mark when it's done
+            (async () => {
+              try {
+                await handleSubmit(event, options);
+              } finally {
+                isSubmissionResolved = true;
+              }
+            })(),
+            timeoutPromise
+          ]);
+          
+          // Only clear if submission was successful
+          setAttachments([]);
+          setLocalStorageInput('');
+          resetHeight();
+          
+          if (width && width > 768) {
+            textareaRef.current?.focus();
+          }
+        } catch (raceError) {
+          // Handle timeout or other errors from the race
+          console.error('[MultimodalInput] Error in Promise.race:', raceError);
+          
+          const errorMessage = raceError instanceof Error ? raceError.message : String(raceError);
+          if (errorMessage.includes('timed out')) {
+            showUniqueErrorToast('Request timed out. Please try again or check your network connection.');
+          } else {
+            throw raceError; // Re-throw non-timeout errors to be handled by outer catch
+          }
         }
       } catch (error) {
         console.error('[MultimodalInput] Error during submission:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         
-        if (errorMessage.includes('timed out')) {
-          toast.error('Request timed out. Please try again.');
-        } else {
-          toast.error(`Failed to send message: ${errorMessage}`);
-        }
+        // Use the error handler to handle all error types consistently
+        showUniqueErrorToast(error);
       }
     },
-    [handleSubmit, attachments, setAttachments, uploadQueue, input, setLocalStorageInput, resetHeight, width, selectedAgent]
+    [handleSubmit, attachments, setAttachments, uploadQueue, input, setLocalStorageInput, resetHeight, width, selectedAgent, isLoading]
   );
   
   // Function to handle agent submission
