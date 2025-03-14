@@ -23,23 +23,20 @@ const logModelError = (modelId: string, error: any) => {
   });
 };
 
-// Create a simplified OpenAI provider using the standard AI SDK format
-// This uses OpenAI's chat completions API under the hood
-import { openai } from '@ai-sdk/openai';
+// Define model mapping for OpenAI models
+export const modelMapping = {
+  'gpt-40': 'gpt-4o',
+  'gpt-o1': 'gpt-4o', // Use gpt-4o as a fallback if o1 is not available
+  'gpt-o3-mini': 'gpt-4o-mini',
+  'title-model': 'gpt-4o',
+  'artifact-model': 'gpt-4o-mini',
+};
 
-export const myProvider = customProvider({
-  languageModels: {
-    'gpt-40': openai('gpt-4o'),
-    'gpt-o1': openai('gpt-4o'), // Use gpt-4o as a fallback if o1 is not available
-    'gpt-o3-mini': openai('gpt-4o-mini'),
-    'title-model': openai('gpt-4o'),
-    'artifact-model': openai('gpt-4o-mini'),
-  },
-  imageModels: {
-    'small-model': openai.image('dall-e-2'),
-    'large-model': openai.image('dall-e-3'),
-  },
-});
+// Define image model mapping
+export const imageModelMapping = {
+  'small-model': 'dall-e-2',
+  'large-model': 'dall-e-3',
+};
 
 interface ChatModel {
   id: string;
@@ -65,6 +62,11 @@ export const chatModels: Array<ChatModel> = [
   },
 ];
 
+// Helper function to get the actual OpenAI model name from our internal model ID
+export const getOpenAIModelName = (modelId: string): string => {
+  return modelMapping[modelId as keyof typeof modelMapping] || 'gpt-4o-mini';
+};
+
 // Create a direct OpenAI client for use with the Responses API
 // This provides a way to access the Responses API directly when needed
 export const openaiResponses = {
@@ -75,8 +77,9 @@ export const openaiResponses = {
         throw new Error('OpenAI client is not initialized. Please provide a valid OPENAI_API_KEY in your environment variables.');
       }
       
-      const model = options.model || 'gpt-4o-mini';
-      console.log(`[Responses API] Creating response with model: ${model}`);
+      const modelId = options.model || DEFAULT_CHAT_MODEL;
+      const model = getOpenAIModelName(modelId);
+      console.log(`[Responses API] Creating response with model: ${model} (from ${modelId})`);
       
       return await openaiClient.responses.create({
         model,
@@ -106,8 +109,9 @@ export const openaiResponses = {
         throw new Error('OpenAI client is not initialized. Please provide a valid OPENAI_API_KEY in your environment variables.');
       }
       
-      const model = options.model || 'gpt-4o-mini';
-      console.log(`[Responses API] Creating streaming response with model: ${model}`);
+      const modelId = options.model || DEFAULT_CHAT_MODEL;
+      const model = getOpenAIModelName(modelId);
+      console.log(`[Responses API] Creating streaming response with model: ${model} (from ${modelId})`);
       
       return await openaiClient.responses.create({
         model,
@@ -128,6 +132,48 @@ export const openaiResponses = {
         model: 'gpt-4o-mini',
         input,
         stream: true,
+      });
+    }
+  },
+  
+  // Add a method for generating images using DALL-E models
+  createImage: async (prompt: string, options: { 
+    model?: string, 
+    size?: '256x256' | '512x512' | '1024x1024' | '1792x1024' | '1024x1792', 
+    quality?: 'standard' | 'hd', 
+    n?: number 
+  } = {}) => {
+    try {
+      // Check if OpenAI client is available
+      if (!openaiClient) {
+        throw new Error('OpenAI client is not initialized. Please provide a valid OPENAI_API_KEY in your environment variables.');
+      }
+      
+      const modelId = options.model || 'large-model';
+      const model = imageModelMapping[modelId as keyof typeof imageModelMapping] || 'dall-e-3';
+      console.log(`[Image API] Creating image with model: ${model} (from ${modelId})`);
+      
+      return await openaiClient.images.generate({
+        model,
+        prompt,
+        size: options.size || '1024x1024',
+        quality: options.quality || 'standard',
+        n: options.n || 1,
+      });
+    } catch (error) {
+      logModelError(options.model || 'unknown', error);
+      
+      // If OpenAI client is missing, don't attempt to fallback
+      if (!openaiClient) {
+        throw error;
+      }
+      
+      console.log(`[Image API] Falling back to dall-e-2`);
+      return await openaiClient.images.generate({
+        model: 'dall-e-2',
+        prompt,
+        size: '1024x1024',
+        n: 1,
       });
     }
   }
