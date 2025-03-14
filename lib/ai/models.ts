@@ -1,7 +1,4 @@
 import { OpenAI } from 'openai';
-import {
-  customProvider,
-} from 'ai';
 
 // Check if OpenAI API key is available
 const apiKey = process.env.OPENAI_API_KEY;
@@ -10,7 +7,7 @@ if (!apiKey) {
 }
 
 // Initialize the OpenAI client with proper validation
-const openaiClient = apiKey 
+export const openaiClient = apiKey 
   ? new OpenAI({ apiKey })
   : null; // Will be null if API key is missing
 

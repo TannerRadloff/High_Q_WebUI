@@ -1,12 +1,10 @@
 import {
   type Message,
   createDataStreamResponse,
-  smoothStream,
-  streamText,
 } from 'ai';
 
 import { getServerSession } from '@/lib/auth';
-import { DEFAULT_CHAT_MODEL, chatModels, openaiResponses } from '@/lib/ai/models';
+import { DEFAULT_CHAT_MODEL, chatModels } from '@/lib/ai/models';
 import { systemPrompt } from '@/lib/ai/prompts';
 import {
   deleteChatById,
@@ -17,18 +15,19 @@ import {
 import {
   generateUUID,
   getMostRecentUserMessage,
-  sanitizeResponseMessages,
 } from '@/lib/utils';
 import type { ExtendedAttachment } from '@/types';
 
 import { generateTitleFromUserMessage } from '../../actions';
-import { createDocument } from '@/lib/ai/tools/create-document';
-import { updateDocument } from '@/lib/ai/tools/update-document';
-import { requestSuggestions } from '@/lib/ai/tools/request-suggestions';
-import { getWeather } from '@/lib/ai/tools/get-weather';
 import { NextResponse } from 'next/server';
+import OpenAI from 'openai';
 
 export const maxDuration = 60;
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 // Detailed error logging
 const logError = (error: any, context: string) => {
@@ -42,9 +41,6 @@ const logError = (error: any, context: string) => {
     }
   }
 };
-
-// Maximum size for file content in characters
-const MAX_FILE_CONTENT_SIZE = 10000;
 
 export async function POST(request: Request) {
   try {
@@ -66,7 +62,7 @@ export async function POST(request: Request) {
 
     // Validate that messages is an array
     if (!Array.isArray(messages)) {
-      return new Response('Invalid messages format', { status: 400 });
+      return NextResponse.json({ error: 'Invalid messages format' }, { status: 400 });
     }
 
     // Extract agent type from request data if present
@@ -77,7 +73,7 @@ export async function POST(request: Request) {
     const session = await getServerSession();
 
     if (!session || !session.user || !session.user.id) {
-      return new Response('Unauthorized', { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Validate the selected model
@@ -104,7 +100,7 @@ export async function POST(request: Request) {
     // If there's no user message but there are artifacts, this is an initial artifact-only state
     // We'll create a chat but won't require a user message yet
     if (!userMessage && !hasArtifacts) {
-      return new Response('No user message found', { status: 400 });
+      return NextResponse.json({ error: 'No user message found' }, { status: 400 });
     }
 
     // Get or create the chat
@@ -152,117 +148,85 @@ export async function POST(request: Request) {
 
     // If there's no user message yet (just artifacts), we're done
     if (!userMessage) {
-      return new Response(JSON.stringify({ 
+      return NextResponse.json({ 
         success: true, 
         message: 'Artifacts saved' 
-      }), {
-        headers: { 'Content-Type': 'application/json' },
       });
     }
 
     return createDataStreamResponse({
       execute: async (dataStream) => {
         try {
-          // Create conversation history format for the API
-          const formattedMessages = messages.map(message => {
-            if (message.role === 'user') {
-              return { role: 'user', content: message.content };
-            } else if (message.role === 'assistant') {
-              return { role: 'assistant', content: message.content };
-            } else if (message.role === 'system') {
-              return { role: 'system', content: message.content };
-            }
-            return null;
-          }).filter(Boolean);
-
-          // Add system prompt
+          // Convert messages to the format expected by OpenAI Responses API
+          let promptText = "";
+          
+          // Add system prompt if available
           const systemInstructions = systemPrompt({ selectedChatModel });
           if (systemInstructions) {
-            formattedMessages.unshift({
-              role: 'system',
-              content: systemInstructions
-            });
+            promptText += `System: ${systemInstructions}\n\n`;
           }
-
-          // Format the input for the API
-          const input = { messages: formattedMessages };
           
-          console.log(`[API] Starting stream with model: ${modelToUse}`);
+          // Add conversation history
+          for (const message of messages) {
+            if (message.role === 'user') {
+              promptText += `User: ${message.content}\n\n`;
+            } else if (message.role === 'assistant') {
+              promptText += `Assistant: ${message.content}\n\n`;
+            }
+          }
           
-          // Determine which model to use for the OpenAI Responses API
-          const apiModel = modelToUse === 'gpt-o1' ? 'gpt-4o' : 
-                          modelToUse === 'gpt-40' ? 'gpt-4o' : 
-                          'gpt-4o-mini';
+          console.log(`[API] Using model: ${modelToUse}`);
           
           // Setup tools based on agent type
-          const tools = [];
-          
-          if (agentType === 'research') {
-            tools.push({ type: 'web_search' });
-          }
+          const tools = agentType === 'research' ? 
+            [{ type: 'web_search_preview' as const }] : 
+            undefined;
           
           try {
-            // Use the streaming Responses API
-            const stream = await openaiResponses.createStream(
-              JSON.stringify(input), 
-              { 
-                model: apiModel, 
-                tools: tools.length > 0 ? tools : undefined 
-              }
-            );
+            // Use the OpenAI Responses API without streaming for simplicity
+            const response = await openai.responses.create({
+              model: modelToUse === 'gpt-o1' ? 'gpt-4o' : 
+                    modelToUse === 'gpt-40' ? 'gpt-4o' : 
+                    'gpt-4o-mini',
+              input: promptText,
+              tools
+            });
             
-            // Accumulate the response for saving
-            let fullResponse = '';
+            const responseText = response.output_text;
             
-            // Process the streaming response
-            for await (const chunk of stream) {
-              if ('choices' in chunk && chunk.choices?.[0]?.delta?.content) {
-                const content = chunk.choices[0].delta.content;
-                fullResponse += content;
-                
-                // Stream the content to the client
-                dataStream.writeData({
-                  type: 'message',
-                  message: {
-                    id: generateUUID(),
-                    role: 'assistant',
-                    content: content,
-                  }
-                });
-              }
+            // Simulate streaming by sending chunks of text
+            const chunkSize = 10;
+            for (let i = 0; i < responseText.length; i += chunkSize) {
+              const chunk = responseText.substring(i, i + chunkSize);
               
-              // Process tool usage if present
-              if ('choices' in chunk && chunk.choices?.[0]?.delta?.tool_calls) {
-                dataStream.writeData({
-                  type: 'message',
-                  message: {
-                    id: generateUUID(),
-                    role: 'system',
-                    content: 'Using tools to process your request...',
-                  }
-                });
-              }
+              dataStream.writeData({
+                type: 'message',
+                message: {
+                  id: generateUUID(),
+                  role: 'assistant',
+                  content: chunk,
+                }
+              });
+              
+              // Add a small delay to simulate streaming
+              await new Promise(resolve => setTimeout(resolve, 10));
             }
             
             // Save the complete response
-            if (fullResponse) {
-              await saveMessages({
-                messages: [{
-                  id: generateUUID(),
-                  role: 'assistant',
-                  content: fullResponse,
-                  createdAt: new Date(),
-                  chatId: id,
-                }],
-              });
-              
-              console.log(`[API] Saved response with length: ${fullResponse.length}`);
-            } else {
-              console.error('[API] No response content to save');
-            }
+            await saveMessages({
+              messages: [{
+                id: generateUUID(),
+                role: 'assistant',
+                content: responseText,
+                createdAt: new Date(),
+                chatId: id,
+              }],
+            });
+            
+            console.log(`[API] Saved response with length: ${responseText.length}`);
             
           } catch (error) {
-            logError(error, 'Error with stream');
+            logError(error, 'Error with OpenAI API');
             
             // Notify the client about the error
             dataStream.writeData({
@@ -278,36 +242,30 @@ export async function POST(request: Request) {
             try {
               console.log('[API] Attempting fallback with gpt-4o-mini');
               
-              const fallbackStream = await openaiResponses.createStream(
-                JSON.stringify(input), 
-                { model: 'gpt-4o-mini' }
-              );
+              const fallbackResponse = await openai.responses.create({
+                model: 'gpt-4o-mini',
+                input: promptText
+              });
               
-              let fallbackResponse = '';
+              const responseText = fallbackResponse.output_text;
               
-              for await (const chunk of fallbackStream) {
-                if ('choices' in chunk && chunk.choices?.[0]?.delta?.content) {
-                  const content = chunk.choices[0].delta.content;
-                  fallbackResponse += content;
-                  
-                  dataStream.writeData({
-                    type: 'message',
-                    message: {
-                      id: generateUUID(),
-                      role: 'assistant',
-                      content: content,
-                    }
-                  });
-                }
-              }
-              
-              // Save the fallback response
-              if (fallbackResponse) {
+              if (responseText) {
+                // Stream the fallback response to the client
+                dataStream.writeData({
+                  type: 'message',
+                  message: {
+                    id: generateUUID(),
+                    role: 'assistant',
+                    content: responseText,
+                  }
+                });
+                
+                // Save the fallback response
                 await saveMessages({
                   messages: [{
                     id: generateUUID(),
                     role: 'assistant',
-                    content: fallbackResponse,
+                    content: responseText,
                     createdAt: new Date(),
                     chatId: id,
                   }],
@@ -346,13 +304,10 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     logError(error, 'Unexpected error in chat API');
-    return new Response(JSON.stringify({ 
+    return NextResponse.json({ 
       error: 'An unexpected error occurred',
       details: error instanceof Error ? error.message : String(error)
-    }), { 
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    }, { status: 500 });
   }
 }
 
