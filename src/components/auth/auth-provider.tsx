@@ -18,6 +18,71 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Helper function to check if we're on an auth page
+function isAuthPage(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname.includes('/login') || 
+         pathname.includes('/register') || 
+         pathname.includes('/signup') || 
+         pathname.includes('/forgot-password') ||
+         pathname.includes('/reset-password');
+}
+
+// Helper to safely redirect to avoid loops
+function safeRedirect(path: string, forceReload = false) {
+  // Get the current location
+  const currentPath = window.location.pathname;
+  
+  // Check if we're already on the target path to avoid unnecessary redirects
+  if (currentPath === path) {
+    console.log('Already on target path, skipping redirect');
+    return;
+  }
+  
+  // Implement a rate limit for redirects to prevent loops
+  // With localStorage availability check
+  try {
+    const redirectKey = 'auth_redirect_timestamp';
+    let shouldRedirect = true;
+    
+    // Only use localStorage if available
+    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+      try {
+        const lastRedirect = localStorage.getItem(redirectKey);
+        const now = Date.now();
+        
+        // Only allow redirects if we haven't redirected in the last 5 seconds
+        shouldRedirect = !lastRedirect || (now - parseInt(lastRedirect)) > 5000;
+        
+        if (shouldRedirect) {
+          localStorage.setItem(redirectKey, now.toString());
+        } else {
+          console.log('Redirect throttled to prevent loops');
+        }
+      } catch (e) {
+        // localStorage might throw in private browsing or if quota is exceeded
+        console.warn('localStorage error, proceeding with redirect:', e);
+        shouldRedirect = true;
+      }
+    }
+    
+    // Proceed with redirect if allowed
+    if (shouldRedirect) {
+      // Use direct location change for more reliable cross-domain redirects
+      if (forceReload) {
+        window.location.href = path;
+      } else {
+        // For safer in-app redirects
+        window.location.assign(path);
+      }
+    }
+  } catch (e) {
+    // Fallback if any error occurs in redirection
+    console.error('Redirect error:', e);
+    window.location.href = path;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -57,6 +122,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data.session) {
           setSession(data.session)
           setUser(data.session.user)
+          
+          // Handle initial redirect if we're authenticated and on an auth page
+          if (isAuthPage(pathname)) {
+            safeRedirect('/', true);
+          }
         }
       } catch (e) {
         console.error('Error during auth initialization:', e)
@@ -76,17 +146,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Handle different auth events
         switch (event) {
           case 'SIGNED_IN':
-            // If we just signed in, redirect to home page if on auth page
-            if (pathname?.includes('/login') || pathname?.includes('/register')) {
-              // Use direct navigation to avoid router issues across different domains
-              window.location.href = '/'
+            // If we just signed in and are on an auth page, redirect to chat
+            if (isAuthPage(pathname)) {
+              safeRedirect('/', true);
             }
             break
             
           case 'SIGNED_OUT':
             // If we just signed out, redirect to login page if not already there
-            if (!pathname?.includes('/login')) {
-              router.push('/login')
+            if (!isAuthPage(pathname)) {
+              safeRedirect('/login');
             }
             break
             
@@ -99,17 +168,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             
           case 'INITIAL_SESSION':
             // Only redirect if authenticated and on a login/register page
-            if (currentSession && (pathname?.includes('/login') || pathname?.includes('/register'))) {
-              // Check if we've already redirected to prevent loops
-              const redirectKey = 'auth_redirect_timestamp'
-              const lastRedirect = localStorage.getItem(redirectKey)
-              const now = Date.now()
-              
-              // Only redirect if we haven't redirected in the last 10 seconds
-              if (!lastRedirect || (now - parseInt(lastRedirect)) > 10000) {
-                localStorage.setItem(redirectKey, now.toString())
-                window.location.href = '/'
-              }
+            if (currentSession && isAuthPage(pathname)) {
+              safeRedirect('/', true);
             }
             break
         }
@@ -149,7 +209,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Update state with new session information
       toast.success('Signed in successfully')
       
-      // Auth state change will handle redirection
+      // Manually redirect to ensure it happens
+      safeRedirect('/', true);
     } catch (error: any) {
       toast.error(error.message || 'Failed to sign in')
       throw error
@@ -170,6 +231,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Auth state change will handle redirection
       toast.success('Signed out successfully')
+      
+      // Ensure redirect happens
+      safeRedirect('/login');
     } catch (error: any) {
       toast.error(error.message || 'Failed to sign out')
       throw error

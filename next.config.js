@@ -48,6 +48,13 @@ const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   reactStrictMode: true,
+  // Increase the default timeout for chunk loading to avoid errors
+  onDemandEntries: {
+    // Period (in ms) where the server will keep pages in the buffer
+    maxInactiveAge: 60 * 60 * 1000, // increased from 25s to 1h
+    // Number of pages that should be kept simultaneously without being disposed
+    pagesBufferLength: 5,
+  },
   // Add ESLint configuration to disable some rules
   eslint: {
     // Don't run ESLint during build in production to avoid failing due to warnings

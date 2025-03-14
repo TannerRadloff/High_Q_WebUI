@@ -38,14 +38,14 @@ function initGlobalErrorHandlers() {
   });
 }
 
-// Helper functions for path types
-function isAuthPage(pathname: string | null) {
+// Helper functions for path types - using the same definition across the app
+function isAuthPage(pathname: string | null): boolean {
   if (!pathname) return false;
-  return pathname.startsWith('/login') || 
-         pathname.startsWith('/signup') || 
-         pathname.startsWith('/register') || 
-         pathname.startsWith('/forgot-password') ||
-         pathname.startsWith('/reset-password');
+  return pathname.includes('/login') || 
+         pathname.includes('/register') || 
+         pathname.includes('/signup') || 
+         pathname.includes('/forgot-password') ||
+         pathname.includes('/reset-password');
 }
 
 function isChatPage(pathname: string | null) {
@@ -61,7 +61,7 @@ export default function ClientLayout({
   const { theme } = useTheme();
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
-  const { isLoading: isAuthLoading } = useAuth();
+  const { isLoading: isAuthLoading, user } = useAuth();
 
   // Call all useEffect hooks together, before any conditional return
   useEffect(() => {
@@ -82,6 +82,15 @@ export default function ClientLayout({
 
   const isAuth = isAuthPage(pathname);
   const isChat = isChatPage(pathname);
+
+  // If we're authenticated but on an auth page, we should have been redirected
+  // This is a fallback in case the auth provider redirect didn't work
+  useEffect(() => {
+    if (mounted && user && isAuth) {
+      console.log('Authenticated user on auth page - redirecting to home');
+      window.location.href = '/';
+    }
+  }, [mounted, user, isAuth, pathname]);
 
   // Show loading indicator while auth is loading
   if (isAuthLoading && !isAuth) {

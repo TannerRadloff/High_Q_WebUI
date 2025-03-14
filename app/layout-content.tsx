@@ -14,6 +14,7 @@ function isAuthPage(pathname: string | null) {
   if (!pathname) return false;
   return pathname.startsWith('/login') || 
          pathname.startsWith('/signup') || 
+         pathname.startsWith('/register') ||
          pathname.startsWith('/forgot-password') ||
          pathname.startsWith('/reset-password');
 }
@@ -47,7 +48,7 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
               <main className={cn(
                 "flex-1 w-full h-full",
                 !isAuth && !isChat && "pl-4",
-                isAuth && "flex-center"
+                isAuth && "flex-center w-full"
               )}>
                 <ClientLayout>
                   {children}

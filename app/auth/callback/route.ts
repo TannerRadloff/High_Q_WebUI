@@ -10,13 +10,7 @@ export async function GET(request: NextRequest) {
   try {
     const requestUrl = new URL(request.url)
     
-    // Log the callback request for debugging
-    console.log('[Auth Callback] Processing OAuth callback', {
-      url: requestUrl.toString(),
-      hasCode: requestUrl.searchParams.has('code'),
-      baseUrl: getBaseUrl()
-    })
-    
+    // Get query parameters
     const code = requestUrl.searchParams.get('code')
     const error = requestUrl.searchParams.get('error')
     const errorDescription = requestUrl.searchParams.get('error_description')
@@ -41,21 +35,10 @@ export async function GET(request: NextRequest) {
     }
     
     // Exchange the code for a session
-    console.log('[Auth Callback] Exchanging code for session')
     await handleOAuthCallback(code)
-    console.log('[Auth Callback] Session exchange completed')
-
-    // Log any old NextAuth cookies that might exist (for debugging)
-    const oldCookies = ['next-auth.session-token', 'next-auth.callback-url', 'next-auth.csrf-token']
-    oldCookies.forEach(cookieName => {
-      if (request.cookies.has(cookieName)) {
-        console.log('[Auth Callback] Found old NextAuth cookie:', cookieName)
-      }
-    })
 
     // Force a redirect to the main application route
     const homeUrl = createUrl('/')
-    console.log('[Auth Callback] Redirecting to main application:', homeUrl)
     
     return NextResponse.redirect(homeUrl)
   } catch (error) {

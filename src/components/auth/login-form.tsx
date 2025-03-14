@@ -165,8 +165,9 @@ function LoginFormContent() {
     setIsLoading(true)
     
     try {
+      // Call the auth context signIn function which handles redirect
       await signIn(email, password)
-      // Auth provider will handle redirect
+      // No need to add additional redirect here - auth provider handles it
     } catch (error: any) {
       showErrorNotification(error.message || 'Failed to sign in')
       setIsLoading(false)
