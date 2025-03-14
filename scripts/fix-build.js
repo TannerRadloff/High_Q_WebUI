@@ -7,6 +7,35 @@ const { execSync } = require('child_process');
 
 console.log('Running build fix script...');
 
+// Set up the NEXT_PUBLIC_APP_URL environment variable if VERCEL_URL is available
+if (process.env.VERCEL_URL) {
+  console.log(`Setting NEXT_PUBLIC_APP_URL from VERCEL_URL: ${process.env.VERCEL_URL}`);
+  
+  try {
+    // Create or update .env.local file
+    const envLocalPath = path.join(process.cwd(), '.env.local');
+    const envVarLine = `NEXT_PUBLIC_APP_URL=https://${process.env.VERCEL_URL}\n`;
+    
+    if (fs.existsSync(envLocalPath)) {
+      // Check if the variable is already set
+      const envContents = fs.readFileSync(envLocalPath, 'utf8');
+      if (!envContents.includes('NEXT_PUBLIC_APP_URL=')) {
+        // Append to existing file
+        fs.appendFileSync(envLocalPath, envVarLine);
+        console.log('Added NEXT_PUBLIC_APP_URL to .env.local');
+      } else {
+        console.log('NEXT_PUBLIC_APP_URL already set in .env.local');
+      }
+    } else {
+      // Create new file
+      fs.writeFileSync(envLocalPath, envVarLine);
+      console.log('Created .env.local with NEXT_PUBLIC_APP_URL');
+    }
+  } catch (error) {
+    console.warn(`Warning: Failed to set NEXT_PUBLIC_APP_URL: ${error.message}`);
+  }
+}
+
 // Helper function to safely create directories and files
 function safelyCreateDir(dir) {
   const fullPath = path.join(process.cwd(), dir);

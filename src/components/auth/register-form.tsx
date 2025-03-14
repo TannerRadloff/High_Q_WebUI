@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { FcGoogle } from 'react-icons/fc'
 import { createClient } from '@/lib/supabase/client'
+import { getOAuthRedirectUrl } from '@/lib/helpers/url'
 
 import { Button } from '@/src/components/ui/button'
 import { Input } from '@/src/components/ui/input'
@@ -56,11 +57,15 @@ export function RegisterForm() {
     setIsLoading(true)
     
     try {
+      // Use the helper function to get a consistent redirect URL
+      const redirectUrl = getOAuthRedirectUrl();
+      console.log('[Register] Using redirect URL:', redirectUrl);
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: redirectUrl,
         },
       })
       
@@ -85,10 +90,14 @@ export function RegisterForm() {
     setIsGoogleLoading(true)
     
     try {
+      // Use the helper function to get a consistent redirect URL
+      const redirectUrl = getOAuthRedirectUrl();
+      console.log('[Register] Using OAuth redirect URL:', redirectUrl);
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: redirectUrl,
         },
       })
       

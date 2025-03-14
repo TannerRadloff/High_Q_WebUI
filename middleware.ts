@@ -39,6 +39,12 @@ export function middleware(request: NextRequest) {
     // Development logging
     logRequest(pathname, request.method)
 
+    // TEMPORARY FIX: In development mode, bypass auth checks to debug the issue
+    if (DEV_MODE && process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true') {
+      console.log('[Middleware] Development mode: Bypassing all auth checks')
+      return NextResponse.next()
+    }
+
     // Check for all possible Supabase cookie names
     const hasAuthCookies = checkSupabaseAuthCookies(request)
     
@@ -96,7 +102,9 @@ function checkSupabaseAuthCookies(request: NextRequest): boolean {
     // Legacy formats
     'sb:token',
     // JWT cookie
-    'sb-id-token'
+    'sb-id-token',
+    // Session cookie
+    'supabase-auth-session'
   ]
   
   // Check for any auth cookie that might exist
@@ -105,8 +113,23 @@ function checkSupabaseAuthCookies(request: NextRequest): boolean {
   // Also check for project-specific cookies (sb-*-auth-token)
   // Iterate through cookies manually to find project-specific tokens
   const projectCookies: string[] = []
+  
+  // Log all cookies in development mode for debugging
+  if (DEV_MODE) {
+    console.log('[Middleware] All cookies:', Array.from(request.cookies.entries()).map(([name]) => name))
+  }
+  
   request.cookies.forEach((value, name) => {
-    if (name.startsWith('sb-') && name.includes('-auth-token')) {
+    // Check for any Supabase-related cookies with more flexible patterns
+    if (
+      (name.startsWith('sb-') && (
+        name.includes('-auth-token') || 
+        name.includes('access') || 
+        name.includes('refresh')
+      )) ||
+      name.includes('supabase') ||
+      name.includes('auth.token')
+    ) {
       projectCookies.push(name)
     }
   })
@@ -121,6 +144,12 @@ function checkSupabaseAuthCookies(request: NextRequest): boolean {
       foundCookies: allFoundCookies,
       hasAuthCookies
     })
+  }
+  
+  // For development, temporarily bypass auth check to debug the issue
+  if (DEV_MODE && process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true') {
+    console.log('[Middleware] Development mode: Bypassing auth check')
+    return true
   }
   
   return hasAuthCookies

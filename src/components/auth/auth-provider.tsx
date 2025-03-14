@@ -59,6 +59,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[AuthProvider] Retrieved session, authenticated:', !!data.session)
         
         if (data.session) {
+          // Log detailed session information for debugging
+          console.log('[AuthProvider] Session details:', {
+            userId: data.session.user?.id,
+            expiresAt: data.session.expires_at ? new Date(data.session.expires_at * 1000).toISOString() : 'unknown',
+            currentTime: new Date().toISOString(),
+            tokenType: data.session.token_type,
+            hasAccessToken: !!data.session.access_token,
+            hasRefreshToken: !!data.session.refresh_token
+          })
+          
           setSession(data.session)
           setUser(data.session.user)
         }
@@ -85,8 +95,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // If we just signed in, redirect to home page if on auth page
             if (pathname?.includes('/login') || pathname?.includes('/register')) {
               console.log('[AuthProvider] Redirecting to home after sign in')
-              router.push('/')
-              router.refresh()
+              
+              // Add a small delay to ensure cookies are set before redirect
+              setTimeout(() => {
+                router.push('/')
+                router.refresh()
+              }, 500)
             }
             break
             

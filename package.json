@@ -24,7 +24,8 @@
     "check:env": "node scripts/check-env.js",
     "migrate:components": "node scripts/migrate-components.js",
     "migrate:components:dry": "node scripts/migrate-components.js --dry-run",
-    "migrate:pages": "node scripts/update-page-imports.js"
+    "migrate:pages": "node scripts/update-page-imports.js",
+    "test:urls": "node scripts/test-urls.js"
   },
   "dependencies": {
     "@ai-sdk/fireworks": "^0.1.14",
