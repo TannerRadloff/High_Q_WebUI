@@ -35,6 +35,7 @@ export function middleware(request: NextRequest) {
       '/_next',
       '/api/auth',  // Allow auth API endpoints
       '/api/register',
+      '/api/check-env', // Allow environment checking API
       '/login',
       '/register',
       '/forgot-password',
@@ -111,7 +112,15 @@ export function middleware(request: NextRequest) {
     // For non-public web routes, check authentication
     if (!hasAuthCookies) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('[Middleware] Redirecting to login - no auth cookies')
+        console.log('[Middleware] Redirecting to login - no auth cookies', {
+          url: request.url,
+          path: pathname,
+          cookies: {
+            hasSession: !!sessionCookie,
+            hasRefresh: !!refreshCookie,
+            cookieCount: Array.from(request.cookies.keys()).length
+          }
+        })
       }
       
       // Save the original URL to redirect back after login
@@ -119,6 +128,11 @@ export function middleware(request: NextRequest) {
       // Add the current path as a redirect parameter (excluding login page)
       if (pathname !== '/login') {
         redirectUrl.searchParams.set('redirect', pathname)
+      }
+      
+      // Debug log the redirect URL in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Middleware] Redirecting to:', redirectUrl.toString())
       }
       
       return NextResponse.redirect(redirectUrl)

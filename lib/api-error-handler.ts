@@ -13,71 +13,89 @@ export const ERROR_TYPES = {
 
 // Error type determination
 export function categorizeError(error: unknown): string {
-  const errorMessage = error instanceof Error 
-    ? error.message.toLowerCase()
-    : String(error).toLowerCase();
+  // Convert the error to a string for pattern matching
+  const errorStr = typeof error === 'string' 
+    ? error 
+    : error instanceof Error 
+    ? error.message 
+    : JSON.stringify(error);
   
-  // Network errors
+  // Log full error details for debugging
+  console.log('[API Error] Categorizing error:', {
+    errorType: error instanceof Error ? error.constructor.name : typeof error,
+    message: errorStr,
+    stack: error instanceof Error ? error.stack : 'No stack trace',
+    status: (error as any)?.status || (error as any)?.statusCode || 'No status code',
+    code: (error as any)?.code || 'No error code'
+  });
+
+  // Check for network connectivity issues
   if (
-    errorMessage.includes('network') || 
-    errorMessage.includes('fetch') || 
-    errorMessage.includes('econnrefused') ||
-    errorMessage.includes('failed to fetch') ||
-    errorMessage.includes('network request failed')
+    errorStr.includes('Failed to fetch') ||
+    errorStr.includes('NetworkError') ||
+    errorStr.includes('network request failed') ||
+    errorStr.includes('Network request failed') ||
+    (error instanceof Error && error.name === 'TypeError' && errorStr.includes('fetch'))
   ) {
     return ERROR_TYPES.NETWORK;
+  }
+
+  // Check for authentication errors
+  if (
+    errorStr.includes('401') || 
+    errorStr.includes('Unauthorized') ||
+    errorStr.includes('auth') ||
+    errorStr.includes('Authentication required') ||
+    errorStr.includes('not authenticated')
+  ) {
+    // Add more detailed logging for auth errors
+    console.log('[API Error] Authentication error details:', {
+      fullError: error,
+      status: (error as any)?.status || (error as any)?.statusCode,
+      response: (error as any)?.response,
+      headers: (error as any)?.headers,
+    });
+    
+    return ERROR_TYPES.AUTH;
   }
   
   // Timeout errors
   if (
-    errorMessage.includes('timeout') || 
-    errorMessage.includes('timed out') ||
-    errorMessage.includes('deadline exceeded')
+    errorStr.includes('timeout') || 
+    errorStr.includes('timed out') ||
+    errorStr.includes('deadline exceeded')
   ) {
     return ERROR_TYPES.TIMEOUT;
   }
   
-  // Authentication errors
-  if (
-    errorMessage.includes('auth') || 
-    errorMessage.includes('unauthorized') ||
-    errorMessage.includes('forbidden') ||
-    errorMessage.includes('permission') ||
-    errorMessage.includes('access denied') ||
-    errorMessage.includes('not allowed') ||
-    errorMessage.includes('api key')
-  ) {
-    return ERROR_TYPES.AUTH;
-  }
-  
   // Rate limit errors
   if (
-    errorMessage.includes('rate limit') || 
-    errorMessage.includes('quota') ||
-    errorMessage.includes('too many requests') ||
-    errorMessage.includes('429')
+    errorStr.includes('rate limit') || 
+    errorStr.includes('quota') ||
+    errorStr.includes('too many requests') ||
+    errorStr.includes('429')
   ) {
     return ERROR_TYPES.RATE_LIMIT;
   }
   
   // Server errors
   if (
-    errorMessage.includes('server error') || 
-    errorMessage.includes('500') ||
-    errorMessage.includes('503') ||
-    errorMessage.includes('internal server')
+    errorStr.includes('server error') || 
+    errorStr.includes('500') ||
+    errorStr.includes('503') ||
+    errorStr.includes('internal server')
   ) {
     return ERROR_TYPES.SERVER;
   }
   
   // Validation errors
   if (
-    errorMessage.includes('validation') || 
-    errorMessage.includes('invalid') ||
-    errorMessage.includes('required field') ||
-    errorMessage.includes('missing') ||
-    errorMessage.includes('bad request') ||
-    errorMessage.includes('400')
+    errorStr.includes('validation') || 
+    errorStr.includes('invalid') ||
+    errorStr.includes('required field') ||
+    errorStr.includes('missing') ||
+    errorStr.includes('bad request') ||
+    errorStr.includes('400')
   ) {
     return ERROR_TYPES.VALIDATION;
   }
