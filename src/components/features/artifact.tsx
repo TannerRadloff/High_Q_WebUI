@@ -18,7 +18,7 @@ import { useDebounceCallback, useWindowSize } from 'usehooks-ts';
 import type { Document, Vote } from '@/lib/db/schema';
 import { fetcher } from '@/lib/utils';
 import { MultimodalInput } from './multimodal-input';
-import { Toolbar } from './toolbar';
+import { Toolbar } from '@/components/layout/toolbar';
 import { VersionFooter } from './version-footer';
 import { ArtifactActions } from './artifact-actions';
 import { ArtifactCloseButton } from './artifact-close-button';
