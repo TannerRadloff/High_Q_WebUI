@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 
 import { AppSidebar } from '@/src/components/layout/app-sidebar';
-import { SidebarInset } from '@/components/ui/sidebar';
+import { SidebarInset } from '@/src/components/ui/sidebar';
 
 import { getServerSession } from '@/lib/auth';
 import Script from 'next/script';

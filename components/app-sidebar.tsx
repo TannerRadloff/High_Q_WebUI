@@ -7,7 +7,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { PlusIcon, BoxIcon } from '@/components/icons';
 import { SidebarHistory } from '@/src/components/layout/sidebar-history';
 import { SidebarUserNav } from '@/src/components/layout/sidebar-user-nav';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/src/components/ui/button';
 import {
   Sidebar,
   SidebarContent,
@@ -17,10 +17,10 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   useSidebar,
-} from '@/components/ui/sidebar';
+} from '@/src/components/ui/sidebar';
 // @ts-ignore - Next.js type declarations issue
 import Link from 'next/link';
-import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/src/components/ui/tooltip';
 
 export function AppSidebar({ user }: { user: User | undefined }) {
   const router = useRouter();

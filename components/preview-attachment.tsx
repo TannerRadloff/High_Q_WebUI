@@ -1,6 +1,6 @@
 import type { ExtendedAttachment } from '@/types';
 
-import { FileIcon, LoaderIcon } from './icons';
+import { FileIcon, LoaderIcon } from '@/src/components/common/icons';
 import { FileText } from 'lucide-react';
 
 export const PreviewAttachment = ({

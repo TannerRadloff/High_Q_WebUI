@@ -9,8 +9,8 @@ import { useWindowSize } from 'usehooks-ts';
 import type { Document } from '@/lib/db/schema';
 import { getDocumentTimestampByIndex } from '@/utils/documents';
 
-import { LoaderIcon } from './icons';
-import { Button } from './ui/button';
+import { LoaderIcon } from '@/src/components/common/icons';
+import { Button } from '@/src/components/ui/button';
 import { useArtifact } from '@/hooks/use-artifact';
 
 interface VersionFooterProps {

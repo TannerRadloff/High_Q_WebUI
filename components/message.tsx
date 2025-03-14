@@ -12,15 +12,15 @@ import { DocumentToolCall, DocumentToolResult } from './document';
 import {
   PencilEditIcon,
   SparklesIcon,
-} from './icons';
-import { Markdown } from './markdown';
+} from '@/src/components/common/icons';
+import { Markdown } from '@/src/components/common/markdown';
 import { MessageActions } from './message-actions';
 import { PreviewAttachment } from './preview-attachment';
 import { Weather } from './weather';
 import equal from 'fast-deep-equal';
 import { cn } from '@/lib/utils';
-import { Button } from './ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { Button } from '@/src/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/src/components/ui/tooltip';
 import { MessageEditor } from './message-editor';
 import { DocumentPreview } from './document-preview';
 import { MessageReasoning } from './message-reasoning';

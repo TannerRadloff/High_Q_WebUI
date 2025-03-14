@@ -24,15 +24,15 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+} from '@/src/components/ui/tooltip';
 import { sanitizeUIMessages } from '@/utils/messages';
 
 import {
   ArrowUpIcon,
   StopIcon,
   SummarizeIcon,
-} from './icons';
-import { artifactDefinitions, type ArtifactKind } from './artifact';
+} from '@/src/components/common/icons';
+import { artifactDefinitions, type ArtifactKind } from '@/src/components/features/artifact';
 import type { ArtifactToolbarItem } from './create-artifact';
 import type { UseChatHelpers } from 'ai/react';
 

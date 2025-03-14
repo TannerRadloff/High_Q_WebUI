@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AgentType } from '../../agents/AgentFactory';
 import AgentStateService, { AgentRequest } from '../../services/agentStateService';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/src/components/ui/button';
 import { BotIcon } from '@/components/icons';
 
 // Agent configuration with descriptions and capabilities

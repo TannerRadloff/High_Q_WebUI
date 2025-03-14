@@ -28,6 +28,9 @@ const pathMappings = {
   '@/components/features/': '@/src/components/features/',
   '@/components/common/': '@/src/components/common/',
   '@/components/model-selector': '@/src/components/features/model-selector',
+  '@/components/ui/sidebar': '@/src/components/ui/sidebar',
+  '@/components/ui/error-boundary': '@/src/components/ui/error-boundary',
+  '@/src/components/auth/auth-provider': '@/components/auth/auth-provider',
   
   // Fix specific component imports
   './visibility-selector': '@/src/components/features/visibility-selector',
@@ -36,6 +39,7 @@ const pathMappings = {
   './model-selector': '@/src/components/features/model-selector',
   './create-artifact': '@/src/components/features/create-artifact',
   './toolbar': '@/src/components/features/toolbar',
+  './ui/sidebar': '@/src/components/ui/sidebar',
 };
 
 // Special fixes for specific files
@@ -50,6 +54,24 @@ const specialFixes = [
       {
         from: "import type { ArtifactToolbarItem } from './create-artifact';",
         to: "import type { ArtifactToolbarItem } from '@/src/components/features/create-artifact';"
+      }
+    ]
+  },
+  {
+    file: 'components/chat-header.tsx',
+    replacements: [
+      {
+        from: "import { useSidebar } from './ui/sidebar';",
+        to: "import { useSidebar } from '@/src/components/ui/sidebar';"
+      }
+    ]
+  },
+  {
+    file: 'components/artifact.tsx',
+    replacements: [
+      {
+        from: "import { useSidebar } from './ui/sidebar';",
+        to: "import { useSidebar } from '@/src/components/ui/sidebar';"
       }
     ]
   }
@@ -102,7 +124,7 @@ import type { UseChatHelpers } from 'ai/react';
 // Find all TypeScript and TSX files in the src directory
 let files = [];
 try {
-  files = glob.sync('src/**/*.{ts,tsx}');
+  files = glob.sync('{src,components,app}/**/*.{ts,tsx}');
   console.log(`Found ${files.length} files to process`);
 } catch (error) {
   console.error(`Error finding files: ${error.message}`);

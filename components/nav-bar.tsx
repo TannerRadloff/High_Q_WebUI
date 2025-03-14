@@ -4,11 +4,11 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/src/components/ui/button'
 import { useAuth } from '@/components/auth/auth-provider'
 import { LogoutButton } from '@/components/auth/logout-button'
 import { UserAuthStatus } from '@/components/user-auth-status'
-import { BotIcon, HomeIcon } from './icons'
+import { BotIcon, HomeIcon } from '@/src/components/common/icons'
 
 const routes = [
   {

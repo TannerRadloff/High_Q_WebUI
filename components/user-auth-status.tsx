@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Button } from './ui/button';
+import { Button } from '@/src/components/ui/button';
 import Link from 'next/link';
 import Image from 'next/image';
 import { User } from '@supabase/supabase-js';

@@ -2,7 +2,7 @@
 
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
-import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { ErrorBoundary } from '@/src/components/ui/error-boundary';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 

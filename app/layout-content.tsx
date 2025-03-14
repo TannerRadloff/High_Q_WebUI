@@ -5,9 +5,9 @@ import { Toaster } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ThemeProvider } from '@/src/components/common/theme-provider';
 import { Providers } from './providers';
-import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { ErrorBoundary } from '@/src/components/ui/error-boundary';
 import { NavBar } from '@/src/components/layout/nav-bar';
-import { SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarProvider } from '@/src/components/ui/sidebar';
 import ClientLayout from './client-layout';
 
 function isAuthPage(pathname: string | null) {

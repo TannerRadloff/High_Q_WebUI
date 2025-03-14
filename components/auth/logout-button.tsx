@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/src/components/ui/button'
 import { useAuth } from '@/components/auth/auth-provider'
 
 interface LogoutButtonProps {

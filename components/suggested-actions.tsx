@@ -1,10 +1,10 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Button } from './ui/button';
+import { Button } from '@/src/components/ui/button';
 import type { ChatRequestOptions, CreateMessage, Message } from 'ai';
 import { memo, useRef, useState, useEffect } from 'react';
-import { ArrowUpIcon } from './icons';
+import { ArrowUpIcon } from '@/src/components/common/icons';
 
 interface SuggestedActionsProps {
   chatId: string;
