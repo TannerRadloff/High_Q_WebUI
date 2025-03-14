@@ -219,6 +219,26 @@ function redirectToLogin(request: NextRequest, pathname: string) {
     })
   }
   
+  // Check for potential redirect loops
+  const referer = request.headers.get('referer')
+  const url = new URL(request.url)
+  
+  // If we detect a pattern that might be a loop
+  // e.g. referer is /login and we're trying to redirect back to login
+  // or referer contains our domain and pathname is root
+  if (referer && (
+      (referer.includes('/login') && pathname === '/') || 
+      (url.hostname === new URL(referer).hostname && pathname === '/')
+    )) {
+    console.log('[Middleware] Detected potential redirect loop, breaking the chain', {
+      referer,
+      pathname
+    })
+    
+    // Break the loop by allowing access
+    return NextResponse.next()
+  }
+  
   // Save the original URL to redirect back after login
   const redirectUrl = new URL('/login', request.url)
   

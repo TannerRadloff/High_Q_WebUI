@@ -86,6 +86,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[AuthProvider] Auth state changed:', event, 'Session:', !!currentSession)
         console.log('[AuthProvider] Current pathname:', pathname)
         
+        // Check for loop condition: if this is an INITIAL_SESSION event on /login page and we already
+        // had set up a user/session (caused by a previous redirect), don't redirect again
+        const isInitialWithExistingSession = event === 'INITIAL_SESSION' && !!user && !!session;
+        
         // Update the state with the new session
         setSession(currentSession)
         setUser(currentSession?.user ?? null)
@@ -110,6 +114,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               }, 500)
             } else {
               console.log('[AuthProvider] Not redirecting, not on a login/register page. Current path:', pathname)
+            }
+            break
+            
+          case 'INITIAL_SESSION':
+            // Only redirect on initial session if we're on the login page AND we don't already have a session
+            // This prevents redirection loops
+            if (!isInitialWithExistingSession && (pathname?.includes('/login') || pathname?.includes('/register')) && currentSession) {
+              console.log('[AuthProvider] Initial session with auth - redirecting to home')
+              
+              // Set a flag in localStorage to prevent future redirects in this session
+              if (typeof window !== 'undefined') {
+                const hasRedirected = localStorage.getItem('auth_redirected');
+                if (!hasRedirected) {
+                  localStorage.setItem('auth_redirected', 'true');
+                  
+                  // Use direct navigation
+                  setTimeout(() => {
+                    window.location.href = '/';
+                  }, 500);
+                } else {
+                  console.log('[AuthProvider] Preventing redirect loop - already redirected in this session');
+                }
+              }
             }
             break
             

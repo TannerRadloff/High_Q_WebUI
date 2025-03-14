@@ -86,13 +86,47 @@ function LoginPage() {
         setIsCheckingEnv(false)
       })
 
+      // Check if we're in a redirect loop
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectParam = urlParams.get('redirect');
+      const isHomeRedirect = redirectParam === '/' || !redirectParam;
+      const hasRedirectLoopParam = urlParams.get('loop_detected') === 'true';
+      
+      // If we're already authenticated and being redirected back to home,
+      // we might be in a loop - break it by skipping redirect
       if (!isAuthLoading && user) {
-        setIsRedirecting(true)
+        // Track this to prevent unnecessary UI flashing
+        setIsRedirecting(true);
+        
+        if (hasRedirectLoopParam) {
+          console.log('[LoginPage] Loop detected, staying on login page');
+          return; // Don't redirect
+        }
+
+        if (isHomeRedirect && window.location.pathname.includes('/login')) {
+          console.log('[LoginPage] Potential redirect loop detected - adding param');
+          // Add a loop parameter to track this situation
+          const newUrl = new URL(window.location.href);
+          newUrl.searchParams.set('loop_detected', 'true');
+          window.history.replaceState({}, '', newUrl.toString());
+        }
+        
         // Add a small delay for a smoother transition
         const redirectTimeout = setTimeout(() => {
           // Only redirect if we're actually on the login page
           if (window.location.pathname.includes('/login')) {
-            router.push('/')
+            // Track redirect attempts in session storage to limit redirects
+            const redirectCount = sessionStorage.getItem('redirectCount') || '0';
+            const count = parseInt(redirectCount, 10);
+            
+            if (count < 3) {
+              console.log(`[LoginPage] Redirecting to home (attempt ${count + 1})`);
+              sessionStorage.setItem('redirectCount', (count + 1).toString());
+              router.push('/');
+            } else {
+              console.log('[LoginPage] Too many redirects, stopping redirect loop');
+              sessionStorage.removeItem('redirectCount');
+            }
           }
         }, 300)
 

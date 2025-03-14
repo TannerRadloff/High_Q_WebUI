@@ -24,18 +24,34 @@ export default function Home() {
       
       if (!user) {
         console.log('[HomePage] User not authenticated, redirecting to login')
+        
+        // Check if we're in a potential redirect loop
+        const redirectCount = sessionStorage.getItem('homeRedirectCount') || '0';
+        const count = parseInt(redirectCount, 10);
+        
         // Only redirect if we're actually on the home page to prevent loops
-        // and only if we're not already redirecting
-        if (window.location.pathname === '/' && !isRedirecting) {
+        // and only if we're not already redirecting and haven't redirected too many times
+        if (window.location.pathname === '/' && !isRedirecting && count < 3) {
           setIsRedirecting(true)
+          
+          // Increment redirect count
+          sessionStorage.setItem('homeRedirectCount', (count + 1).toString());
+          console.log(`[HomePage] Redirecting to login (attempt ${count + 1})`);
           
           // Add a small delay to prevent rapid redirects
           setTimeout(() => {
-            router.push('/login')
+            // Add a query param to help with loop detection
+            router.push('/login?from=home')
           }, 300)
+        } else if (count >= 3) {
+          console.log('[HomePage] Too many redirects, stopping redirect loop');
+          // Reset counter and show an error state instead
+          sessionStorage.removeItem('homeRedirectCount');
         }
       } else {
         console.log('[HomePage] User authenticated, staying on home page')
+        // Reset redirect counter when authentication succeeds
+        sessionStorage.removeItem('homeRedirectCount');
       }
     }
   }, [user, isLoading, router, session, hasCheckedAuth, isRedirecting])
