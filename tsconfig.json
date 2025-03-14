@@ -39,14 +39,17 @@
       "@/hooks/*": [
         "./src/hooks/*"
       ],
+      "@/components": [
+        "./components"
+      ],
       "@/components/*": [
-        "./src/components/*"
+        "./components/*"
       ],
       "@/types/*": [
-        "./src/types/*"
+        "./types/*"
       ],
       "@/lib/*": [
-        "./src/lib/*"
+        "./lib/*"
       ],
       "@/artifacts/*": [
         "./src/artifacts/*"
