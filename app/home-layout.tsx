@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { AppSidebar } from '@/components/app-sidebar';
+import { AppSidebar } from '@/src/components/layout/app-sidebar';
 import { SidebarInset, useSidebar } from '@/components/ui/sidebar';
 import { useAuth } from '@/components/auth/auth-provider';
 

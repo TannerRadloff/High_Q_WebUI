@@ -9,7 +9,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/components/auth/auth-provider';
 import { toast } from 'sonner';
 
-import { ChatHeader } from '@/components/chat-header';
+import { ChatHeader } from '@/src/components/layout/chat-header';
 import type { Vote } from '@/lib/db/schema';
 import { fetcher } from '@/utils';
 import { generateUUID } from '@/utils/auth';

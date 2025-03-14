@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth/auth-provider'
-import { Chat } from '@/components/chat'
+import { Chat } from '@/src/components/features/chat'
 import HomeLayout from './home-layout'
 
 export default function Home() {

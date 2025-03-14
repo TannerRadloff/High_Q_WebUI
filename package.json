@@ -21,7 +21,10 @@
     "db:pull": "drizzle-kit pull",
     "db:check": "drizzle-kit check",
     "db:up": "drizzle-kit up",
-    "check:env": "node scripts/check-env.js"
+    "check:env": "node scripts/check-env.js",
+    "migrate:components": "node scripts/migrate-components.js",
+    "migrate:components:dry": "node scripts/migrate-components.js --dry-run",
+    "migrate:pages": "node scripts/update-page-imports.js"
   },
   "dependencies": {
     "@ai-sdk/fireworks": "^0.1.14",

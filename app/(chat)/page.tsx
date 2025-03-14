@@ -1,4 +1,4 @@
-import { Chat } from '@/components/chat';
+import { Chat } from '@/src/components/features/chat';
 import { DEFAULT_CHAT_MODEL } from '@/lib/ai/models';
 import { generateUUID } from '@/utils/auth';
 import { DataStreamHandler } from '@/components/data-stream-handler';

@@ -18,7 +18,7 @@ import {
   passwordReset,
   type PasswordReset,
 } from './schema';
-import type { ArtifactKind } from '@/components/artifact';
+import type { ArtifactKind } from '@/src/components/features/artifact';
 
 // Create a database connection
 let client: postgres.Sql | null = null;
