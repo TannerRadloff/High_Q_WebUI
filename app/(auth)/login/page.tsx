@@ -7,6 +7,7 @@ import { useAuth } from '@/components/auth/auth-provider'
 import { Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { ErrorMessage } from '@/src/components/ui/error-message'
 
 interface EnvCheckResult {
   isValid: boolean;
@@ -66,46 +67,47 @@ export default function LoginPage() {
   }, [user, isAuthLoading, router, checkEnvironment])
 
   return (
-    <div className="flex flex-col items-center justify-center w-full min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-gray-900 to-black">
-      <div className="w-full max-w-md mb-8">
-        <motion.div 
-          className="text-center"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <Link href="/" className="flex items-center justify-center">
-            <span className="text-5xl mb-2">✨</span>
-          </Link>
-          <h2 className="text-center text-3xl font-extrabold text-white">
-            NextJS AI Chatbot
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-400">
-            Welcome back! Please sign in to your account
-          </p>
-        </motion.div>
+    <div className="flex flex-col items-center justify-center min-h-screen py-2 bg-gradient-to-b from-black via-slate-900 to-slate-950">
+      {/* Background animations */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 bg-black opacity-80"></div>
+        <div className="cosmic-animation-container"></div>
       </div>
-
+      
       {/* Loading state */}
-      {(isAuthLoading || isCheckingEnv || isRedirecting) && (
+      {(isAuthLoading || isCheckingEnv) && (
         <motion.div 
-          className="flex items-center justify-center min-h-[40vh]"
+          key="loading"
+          className="w-full max-w-md flex flex-col items-center justify-center space-y-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
         >
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto" />
-            <p className="mt-4 text-sm text-zinc-400">
-              {isRedirecting 
-                ? 'Redirecting to your dashboard...' 
-                : 'Preparing your login...'}
-            </p>
+          <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-muted-foreground">Checking environment...</p>
+        </motion.div>
+      )}
+      
+      {/* Redirect indicator */}
+      {isRedirecting && (
+        <motion.div 
+          className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="bg-background p-4 rounded-md shadow-xl">
+            <div className="flex items-center space-x-2">
+              <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+              <p>Redirecting to dashboard...</p>
+            </div>
           </div>
         </motion.div>
       )}
-
-      {/* Error state */}
+      
+      {/* Environment configuration error */}
       {!isAuthLoading && !isCheckingEnv && !isRedirecting && (envError || dbError) && (
         <motion.div 
           className="w-full mx-auto max-w-md space-y-6 rounded-xl bg-gradient-to-b from-zinc-900/70 to-zinc-800/90 p-8 shadow-2xl shadow-zinc-900/30 backdrop-blur-sm border border-zinc-800/80"
@@ -117,31 +119,23 @@ export default function LoginPage() {
           <div className="flex flex-col text-center">
             <h2 className="text-2xl font-bold tracking-tight text-red-400">Configuration Error</h2>
             
-            {envError && (
-              <motion.div 
-                className="mt-4 p-4 bg-red-900/20 border border-red-800 rounded-md"
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-              >
-                <p className="text-sm text-red-400">
-                  {envError}
-                </p>
-              </motion.div>
-            )}
-            
-            {dbError && (
-              <motion.div 
-                className="mt-4 p-4 bg-red-900/20 border border-red-800 rounded-md"
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                <p className="text-sm text-red-400">
-                  {dbError}
-                </p>
-              </motion.div>
-            )}
+            <div className="mt-4">
+              {envError && (
+                <ErrorMessage
+                  type="server"
+                  message={envError}
+                  className="mb-3"
+                />
+              )}
+              
+              {dbError && (
+                <ErrorMessage
+                  type="server"
+                  message={dbError}
+                  className="mb-3"
+                />
+              )}
+            </div>
             
             <p className="mt-4 text-sm text-zinc-400">
               Please check your environment configuration before continuing.

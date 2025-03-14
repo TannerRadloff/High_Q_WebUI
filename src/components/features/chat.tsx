@@ -14,11 +14,9 @@ import type { Vote } from '@/lib/db/schema';
 import { fetcher } from '@/utils';
 import { generateUUID } from '@/utils/auth';
 import type { ExtendedAttachment } from '@/types';
-import { 
-  showUniqueErrorToast, 
-  resetErrorTracking, 
-  logError as logApiError 
-} from '@/lib/api-error-handler';
+import { logError as logApiError } from '@/lib/api-error-handler';
+import { isAuthenticationError, handleAPIError } from '@/src/utils/auth-checks';
+import { ErrorMessage } from '@/src/components/ui/error-message';
 
 import { Artifact } from '@/src/components/features/artifact';
 import { Messages } from './messages';
@@ -36,60 +34,11 @@ declare global {
 
 // Agent mode functionality is now integrated directly into the MultimodalInput component
 
-// Add this interface to help type the error messages from the API
+// Interface to help type the error messages from the API
 interface StreamErrorMessage {
   type: 'error';
   error: string;
 }
-
-// Helper to check if an error is auth-related
-const isAuthenticationError = (error: any): boolean => {
-  if (!error) return false;
-  
-  // Check common patterns for auth errors
-  if (error instanceof Error) {
-    const message = error.message.toLowerCase();
-    return message.includes('auth') || 
-           message.includes('unauthorized') || 
-           message.includes('unauthenticated') ||
-           message.includes('permission') ||
-           message.includes('forbidden') ||
-           message.includes('login') ||
-           message.includes('sign in');
-  }
-  
-  if (typeof error === 'string') {
-    const message = error.toLowerCase();
-    return message.includes('auth') || 
-           message.includes('unauthorized') || 
-           message.includes('unauthenticated') ||
-           message.includes('permission') ||
-           message.includes('forbidden') ||
-           message.includes('login') ||
-           message.includes('sign in');
-  }
-  
-  // Check for status codes
-  if (error.status === 401 || error.status === 403) {
-    return true;
-  }
-  
-  return false;
-};
-
-// Helper to dispatch global error event
-const dispatchGlobalErrorEvent = (errorType: 'loading-error' | 'authentication-required', errorMessage?: string) => {
-  if (typeof window === 'undefined') return;
-  
-  const errorEvent = new CustomEvent('historyLoadError', { 
-    detail: { 
-      type: errorType,
-      message: errorMessage || 'An error occurred',
-      timestamp: new Date().toISOString()
-    } 
-  });
-  document.dispatchEvent(errorEvent);
-};
 
 export function Chat({
   id,
@@ -111,6 +60,8 @@ export function Chat({
   const { user } = useAuth();
   
   const [hasError, setHasError] = useState(false);
+  const [errorType, setErrorType] = useState<'general' | 'authentication' | 'network'>('general');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(true);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [showWelcome, setShowWelcome] = useState(id === 'create-new');
@@ -162,6 +113,8 @@ export function Chat({
   // Clear error state when chat ID changes
   useEffect(() => {
     setHasError(false);
+    setErrorType('general');
+    setErrorMessage(null);
     setIsFirstLoad(true);
     
     if (id === 'create-new') {
@@ -169,10 +122,6 @@ export function Chat({
     } else {
       setShowWelcome(initialMessages.length === 0);
     }
-    
-    return () => {
-      setHasError(false);
-    };
   }, [id, initialMessages.length]);
 
   // Scroll to bottom of messages when new ones arrive
@@ -227,10 +176,17 @@ export function Chat({
           }
         } catch (error) {
           logApiError(error, 'Failed to create new chat');
-          if (!hasError) {
-            toast.error(error instanceof Error ? error.message : 'Failed to create new chat. Please try again.');
-            setHasError(true);
+          setHasError(true);
+          
+          // Check if it's an auth error
+          if (isAuthenticationError(error)) {
+            setErrorType('authentication');
+          } else {
+            setErrorType('general');
           }
+          
+          setErrorMessage(error instanceof Error ? error.message : 'Failed to create new chat. Please try again.');
+          toast.error(error instanceof Error ? error.message : 'Failed to create new chat. Please try again.');
         } finally {
           setIsCreatingChat(false);
         }
@@ -238,7 +194,7 @@ export function Chat({
     }
 
     createNewChat();
-  }, [id, user, selectedVisibilityType, hasError]);
+  }, [id, user, selectedVisibilityType]);
 
   const {
     messages,
@@ -263,19 +219,24 @@ export function Chat({
         const status = response.status;
         console.error(`[CHAT] HTTP Error (${status}): ${response.statusText}`);
         
+        setHasError(true);
+        
         // Handle auth errors
         if (status === 401 || status === 403) {
-          dispatchGlobalErrorEvent('authentication-required', response.statusText);
-          setHasError(true);
-          return;
+          setErrorType('authentication');
+          setErrorMessage('Authentication required to access this feature.');
+          handleAPIError({ status, statusText: response.statusText }, 'Chat response error');
+        } else {
+          // Handle other errors
+          setErrorType('general');
+          setErrorMessage(`API error: ${response.statusText || 'Request failed'}`);
+          toast.error(`API error: ${response.statusText || 'Request failed'}`);
         }
-        
-        // Handle other errors
-        toast.error(`API error: ${response.statusText || 'Request failed'}`);
-        setHasError(true);
       } else {
         // Reset error state on successful response
         setHasError(false);
+        setErrorType('general');
+        setErrorMessage(null);
         setShowWelcome(false);
         
         // Show brief sparkle animation on new response
@@ -304,15 +265,18 @@ export function Chat({
     onError: (error) => {
       console.error(`[CHAT] Error with model ${selectedChatModel}:`, error);
       
-      // Check if this is an auth error
+      setHasError(true);
+      
+      // Set error type and message based on authentication status
       if (isAuthenticationError(error)) {
-        dispatchGlobalErrorEvent('authentication-required', error instanceof Error ? error.message : String(error));
+        setErrorType('authentication');
+        setErrorMessage('Authentication required to access this feature.');
+        handleAPIError(error, 'Chat API error');
       } else {
-        // Simple error handling for non-auth errors
+        setErrorType('general');
+        setErrorMessage('An error occurred while processing your message. Please try again.');
         toast.error('An error occurred while processing your message. Please try again.');
       }
-      
-      setHasError(true);
     },
   });
   
@@ -336,7 +300,7 @@ export function Chat({
     return null;
   };
 
-  // Handle custom form submission with animation
+  // Handle custom form submission with authentication check
   const customHandleSubmit = useCallback(
     (
       event?: { preventDefault?: () => void } | undefined,
@@ -354,6 +318,15 @@ export function Chat({
         return;
       }
       
+      // Check authentication status only when submitting
+      if (!user) {
+        setHasError(true);
+        setErrorType('authentication');
+        setErrorMessage('You need to be signed in to send messages.');
+        handleAPIError({ status: 401, message: 'Authentication required' }, 'Chat submission');
+        return;
+      }
+      
       // Add subtle animation when sending a message
       if (chatContainerRef.current) {
         chatContainerRef.current.classList.add('chat-sending-pulse');
@@ -366,11 +339,16 @@ export function Chat({
       
       // Reset any previous errors
       setHasError(false);
+      setErrorMessage(null);
       
       handleSubmit(event, chatRequestOptions);
     },
-    [handleSubmit, isOnline]
+    [handleSubmit, isOnline, user]
   );
+
+  const handleAuthentication = useCallback(() => {
+    window.location.href = '/login';
+  }, []);
 
   return (
     <div 
@@ -545,28 +523,20 @@ export function Chat({
         </div>
       )}
         
-      {/* Error Message - only show for non-auth errors since auth errors use the global overlay */}
-      {hasError && !isAuthenticationError && (
-        <div className="p-4 mb-4 bg-destructive/10 border border-destructive rounded-lg max-w-2xl mx-auto" role="alert">
-          <p className="text-sm text-destructive">An error occurred. Please try again or refresh the page.</p>
-          <div className="mt-2 flex gap-2">
-            <button
-              onClick={() => reload()}
-              className="px-3 py-1 text-xs rounded-md bg-primary text-primary-foreground"
-              aria-label="Try reloading the chat"
-            >
-              Try Again
-            </button>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-3 py-1 text-xs rounded-md bg-secondary text-secondary-foreground"
-              aria-label="Reload the page"
-            >
-              Refresh Page
-            </button>
+      {/* Unified Error Message - using our new component */}
+      <AnimatePresence>
+        {hasError && (
+          <div className="absolute bottom-24 left-0 right-0 flex justify-center px-4">
+            <ErrorMessage
+              type={errorType}
+              message={errorMessage || undefined}
+              onRetry={errorType !== 'authentication' ? reload : undefined}
+              onLogin={errorType === 'authentication' ? handleAuthentication : undefined}
+              className="max-w-2xl"
+            />
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
       
       {/* Input Area */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background to-transparent pt-10 pb-4 px-4">

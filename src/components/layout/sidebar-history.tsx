@@ -48,6 +48,8 @@ import {
 import type { Chat } from '@/lib/db/schema';
 import { fetcher } from '@/lib/utils';
 import { useChatVisibility } from '@/hooks/use-chat-visibility';
+import { isAuthenticationError, handleAPIError } from '@/src/utils/auth-checks';
+import { ErrorMessage } from '@/src/components/ui/error-message';
 
 type GroupedChats = {
   today: Chat[];
@@ -176,15 +178,10 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
       // Clear any existing error toasts before showing a new one
       toast.dismiss('sidebar-history-error');
       
-      // Check specifically for authentication errors
-      const isAuthError = 
-        (err instanceof Error && err.message.toLowerCase().includes('authentication')) ||
-        (typeof err === 'string' && err.toLowerCase().includes('authentication')) ||
-        (err && (err as any).status === 401);
-      
-      if (isAuthError) {
-        // For auth errors, we'll use the global error overlay instead of a toast
-        dispatchErrorEvent('authentication-required');
+      // Use centralized auth check
+      if (isAuthenticationError(err)) {
+        // For auth errors, use our centralized error handler
+        handleAPIError(err, 'Chat history authorization');
       } else {
         // Only show toast for non-auth errors
         toast.error('Failed to load chat history. Please try refreshing the page.', {
@@ -198,66 +195,11 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     revalidateOnReconnect: true,
     dedupingInterval: 10000,
     shouldRetryOnError: true,
-    errorRetryCount: 3, 
-    errorRetryInterval: 3000,
-    onLoadingSlow: () => {
-      console.log('Chat history loading is taking longer than expected');
-    },
+    errorRetryCount: 3,
   });
 
-  // Helper function to dispatch error events with proper type
-  const dispatchErrorEvent = useCallback((errorType: 'loading-error' | 'authentication-required') => {
-    if (typeof window === 'undefined') return;
-    
-    const errorEvent = new CustomEvent('historyLoadError', { 
-      detail: { 
-        type: errorType,
-        message: error instanceof Error ? error.message : 'Failed to load chat history',
-        timestamp: new Date().toISOString()
-      } 
-    });
-    document.dispatchEvent(errorEvent);
-  }, [error]);
-
-  // Add a manual retry function with debounce
-  const retryLoadHistory = useCallback(() => {
-    console.log('Manually retrying history load');
-    toast.loading('Retrying to load chat history...', { id: 'retry-history' });
-    
-    // Add a small delay before retry to ensure the UI has time to update
-    setTimeout(() => {
-      mutate()
-        .then(() => {
-          toast.dismiss('retry-history');
-          toast.success('Chat history refreshed');
-        })
-        .catch(err => {
-          toast.dismiss('retry-history');
-          console.error('Manual retry failed:', err);
-          
-          // Check if this is an auth error
-          const isAuthError = 
-            (err instanceof Error && err.message.toLowerCase().includes('authentication')) ||
-            (typeof err === 'string' && err.toLowerCase().includes('authentication')) ||
-            (err && (err as any).status === 401);
-          
-          if (isAuthError) {
-            // For auth errors, use the global error overlay
-            dispatchErrorEvent('authentication-required');
-          } else {
-            toast.error('Retry failed. Please try again later.');
-          }
-        });
-    }, 300);
-  }, [mutate, dispatchErrorEvent]);
-
-  // Check for errors and show retry button if needed
-  const hasError = error !== undefined;
-  const isAuthError = 
-    hasError && 
-    ((error instanceof Error && error.message.toLowerCase().includes('authentication')) ||
-    (typeof error === 'string' && error.toLowerCase().includes('authentication')) ||
-    (error && (error as any).status === 401));
+  // Use our centralized auth check function
+  const isAuthError = error && isAuthenticationError(error);
 
   useEffect(() => {
     if (user) {
@@ -268,14 +210,9 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
       mutate().catch(error => {
         console.error('Error in initial history load:', error);
         
-        // Check if this is an auth error on initial load
-        const isAuthErr = 
-          (error instanceof Error && error.message.toLowerCase().includes('authentication')) ||
-          (typeof error === 'string' && error.toLowerCase().includes('authentication')) ||
-          (error && (error as any).status === 401);
-        
-        if (isAuthErr) {
-          dispatchErrorEvent('authentication-required');
+        // Use centralized auth check
+        if (isAuthenticationError(error)) {
+          handleAPIError(error, 'Chat history initial load');
         }
       });
     }
@@ -285,7 +222,23 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
       toast.dismiss('sidebar-history-error');
       toast.dismiss('retry-history');
     };
-  }, [pathname, mutate, user, dispatchErrorEvent]);
+  }, [pathname, mutate, user]);
+
+  const retryLoadHistory = useCallback(() => {
+    toast.loading('Retrying...', { id: 'retry-history', duration: 3000 });
+    mutate().catch(error => {
+      console.error('Error retrying history load:', error);
+      // Handle errors in the retry operation
+      if (isAuthenticationError(error)) {
+        handleAPIError(error, 'History retry');
+      } else {
+        toast.error('Still unable to load chat history. Please try again later.', {
+          id: 'sidebar-history-error',
+          duration: 5000,
+        });
+      }
+    });
+  }, [mutate]);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -331,31 +284,14 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     // Only show the error UI for non-auth errors
     // Auth errors will be handled by the global overlay
     if (!isAuthError) {
-      // Dispatch custom event for global error handling for non-auth errors
-      dispatchErrorEvent('loading-error');
-      
       return (
-        <div className="error-loading-history p-4">
-          <div className="py-4 text-center">
-            <div className="text-destructive mb-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-              </svg>
-              <p>Error loading chat history</p>
-            </div>
-            <p className="text-sm text-muted-foreground mb-3">
-              We couldn't load your chat history. Please try again.
-            </p>
-            <button 
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 transition-colors"
-              onClick={retryLoadHistory}
-              aria-label="Retry loading chat history"
-            >
-              Try again
-            </button>
-          </div>
+        <div className="error-container p-4">
+          <ErrorMessage 
+            type="general"
+            message="We couldn't load your chat history. Please try again."
+            onRetry={retryLoadHistory}
+            className="w-full"
+          />
         </div>
       );
     } else {

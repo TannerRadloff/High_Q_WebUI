@@ -9,6 +9,7 @@ import { motion } from 'framer-motion'
 import { useAuth } from '@/components/auth/auth-provider'
 import { createClient } from '@/lib/supabase/client'
 import { LockIcon } from '@/src/components/common/icons'
+import { ErrorMessage } from '@/src/components/ui/error-message'
 
 import { Button } from '@/src/components/ui/button'
 import { Input } from '@/src/components/ui/input' 
@@ -117,7 +118,7 @@ export function LoginForm() {
     }
   }
 
-  // Don't render the form if there are environment or database errors
+  // If there are API key or DB configuration errors, show special message
   if (apiKeyError || dbError) {
     return (
       <motion.div 
@@ -130,31 +131,23 @@ export function LoginForm() {
         <div className="flex flex-col text-center">
           <h2 className="text-2xl font-bold tracking-tight text-red-400">Configuration Error</h2>
           
-          {apiKeyError && (
-            <motion.div 
-              className="mt-4 p-4 bg-red-900/20 border border-red-800 rounded-md"
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-            >
-              <p className="text-sm text-red-400">
-                {apiKeyError}
-              </p>
-            </motion.div>
-          )}
-          
-          {dbError && (
-            <motion.div 
-              className="mt-4 p-4 bg-red-900/20 border border-red-800 rounded-md"
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <p className="text-sm text-red-400">
-                {dbError}
-              </p>
-            </motion.div>
-          )}
+          <div className="mt-4">
+            {apiKeyError && (
+              <ErrorMessage
+                type="server"
+                message={apiKeyError}
+                className="mb-3"
+              />
+            )}
+            
+            {dbError && (
+              <ErrorMessage
+                type="server"
+                message={dbError}
+                className="mb-3"
+              />
+            )}
+          </div>
           
           <p className="mt-4 text-sm text-zinc-400">
             Please check your environment configuration before continuing.
