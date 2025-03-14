@@ -60,12 +60,18 @@ export const login = async (
       return { status: 'failed' };
     }
 
+    // Make sure cookies are properly set
+    if (data.session) {
+      // Log successful authentication
+      console.log('User authenticated successfully, session created');
+    }
+
     return { status: 'success' };
   } catch (error) {
     if (error instanceof z.ZodError) {
       return { status: 'invalid_data' };
     }
-
+    console.error('Login error:', error);
     return { status: 'failed' };
   }
 };
@@ -105,6 +111,9 @@ export const register = async (
     const { error } = await supabase.auth.signUp({
       email: validatedData.email,
       password: validatedData.password,
+      options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`,
+      }
     });
 
     if (error) {
@@ -117,7 +126,7 @@ export const register = async (
     if (error instanceof z.ZodError) {
       return { status: 'invalid_data' };
     }
-
+    console.error('Registration error:', error);
     return { status: 'failed' };
   }
 };

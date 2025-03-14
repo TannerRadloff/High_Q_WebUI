@@ -35,6 +35,11 @@ export const createClient = () => {
           console.error('Error checking session:', error)
         } else {
           console.log('Session available on client creation:', !!data.session)
+          if (data.session && data.session.expires_at) {
+            // Print debug information about the session
+            console.log('Session expires at:', new Date(data.session.expires_at * 1000).toISOString())
+            console.log('Current time:', new Date().toISOString())
+          }
         }
       }).catch(err => {
         console.error('Unexpected error checking session:', err)

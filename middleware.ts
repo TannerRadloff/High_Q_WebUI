@@ -39,8 +39,8 @@ export function middleware(request: NextRequest) {
     // Development logging
     logRequest(pathname, request.method)
 
-    // Check for authentication cookies - both access token and refresh token
-    const hasAuthCookies = checkAuthCookies(request)
+    // Check for all possible Supabase cookie names
+    const hasAuthCookies = checkSupabaseAuthCookies(request)
     
     // Path classification
     const pathInfo = classifyPath(pathname)
@@ -80,23 +80,45 @@ export function middleware(request: NextRequest) {
 }
 
 /**
- * Check if the request has valid authentication cookies
+ * Check if the request has valid Supabase authentication cookies
+ * 
+ * More comprehensive check for all possible Supabase cookie naming patterns
  */
-function checkAuthCookies(request: NextRequest): boolean {
-  // Check for both access token and refresh token
-  const accessToken = request.cookies.get('sb-access-token')
-  const refreshToken = request.cookies.get('sb-refresh-token')
+function checkSupabaseAuthCookies(request: NextRequest): boolean {
+  // All possible Supabase cookie variations
+  const cookieNames = [
+    // Standard Supabase cookie names
+    'sb-access-token',
+    'sb-refresh-token',
+    // Alternative cookie formats
+    'sb-auth-token',
+    'supabase-auth-token',
+    // Legacy formats
+    'sb:token',
+    // JWT cookie
+    'sb-id-token'
+  ]
   
-  // Also check for supabase alternative cookie names
-  const supabaseAuth = request.cookies.get('sb-auth-token')
+  // Check for any auth cookie that might exist
+  const foundCookies = cookieNames.filter(name => request.cookies.has(name))
   
-  const hasAuthCookies = !!accessToken || !!refreshToken || !!supabaseAuth
+  // Also check for project-specific cookies (sb-*-auth-token)
+  // Iterate through cookies manually to find project-specific tokens
+  const projectCookies: string[] = []
+  request.cookies.forEach((value, name) => {
+    if (name.startsWith('sb-') && name.includes('-auth-token')) {
+      projectCookies.push(name)
+    }
+  })
+  
+  const hasAuthCookies = foundCookies.length > 0 || projectCookies.length > 0
+  
+  // Combine all found cookies for logging
+  const allFoundCookies = [...foundCookies, ...projectCookies]
   
   if (DEV_MODE) {
-    console.log('[Middleware] Auth check:', {
-      hasAccessToken: !!accessToken,
-      hasRefreshToken: !!refreshToken,
-      hasSupabaseAuth: !!supabaseAuth,
+    console.log('[Middleware] Auth cookies check:', {
+      foundCookies: allFoundCookies,
       hasAuthCookies
     })
   }
