@@ -1,9 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { LoginForm } from '@/components/auth/login-form'
 import { useAuth } from '@/components/auth/auth-provider'
+import { Loader2 } from 'lucide-react'
+import { motion } from 'framer-motion'
+import Link from 'next/link'
 
 interface EnvCheckResult {
   isValid: boolean;
@@ -15,110 +18,144 @@ interface EnvCheckResult {
 }
 
 export default function LoginPage() {
-  const { user, isLoading } = useAuth()
+  const { user, isLoading: isAuthLoading } = useAuth()
   const router = useRouter()
   const [envError, setEnvError] = useState<string | null>(null)
   const [dbError, setDbError] = useState<string | null>(null)
   const [isCheckingEnv, setIsCheckingEnv] = useState(true)
+  const [isRedirecting, setIsRedirecting] = useState(false)
 
-  useEffect(() => {
-    // Check for environment configuration issues through API
-    setIsCheckingEnv(true);
-    fetch('/api/check-env')
-      .then(response => response.json())
-      .then((data: EnvCheckResult) => {
-        if (!data.isValid) {
-          const errorMessage = `The application is misconfigured. Missing required environment variables. Please check the server logs for more details.`;
-          console.error('[LoginPage] Environment configuration error:', errorMessage);
-          setEnvError(errorMessage);
-        }
-        
-        // Check database connection status
-        if (data.database && !data.database.isConnected) {
-          const dbErrorMsg = `Database connection error: ${data.database.error || 'Unknown error'}. Please check your database configuration.`;
-          console.error('[LoginPage] Database connection error:', dbErrorMsg);
-          setDbError(dbErrorMsg);
-        }
-      })
-      .catch(error => {
-        console.error('[LoginPage] Error checking environment configuration:', error);
-        setEnvError('Failed to check environment configuration. Please try again later.');
-      })
-      .finally(() => {
-        setIsCheckingEnv(false);
-      });
-
-    if (!isLoading) {
-      console.log('[LoginPage] Auth state loaded:', { hasUser: !!user })
+  // Environment check function
+  const checkEnvironment = useCallback(async () => {
+    try {
+      setIsCheckingEnv(true)
+      const response = await fetch('/api/check-env')
+      const data: EnvCheckResult = await response.json()
       
-      if (user) {
-        console.log('[LoginPage] User is authenticated, redirecting to home')
-        // Safe redirect - only redirect if we're actually on the login page
-        // This prevents redirect loops
-        if (window.location.pathname.includes('/login')) {
-          // Use router.push instead of window.location for a smoother experience
-          router.push('/')
-        } else {
-          console.log('[LoginPage] Already at home, not redirecting')
-        }
+      if (!data.isValid) {
+        setEnvError(`The application is misconfigured. Missing required environment variables. Please check the server logs for more details.`)
       }
+      
+      if (data.database && !data.database.isConnected) {
+        setDbError(`Database connection error: ${data.database.error || 'Unknown error'}. Please check your database configuration.`)
+      }
+    } catch (error) {
+      console.error('[LoginPage] Error checking environment:', error)
+      setEnvError('Failed to check environment configuration. Please try again later.')
+    } finally {
+      setIsCheckingEnv(false)
     }
-  }, [user, isLoading, router])
+  }, [])
 
-  // Show loading state while checking auth or environment
-  if (isLoading || isCheckingEnv) {
-    console.log('[LoginPage] Loading auth state or checking environment...')
-    return (
-      <div className="flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">Loading...</p>
-        </div>
-      </div>
-    )
-  }
+  // Handle authentication and redirection
+  useEffect(() => {
+    checkEnvironment()
 
-  // Show environment error if there is one
-  if (envError || dbError) {
-    return (
-      <div className="w-full mx-auto max-w-md space-y-6 rounded-xl bg-gradient-to-b from-zinc-50/70 to-white/90 p-8 shadow-2xl shadow-red-500/10 dark:from-zinc-900/70 dark:to-zinc-800/90 dark:shadow-zinc-900/30 backdrop-blur-sm border border-zinc-200/80 dark:border-zinc-800/80">
-        <div className="flex flex-col text-center">
-          <h2 className="text-2xl font-bold tracking-tight text-red-600 dark:text-red-400">Configuration Error</h2>
-          
-          {envError && (
-            <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-              <p className="text-sm text-red-600 dark:text-red-400">
-                {envError}
-              </p>
-            </div>
-          )}
-          
-          {dbError && (
-            <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-              <p className="text-sm text-red-600 dark:text-red-400">
-                {dbError}
-              </p>
-            </div>
-          )}
-          
-          <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
-            Please check your environment configuration before continuing.
+    if (!isAuthLoading && user) {
+      setIsRedirecting(true)
+      // Add a small delay for a smoother transition
+      const redirectTimeout = setTimeout(() => {
+        // Only redirect if we're actually on the login page
+        if (window.location.pathname.includes('/login')) {
+          router.push('/')
+        }
+      }, 300)
+
+      return () => clearTimeout(redirectTimeout)
+    }
+  }, [user, isAuthLoading, router, checkEnvironment])
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center py-12 sm:px-6 lg:px-8 bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-black">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md mb-8">
+        <motion.div 
+          className="text-center"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <Link href="/" className="flex items-center justify-center">
+            <span className="text-5xl mb-2">✨</span>
+          </Link>
+          <h2 className="text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+            NextJS AI Chatbot
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+            Welcome back! Please sign in to your account
           </p>
-        </div>
+        </motion.div>
       </div>
-    )
-  }
 
-  // Only show login form if user is not authenticated
-  if (!user) {
-    console.log('[LoginPage] User not authenticated, showing login form')
-    return <LoginForm />
-  }
+      {/* Loading state */}
+      {(isAuthLoading || isCheckingEnv || isRedirecting) && (
+        <motion.div 
+          className="flex items-center justify-center min-h-[40vh]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto" />
+            <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+              {isRedirecting 
+                ? 'Redirecting to your dashboard...' 
+                : 'Preparing your login...'}
+            </p>
+          </div>
+        </motion.div>
+      )}
 
-  // If we're authenticated but not on the login page, render nothing
-  // This prevents unnecessary redirects
-  console.log('[LoginPage] User authenticated but not on login page')
-  return null
+      {/* Error state */}
+      {!isAuthLoading && !isCheckingEnv && !isRedirecting && (envError || dbError) && (
+        <motion.div 
+          className="w-full mx-auto max-w-md space-y-6 rounded-xl bg-gradient-to-b from-zinc-50/70 to-white/90 p-8 shadow-2xl shadow-red-500/10 dark:from-zinc-900/70 dark:to-zinc-800/90 dark:shadow-zinc-900/30 backdrop-blur-sm border border-zinc-200/80 dark:border-zinc-800/80"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 10 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="flex flex-col text-center">
+            <h2 className="text-2xl font-bold tracking-tight text-red-600 dark:text-red-400">Configuration Error</h2>
+            
+            {envError && (
+              <motion.div 
+                className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md"
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+              >
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {envError}
+                </p>
+              </motion.div>
+            )}
+            
+            {dbError && (
+              <motion.div 
+                className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md"
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <p className="text-sm text-red-600 dark:text-red-400">
+                  {dbError}
+                </p>
+              </motion.div>
+            )}
+            
+            <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+              Please check your environment configuration before continuing.
+            </p>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Login form for non-authenticated users */}
+      {!isAuthLoading && !isCheckingEnv && !isRedirecting && !envError && !dbError && !user && (
+        <LoginForm />
+      )}
+    </div>
+  )
 }
 
 
