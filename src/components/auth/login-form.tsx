@@ -10,6 +10,9 @@ import { useAuth } from '@/components/auth/auth-provider'
 import { createClient } from '@/lib/supabase/client'
 import { LockIcon } from '@/src/components/common/icons'
 import { ErrorMessage } from '@/src/components/ui/error-message'
+import { ErrorBoundary, FallbackProps } from 'react-error-boundary'
+import { SupabaseClient } from '@supabase/supabase-js'
+import { Database } from '@/types/supabase'
 
 import { Button } from '@/src/components/ui/button'
 import { Input } from '@/src/components/ui/input' 
@@ -26,7 +29,42 @@ interface EnvCheckResult {
   };
 }
 
+// Error fallback component for the login form
+function FormErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
+  return (
+    <div className="w-full max-w-md mx-auto p-6 bg-zinc-900/90 rounded-lg border border-red-500/30 shadow-xl">
+      <h2 className="text-xl text-red-400 font-semibold mb-4">Authentication Error</h2>
+      <p className="text-white/80 mb-4">
+        There was a problem with the authentication system. Please try again later.
+      </p>
+      <pre className="bg-black/50 p-3 rounded text-xs text-red-300 mb-4 overflow-auto max-h-[150px]">
+        {error.message}
+      </pre>
+      <button
+        onClick={resetErrorBoundary}
+        className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/80 transition-colors"
+      >
+        Try again
+      </button>
+    </div>
+  );
+}
+
 export function LoginForm() {
+  return (
+    <ErrorBoundary
+      FallbackComponent={FormErrorFallback}
+      onReset={() => {
+        // Reset the state when trying again
+        window.location.reload();
+      }}
+    >
+      <LoginFormContent />
+    </ErrorBoundary>
+  );
+}
+
+function LoginFormContent() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
@@ -34,8 +72,21 @@ export function LoginForm() {
   const [password, setPassword] = useState('')
   const [apiKeyError, setApiKeyError] = useState<string | null>(null)
   const [dbError, setDbError] = useState<string | null>(null)
+  const [clientError, setClientError] = useState<string | null>(null)
   const { signIn } = useAuth()
-  const supabase = createClient()
+  
+  // Create the Supabase client with error handling
+  const [supabase, setSupabase] = useState<SupabaseClient<Database> | null>(null)
+  
+  useEffect(() => {
+    try {
+      const client = createClient()
+      setSupabase(client)
+    } catch (error) {
+      console.error('Failed to initialize Supabase client:', error)
+      setClientError('Could not initialize authentication client. Please check your configuration.')
+    }
+  }, [])
 
   // Debug function to check environment variables - disabled to avoid redirect issues
   // useEffect(() => {
@@ -104,6 +155,11 @@ export function LoginForm() {
       return
     }
     
+    if (!supabase) {
+      showErrorNotification('Authentication system is not ready. Please reload the page.')
+      return
+    }
+    
     setIsLoading(true)
     
     try {
@@ -116,6 +172,11 @@ export function LoginForm() {
   }
 
   const handleGoogleSignIn = async () => {
+    if (!supabase) {
+      showErrorNotification('Authentication system is not ready. Please reload the page.')
+      return
+    }
+    
     setIsGoogleLoading(true)
     
     try {
@@ -144,7 +205,7 @@ export function LoginForm() {
   }
 
   // If there are API key or DB configuration errors, show special message
-  if (apiKeyError || dbError) {
+  if (apiKeyError || dbError || clientError) {
     return (
       <motion.div 
         className="w-full mx-auto max-w-md space-y-6 rounded-xl bg-gradient-to-b from-zinc-900/70 to-zinc-800/90 p-8 shadow-2xl shadow-zinc-900/30 backdrop-blur-sm border border-zinc-800/80"
@@ -169,6 +230,14 @@ export function LoginForm() {
               <ErrorMessage
                 type="server"
                 message={dbError}
+                className="mb-3"
+              />
+            )}
+            
+            {clientError && (
+              <ErrorMessage
+                type="server"
+                message={clientError}
                 className="mb-3"
               />
             )}

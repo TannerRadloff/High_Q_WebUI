@@ -6,6 +6,7 @@ import { LoginForm } from '@/src/components/auth/login-form'
 import { useAuth } from '@/components/auth/auth-provider'
 import { motion } from 'framer-motion'
 import { ErrorMessage } from '@/src/components/ui/error-message'
+import { ErrorBoundary, FallbackProps } from 'react-error-boundary'
 
 interface EnvCheckResult {
   isValid: boolean;
@@ -16,7 +17,42 @@ interface EnvCheckResult {
   };
 }
 
-export default function LoginPage() {
+// Error fallback component
+function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
+  return (
+    <div className="w-full max-w-md mx-auto p-6 bg-zinc-900/90 rounded-lg border border-red-500/30 shadow-xl">
+      <h2 className="text-xl text-red-400 font-semibold mb-4">Something went wrong</h2>
+      <p className="text-white/80 mb-4">
+        There was an error loading the login page. Please try again.
+      </p>
+      <pre className="bg-black/50 p-3 rounded text-xs text-red-300 mb-4 overflow-auto max-h-[150px]">
+        {error.message}
+      </pre>
+      <button
+        onClick={resetErrorBoundary}
+        className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/80 transition-colors"
+      >
+        Try again
+      </button>
+    </div>
+  );
+}
+
+export default function LoginPageWrapper() {
+  return (
+    <ErrorBoundary
+      FallbackComponent={ErrorFallback}
+      onReset={() => {
+        // Reset the state when trying again
+        window.location.reload();
+      }}
+    >
+      <LoginPage />
+    </ErrorBoundary>
+  );
+}
+
+function LoginPage() {
   const { user, isLoading: isAuthLoading } = useAuth()
   const router = useRouter()
   const [envError, setEnvError] = useState<string | null>(null)
@@ -43,22 +79,28 @@ export default function LoginPage() {
 
   // Handle authentication and redirection
   useEffect(() => {
-    // Try to check environment but don't block if it fails
-    checkEnvironment().catch(() => {
+    // Wrap in try/catch to prevent unhandled errors
+    try {
+      // Try to check environment but don't block if it fails
+      checkEnvironment().catch(() => {
+        setIsCheckingEnv(false)
+      })
+
+      if (!isAuthLoading && user) {
+        setIsRedirecting(true)
+        // Add a small delay for a smoother transition
+        const redirectTimeout = setTimeout(() => {
+          // Only redirect if we're actually on the login page
+          if (window.location.pathname.includes('/login')) {
+            router.push('/')
+          }
+        }, 300)
+
+        return () => clearTimeout(redirectTimeout)
+      }
+    } catch (error) {
+      console.error('[LoginPage] Unhandled error in effect:', error)
       setIsCheckingEnv(false)
-    })
-
-    if (!isAuthLoading && user) {
-      setIsRedirecting(true)
-      // Add a small delay for a smoother transition
-      const redirectTimeout = setTimeout(() => {
-        // Only redirect if we're actually on the login page
-        if (window.location.pathname.includes('/login')) {
-          router.push('/')
-        }
-      }, 300)
-
-      return () => clearTimeout(redirectTimeout)
     }
   }, [user, isAuthLoading, router, checkEnvironment])
 
