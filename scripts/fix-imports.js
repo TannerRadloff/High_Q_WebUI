@@ -118,7 +118,24 @@ import type { ArtifactKind } from '@/src/types/artifact';
 import type { ArtifactToolbarItem } from '@/src/components/features/create-artifact';
 import type { UseChatHelpers } from 'ai/react';
 
-// Rest of the file content...`
+type ToolProps = {
+  description: string;
+  icon: ReactNode;
+  selectedTool: string | null;
+  setSelectedTool: Dispatch<SetStateAction<string | null>>;
+  isToolbarVisible?: boolean;
+  setIsToolbarVisible?: Dispatch<SetStateAction<boolean>>;
+  isAnimating: boolean;
+  append: (
+    message: Message | CreateMessage,
+    chatRequestOptions?: ChatRequestOptions,
+  ) => Promise<string | null | undefined>;
+  onClick: ({
+    appendMessage,
+  }: {
+    appendMessage: UseChatHelpers['append'];
+  }) => void;
+}`
 };
 
 // Find all TypeScript and TSX files in the src directory
@@ -152,7 +169,16 @@ files.forEach(file => {
       // Only rewrite the imports section at the top of the file
       const importEndIndex = content.indexOf('type ToolProps');
       if (importEndIndex > 0) {
-        const newContent = fileRewrites[file] + content.substring(importEndIndex);
+        // Keep the original content after the ToolProps type declaration
+        const toolPropsType = content.substring(importEndIndex);
+        // Find where the ToolProps type ends
+        const toolPropsEndIndex = toolPropsType.indexOf('};') + 2;
+        // Get the rest of the file after the ToolProps type
+        const restOfFile = toolPropsType.substring(toolPropsEndIndex);
+        
+        // Combine the fixed import section with the rest of the file
+        const newContent = fileRewrites[file] + restOfFile;
+        
         if (safelyWriteFile(file, newContent)) {
           successCount++;
           console.log(`Fixed imports in ${file}`);
