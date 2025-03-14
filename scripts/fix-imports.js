@@ -5,6 +5,17 @@ const fs = require('fs');
 const path = require('path');
 const glob = require('glob');
 
+// Helper function to safely write to files
+function safelyWriteFile(filePath, content) {
+  try {
+    fs.writeFileSync(filePath, content, 'utf8');
+    return true;
+  } catch (error) {
+    console.warn(`Warning: Could not write to ${filePath}: ${error.message}`);
+    return false;
+  }
+}
+
 // Path mappings to fix
 const pathMappings = {
   // Fix relative imports in src/components/features
@@ -16,6 +27,7 @@ const pathMappings = {
   '@/components/ui/': '@/src/components/ui/',
   '@/components/features/': '@/src/components/features/',
   '@/components/common/': '@/src/components/common/',
+  '@/components/model-selector': '@/src/components/features/model-selector',
   
   // Fix specific component imports
   './visibility-selector': '@/src/components/features/visibility-selector',
@@ -43,45 +55,140 @@ const specialFixes = [
   }
 ];
 
-// Find all TypeScript and TSX files in the src directory
-const files = glob.sync('src/**/*.{ts,tsx}');
+// Create a map of files that need to be completely rewritten
+const fileRewrites = {
+  'src/components/layout/toolbar.tsx': `'use client';
 
-console.log(`Found ${files.length} files to process`);
+import type { ChatRequestOptions, CreateMessage, Message } from 'ai';
+import cx from 'classnames';
+import {
+  AnimatePresence,
+  motion,
+  useMotionValue,
+  useTransform,
+} from 'framer-motion';
+import {
+  type Dispatch,
+  memo,
+  type ReactNode,
+  type SetStateAction,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+import { useOnClickOutside } from 'usehooks-ts';
+import { nanoid } from 'nanoid';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/src/components/ui/tooltip';
+import { sanitizeUIMessages } from '@/utils/messages';
+
+import {
+  ArrowUpIcon,
+  StopIcon,
+  SummarizeIcon,
+} from '@/src/components/common/icons';
+import { artifactDefinitions } from '@/src/components/features/artifact';
+import type { ArtifactKind } from '@/src/types/artifact';
+import type { ArtifactToolbarItem } from '@/src/components/features/create-artifact';
+import type { UseChatHelpers } from 'ai/react';
+
+// Rest of the file content...`
+};
+
+// Find all TypeScript and TSX files in the src directory
+let files = [];
+try {
+  files = glob.sync('src/**/*.{ts,tsx}');
+  console.log(`Found ${files.length} files to process`);
+} catch (error) {
+  console.error(`Error finding files: ${error.message}`);
+  process.exit(1);
+}
 
 // Process each file
+let successCount = 0;
+let errorCount = 0;
+
 files.forEach(file => {
-  let content = fs.readFileSync(file, 'utf8');
-  let hasChanges = false;
-  
-  // Apply special fixes for specific files
-  const specialFix = specialFixes.find(fix => fix.file === file);
-  if (specialFix) {
-    specialFix.replacements.forEach(replacement => {
-      if (content.includes(replacement.from)) {
-        content = content.replace(replacement.from, replacement.to);
-        hasChanges = true;
+  try {
+    // Check if this file needs a complete rewrite
+    if (fileRewrites[file]) {
+      console.log(`Completely rewriting ${file}`);
+      let content;
+      try {
+        content = fs.readFileSync(file, 'utf8');
+      } catch (error) {
+        console.warn(`Warning: Could not read ${file}: ${error.message}`);
+        errorCount++;
+        return;
       }
-    });
-  }
-  
-  // Apply each path mapping
-  Object.entries(pathMappings).forEach(([from, to]) => {
-    // Look for import statements with the path to replace
-    const importRegex = new RegExp(`import\\s+(?:{[^}]*}|[^{};]*)\\s+from\\s+['"]${from}`, 'g');
+      
+      // Only rewrite the imports section at the top of the file
+      const importEndIndex = content.indexOf('type ToolProps');
+      if (importEndIndex > 0) {
+        const newContent = fileRewrites[file] + content.substring(importEndIndex);
+        if (safelyWriteFile(file, newContent)) {
+          successCount++;
+          console.log(`Fixed imports in ${file}`);
+        } else {
+          errorCount++;
+        }
+      }
+      return;
+    }
+
+    let content;
+    try {
+      content = fs.readFileSync(file, 'utf8');
+    } catch (error) {
+      console.warn(`Warning: Could not read ${file}: ${error.message}`);
+      errorCount++;
+      return;
+    }
     
-    if (importRegex.test(content)) {
-      hasChanges = true;
-      content = content.replace(importRegex, match => {
-        return match.replace(from, to);
+    let hasChanges = false;
+    
+    // Apply special fixes for specific files
+    const specialFix = specialFixes.find(fix => fix.file === file);
+    if (specialFix) {
+      specialFix.replacements.forEach(replacement => {
+        if (content.includes(replacement.from)) {
+          content = content.replace(replacement.from, replacement.to);
+          hasChanges = true;
+        }
       });
     }
-  });
-  
-  // Save the file if changes were made
-  if (hasChanges) {
-    fs.writeFileSync(file, content, 'utf8');
-    console.log(`Fixed imports in ${file}`);
+    
+    // Apply each path mapping
+    Object.entries(pathMappings).forEach(([from, to]) => {
+      // Look for import statements with the path to replace
+      const importRegex = new RegExp(`import\\s+(?:{[^}]*}|[^{};]*)\\s+from\\s+['"]${from}`, 'g');
+      
+      if (importRegex.test(content)) {
+        hasChanges = true;
+        content = content.replace(importRegex, match => {
+          return match.replace(from, to);
+        });
+      }
+    });
+    
+    // Save the file if changes were made
+    if (hasChanges) {
+      if (safelyWriteFile(file, content)) {
+        successCount++;
+        console.log(`Fixed imports in ${file}`);
+      } else {
+        errorCount++;
+      }
+    }
+  } catch (error) {
+    console.error(`Error processing ${file}: ${error.message}`);
+    errorCount++;
   }
 });
 
-console.log('Import path fixing completed!'); 
+console.log(`Import path fixing completed! Success: ${successCount}, Errors: ${errorCount}`); 

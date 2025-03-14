@@ -1,1 +1,1 @@
-export * from './artifact';
+export * from "./artifact";
