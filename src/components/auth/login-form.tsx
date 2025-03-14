@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { FcGoogle } from 'react-icons/fc'
 import { motion } from 'framer-motion'
-import { useAuth } from '@/src/components/auth/auth-provider'
+import { useAuth } from '@/components/auth/auth-provider'
 import { createClient } from '@/lib/supabase/client'
 import { LockIcon } from '@/src/components/common/icons'
 

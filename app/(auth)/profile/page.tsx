@@ -1,6 +1,6 @@
 'use client'
 
-import { useAuth } from '@/src/components/auth/auth-provider'
+import { useAuth } from '@/components/auth/auth-provider'
 import { LogoutButton } from '@/src/components/auth/logout-button'
 import { Button } from '@/src/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/src/components/ui/card'

@@ -1,7 +1,7 @@
-import { Artifact } from '@/components/create-artifact';
-import { DiffView } from '@/components/diffview';
-import { DocumentSkeleton } from '@/components/document-skeleton';
-import { Editor } from '@/components/text-editor';
+import { Artifact } from '@/src/components/features/create-artifact';
+import { DiffView } from '@/src/components/common/diffview';
+import { DocumentSkeleton } from '@/src/components/features/document-skeleton';
+import { Editor } from '@/src/components/common/text-editor';
 import {
   ClockRewind,
   CopyIcon,
@@ -9,8 +9,9 @@ import {
   PenIcon,
   RedoIcon,
   UndoIcon,
-} from '@/components/icons';
+} from '@/src/components/common/icons';
 import type { Suggestion } from '@/lib/db/schema';
+import type { UIArtifact } from '@/src/types/artifact';
 import { toast } from 'sonner';
 import { getSuggestions } from '../actions';
 
@@ -41,7 +42,7 @@ export const textArtifact = new Artifact<'text', TextArtifactMetadata>({
     }
 
     if (streamPart.type === 'text-delta') {
-      setArtifact((draftArtifact) => {
+      setArtifact((draftArtifact: any) => {
         return {
           ...draftArtifact,
           content: draftArtifact.content + (streamPart.content as string),

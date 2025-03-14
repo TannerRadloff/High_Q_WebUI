@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { LoginForm } from '@/src/components/auth/login-form'
-import { useAuth } from '@/src/components/auth/auth-provider'
+import { useAuth } from '@/components/auth/auth-provider'
 import { Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'

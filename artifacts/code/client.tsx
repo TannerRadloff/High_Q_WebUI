@@ -1,20 +1,23 @@
-import { Artifact } from '@/components/create-artifact';
-import { CodeEditor } from '@/components/code-editor';
+import { Artifact } from '@/src/components/features/create-artifact';
+import { CodeEditor } from '@/src/components/common/code-editor';
 import {
+  ClockRewind,
   CopyIcon,
   LogsIcon,
   MessageIcon,
+  PenIcon,
   PlayIcon,
   RedoIcon,
   UndoIcon,
-} from '@/components/icons';
+} from '@/src/components/common/icons';
 import { toast } from 'sonner';
 import { generateUUID } from '@/lib/utils';
+import type { UIArtifact } from '@/src/types/artifact';
 import {
   Console,
   type ConsoleOutput,
   type ConsoleOutputContent,
-} from '@/components/console';
+} from '@/src/components/common/console';
 
 const OUTPUT_HANDLERS = {
   matplotlib: `
@@ -77,7 +80,7 @@ export const codeArtifact = new Artifact<'code', Metadata>({
   },
   onStreamPart: ({ streamPart, setArtifact }) => {
     if (streamPart.type === 'code-delta') {
-      setArtifact((draftArtifact) => ({
+      setArtifact((draftArtifact: any) => ({
         ...draftArtifact,
         content: streamPart.content as string,
         isVisible:

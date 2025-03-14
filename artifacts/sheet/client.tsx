@@ -1,12 +1,13 @@
-import { Artifact } from '@/components/create-artifact';
+import { Artifact } from '@/src/components/features/create-artifact';
 import {
   CopyIcon,
   LineChartIcon,
   RedoIcon,
   SparklesIcon,
   UndoIcon,
-} from '@/components/icons';
-import { SpreadsheetEditor } from '@/components/sheet-editor';
+} from '@/src/components/common/icons';
+import { SpreadsheetEditor } from '@/src/components/common/sheet-editor';
+import type { UIArtifact } from '@/src/types/artifact';
 import { parse, unparse } from 'papaparse';
 import { toast } from 'sonner';
 
@@ -18,7 +19,7 @@ export const sheetArtifact = new Artifact<'sheet', Metadata>({
   initialize: async () => {},
   onStreamPart: ({ setArtifact, streamPart }) => {
     if (streamPart.type === 'sheet-delta') {
-      setArtifact((draftArtifact) => ({
+      setArtifact((draftArtifact: any) => ({
         ...draftArtifact,
         content: streamPart.content as string,
         isVisible: true,

@@ -1,6 +1,7 @@
-import { Artifact } from '@/components/create-artifact';
-import { CopyIcon, RedoIcon, UndoIcon } from '@/components/icons';
-import { ImageEditor } from '@/components/image-editor';
+import { Artifact } from '@/src/components/features/create-artifact';
+import { CopyIcon, RedoIcon, UndoIcon } from '@/src/components/common/icons';
+import { ImageEditor } from '@/src/components/common/image-editor';
+import type { UIArtifact } from '@/src/types/artifact';
 import { toast } from 'sonner';
 
 export const imageArtifact = new Artifact({
@@ -8,7 +9,7 @@ export const imageArtifact = new Artifact({
   description: 'Useful for image generation',
   onStreamPart: ({ streamPart, setArtifact }) => {
     if (streamPart.type === 'image-delta') {
-      setArtifact((draftArtifact) => ({
+      setArtifact((draftArtifact: any) => ({
         ...draftArtifact,
         content: streamPart.content as string,
         isVisible: true,
