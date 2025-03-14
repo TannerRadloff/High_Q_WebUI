@@ -12,6 +12,7 @@ import { Input } from '@/src/components/ui/input'
 import { Label } from '@/src/components/ui/label'
 import { Separator } from '@/src/components/ui/separator'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/src/components/ui/card'
+import { ErrorMessage } from '@/src/components/ui/error-message'
 
 export function RegisterForm() {
   const router = useRouter()
@@ -20,9 +21,11 @@ export function RegisterForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
   const supabase = createClient()
 
   const showErrorNotification = (message: string) => {
+    setFormError(message)
     toast.error(message, {
       id: 'register-error',
       duration: 5000,
@@ -31,6 +34,9 @@ export function RegisterForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Clear any previous errors
+    setFormError(null)
     
     if (!email || !password || !confirmPassword) {
       showErrorNotification('Please fill in all fields')
@@ -109,6 +115,13 @@ export function RegisterForm() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            {formError && (
+              <ErrorMessage
+                type="validation"
+                message={formError}
+                className="mb-2"
+              />
+            )}
             <div className="space-y-2">
               <form onSubmit={handleSubmit}>
                 <div className="grid gap-4">

@@ -3,29 +3,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { AgentType } from '../../agents/AgentFactory';
 import AgentStateService, { AgentRequest } from '../../services/agentStateService';
-import { Button } from '@/src/components/ui/button';
 import { BotIcon } from '@/components/icons';
-import { agentTypeConfig } from '@/src/config/agent-types';
-
-// Map the centralized config to include AgentType enum values needed by this component
-const agentConfigs = agentTypeConfig
-  .filter(agent => agent.id !== 'default') // Exclude the default agent
-  .map(agent => ({
-    ...agent, 
-    type: getAgentTypeFromId(agent.id)
-  }));
-
-// Helper function to map ID to AgentType
-function getAgentTypeFromId(id: string): AgentType {
-  switch (id) {
-    case 'delegation': return AgentType.DELEGATION;
-    case 'research': return AgentType.RESEARCH;
-    case 'report': return AgentType.REPORT;
-    case 'triage': return AgentType.TRIAGE;
-    case 'judge': return AgentType.JUDGE;
-    default: return AgentType.DELEGATION;
-  }
-}
+import { Button } from '@/src/components/ui/button';
+import { AgentSelector, agentTypeToId, idToAgentType } from '@/src/components/features/agent-selector';
 
 // Helper function to format timestamps
 const formatTimestamp = (timestamp: number): string => {
@@ -38,13 +18,21 @@ export default function AgentModeInterface() {
   const [userInput, setUserInput] = useState('');
   
   // State for agent operations
-  const [selectedAgent, setSelectedAgent] = useState<AgentType>(AgentType.DELEGATION);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('delegation');
   const [agentRequests, setAgentRequests] = useState<AgentRequest[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Get the AgentType enum value from the string ID
+  const selectedAgent = idToAgentType(selectedAgentId);
 
   // Refs
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Handle agent change from the selector
+  const handleAgentChange = (agentId: string) => {
+    setSelectedAgentId(agentId);
+  };
 
   // Auto-scroll chat to bottom when new messages appear
   useEffect(() => {
@@ -134,22 +122,13 @@ export default function AgentModeInterface() {
 
   return (
     <div className="flex flex-col h-full w-full bg-background">
-      {/* Agent selection bar */}
-      <div className="border-b p-2 flex items-center gap-2 overflow-x-auto">
-        {agentConfigs.map(agent => (
-          <Button
-            key={agent.id}
-            variant={selectedAgent === agent.type ? "default" : "outline"}
-            size="sm"
-            className={`flex items-center gap-2 whitespace-nowrap ${
-              selectedAgent === agent.type ? "bg-primary text-primary-foreground" : ""
-            }`}
-            onClick={() => setSelectedAgent(agent.type)}
-          >
-            <BotIcon size={16} />
-            <span>{agent.name}</span>
-          </Button>
-        ))}
+      {/* Agent selection bar - using our centralized component */}
+      <div className="border-b p-2">
+        <AgentSelector
+          selectedAgentId={selectedAgentId}
+          onAgentChange={handleAgentChange}
+          displayMode="buttons"
+        />
       </div>
       
       {/* Chat container */}
@@ -168,7 +147,7 @@ export default function AgentModeInterface() {
               Select an agent type above and start a conversation. The agent will process your request using the OpenAI Agents SDK.
             </p>
             <div className="text-sm text-muted-foreground">
-              Currently using: <span className="font-medium text-foreground">{agentConfigs.find(a => a.type === selectedAgent)?.name} Agent</span>
+              Currently using: <span className="font-medium text-foreground">{selectedAgent} Agent</span>
             </div>
           </div>
         )}
@@ -248,14 +227,8 @@ export default function AgentModeInterface() {
                 <div className="flex-1">
                   <div className="bg-card border rounded-lg p-3">
                     <div className="flex items-center gap-2">
-                      <div className="flex space-x-1">
-                        <div className="h-2 w-2 bg-primary/40 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></div>
-                        <div className="h-2 w-2 bg-primary/40 rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></div>
-                        <div className="h-2 w-2 bg-primary/40 rounded-full animate-pulse" style={{ animationDelay: '600ms' }}></div>
-                      </div>
-                      <span className="text-sm text-muted-foreground">
-                        {request.agentType} Agent is processing...
-                      </span>
+                      <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                      <span>Processing your request...</span>
                     </div>
                   </div>
                 </div>
@@ -272,7 +245,7 @@ export default function AgentModeInterface() {
             <textarea
               ref={textareaRef}
               className="w-full border rounded-md px-3 py-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary resize-none min-h-[40px]"
-              placeholder={`Ask the ${agentConfigs.find(a => a.type === selectedAgent)?.name} Agent...`}
+              placeholder={`Ask the ${selectedAgent} Agent...`}
               rows={1}
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}

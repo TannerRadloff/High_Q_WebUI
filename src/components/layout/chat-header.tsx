@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useWindowSize } from 'usehooks-ts';
 import { useCallback } from 'react';
 
-import { ModelSelector } from '@/src/components/features/model-selector';
+import { AIModelSelector } from '@/src/components/features/model-selector';
 import { SidebarToggle } from '@/src/components/layout/sidebar-toggle';
 import { Button } from '@/src/components/ui/button';
 import { PlusIcon, BotIcon } from '@/src/components/common/icons';
@@ -67,9 +67,10 @@ function ChatHeaderComponent({
           </div>
         )}
         
-        <ModelSelector
+        <AIModelSelector
           selectedModelId={selectedModelId}
           className="order-1 md:order-2"
+          mode="chat-model"
         />
         
         <VisibilitySelector

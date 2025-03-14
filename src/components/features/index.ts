@@ -10,7 +10,7 @@ export * from './message';
 export * from './messages';
 // Handle artifact exports individually to avoid ambiguity
 export { Artifact } from './artifact';
-export type { ArtifactKind, UIArtifact } from './artifact';
+// Note: ArtifactKind and UIArtifact are now defined in @/types/artifact
 export * from './visibility-selector';
 export * from './multimodal-input';
 export * from './message-actions';
@@ -26,6 +26,7 @@ export * from './artifact-actions';
 export * from './artifact-messages';
 export * from './artifact-close-button';
 export * from './model-selector';
+export * from './agent-selector';
 export * from './preview-attachment';
 export * from './data-stream-handler';
 export * from './overview';

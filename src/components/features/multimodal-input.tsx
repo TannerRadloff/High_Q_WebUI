@@ -21,6 +21,11 @@ import { toast } from 'sonner';
 import { useLocalStorage, useWindowSize } from 'usehooks-ts';
 import equal from 'fast-deep-equal';
 import { motion, AnimatePresence } from 'framer-motion';
+import { v4 as uuidv4 } from 'uuid';
+import { useAutoResizeTextarea } from '@/hooks/use-auto-resize-textarea';
+import { useDidUpdate } from '@/hooks/use-did-update';
+import { useAuth } from '@/components/auth/auth-provider';
+import { handleAPIError } from '@/src/utils/auth-checks';
 
 import { cn } from '@/utils/formatting';
 import { showUniqueErrorToast } from '@/lib/api-error-handler';
@@ -42,6 +47,7 @@ import {
 import { generateUUID } from '@/utils/auth';
 import { sanitizeUIMessages } from '@/utils/messages';
 import { agentTypeConfig } from '@/src/config/agent-types';
+import { AgentSelector } from '@/src/components/features/agent-selector';
 
 // Add an interface at the top of the file
 interface MessageWithDocument extends Message {
@@ -89,6 +95,7 @@ function PureMultimodalInput({
   const { width } = useWindowSize();
   const [isFocused, setIsFocused] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<string>('default');
+  const { user } = useAuth();
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -295,6 +302,13 @@ function PureMultimodalInput({
         return;
       }
       
+      // Check authentication status before submitting
+      if (!user) {
+        handleAPIError({ status: 401, message: 'Authentication required' }, 'MultimodalInput submission');
+        console.warn('[MultimodalInput] Prevented submission - authentication required');
+        return;
+      }
+      
       console.log(`[MultimodalInput] Submitting with agent: ${selectedAgent} | Input length: ${inputLength} | Attachments: ${attachments.length}`);
       
       try {
@@ -372,7 +386,7 @@ function PureMultimodalInput({
         showUniqueErrorToast(error);
       }
     },
-    [handleSubmit, attachments, setAttachments, uploadQueue, input, setLocalStorageInput, resetHeight, width, selectedAgent, isLoading]
+    [handleSubmit, attachments, setAttachments, uploadQueue, input, setLocalStorageInput, resetHeight, width, selectedAgent, isLoading, user]
   );
   
   // Function to handle agent submission
@@ -448,27 +462,12 @@ function PureMultimodalInput({
                 <div className="flex items-center gap-2">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Select
-                        value={selectedAgent}
-                        onValueChange={setSelectedAgent}
-                      >
-                        <SelectTrigger className="w-[180px]">
-                          <div className="flex items-center gap-2">
-                            <BotIcon size={16} />
-                            <SelectValue placeholder="Select Agent" />
-                          </div>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {agentTypeConfig.map(agent => (
-                            <SelectItem key={agent.id} value={agent.id}>
-                              <div className="flex flex-col">
-                                <span>{agent.name}</span>
-                                <span className="text-xs text-muted-foreground">{agent.description}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <AgentSelector
+                        selectedAgentId={selectedAgent}
+                        onAgentChange={setSelectedAgent}
+                        buttonSize="sm"
+                        disabled={isLoading}
+                      />
                     </TooltipTrigger>
                     <TooltipContent>
                       Select an AI agent type to process your request
