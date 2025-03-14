@@ -29,22 +29,27 @@ function getDbConnection() {
   if (dbInstance) return dbInstance;
   
   if (!process.env.POSTGRES_URL) {
+    console.error('Database connection error: POSTGRES_URL environment variable is not set.');
     throw new Error('POSTGRES_URL environment variable is not set.');
   }
   
   try {
-    // Configure postgres with connection options
+    console.log('Initializing database connection to Vercel Postgres...');
+    
+    // Configure postgres with connection options optimized for Vercel Postgres
     client = postgres(process.env.POSTGRES_URL, {
       max: 10, // Maximum number of connections
       idle_timeout: 20, // Idle connection timeout in seconds
       connect_timeout: 10, // Connection timeout in seconds
       max_lifetime: 60 * 30, // Connection max lifetime in seconds (30 minutes)
+      ssl: process.env.NODE_ENV === 'production', // Enable SSL in production
     });
     
     dbInstance = drizzle(client);
+    console.log('Database connection to Vercel Postgres initialized successfully');
     return dbInstance;
   } catch (error) {
-    console.error('Failed to initialize database connection:', error);
+    console.error('Failed to initialize database connection to Vercel Postgres:', error);
     throw error;
   }
 }
@@ -52,7 +57,18 @@ function getDbConnection() {
 // Helper to ensure we have a database connection
 function ensureDbConnection() {
   if (!dbInstance) {
-    getDbConnection();
+    console.log('Database connection not initialized, creating new connection');
+    try {
+      getDbConnection();
+      if (!dbInstance) {
+        console.error('Failed to initialize database connection');
+        throw new Error('Database connection could not be established');
+      }
+      console.log('Database connection successfully established');
+    } catch (error) {
+      console.error('Error establishing database connection:', error);
+      throw new Error('Failed to connect to database: ' + (error instanceof Error ? error.message : String(error)));
+    }
   }
   return dbInstance!;
 }
@@ -150,14 +166,18 @@ export async function deleteChatById({ id }: { id: string }) {
 
 export async function getChatsByUserId({ id }: { id: string }) {
   try {
+    console.log(`Database: Fetching chats for user ${id.substring(0, 5)}...`);
     const db = ensureDbConnection();
-    return await db
+    const chats = await db
       .select()
       .from(chat)
       .where(eq(chat.userId, id))
       .orderBy(desc(chat.createdAt));
+    
+    console.log(`Database: Successfully fetched ${chats.length} chats for user ${id.substring(0, 5)}...`);
+    return chats;
   } catch (error) {
-    console.error('Failed to get chats by user id from database:', error);
+    console.error(`Database: Failed to get chats for user ${id.substring(0, 5)}...`, error);
     throw error;
   }
 }

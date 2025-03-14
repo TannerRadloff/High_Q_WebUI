@@ -7,9 +7,20 @@ if (!apiKey) {
 }
 
 // Initialize the OpenAI client with proper validation
-export const openaiClient = apiKey 
-  ? new OpenAI({ apiKey })
-  : null; // Will be null if API key is missing
+let openaiClient: OpenAI | null = null;
+try {
+  if (apiKey) {
+    openaiClient = new OpenAI({ apiKey });
+    console.log('OpenAI client initialized successfully');
+  } else {
+    console.warn('OpenAI client not initialized due to missing API key');
+  }
+} catch (error) {
+  console.error('Failed to initialize OpenAI client:', error);
+}
+
+// Export the client
+export { openaiClient };
 
 export const DEFAULT_CHAT_MODEL: string = 'gpt-o3-mini';
 

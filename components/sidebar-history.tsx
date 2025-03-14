@@ -157,13 +157,30 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     data: history,
     isLoading,
     mutate,
+    error,
   } = useSWR<Array<Chat>>(user ? '/api/history' : null, fetcher, {
     fallbackData: [],
+    onError: (err) => {
+      console.error('Error fetching chat history:', err);
+      toast.error('Failed to load chat history. Please try refreshing the page.');
+    },
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+    dedupingInterval: 5000, // 5 seconds
+    shouldRetryOnError: true,
+    errorRetryCount: 3,
+    errorRetryInterval: 3000, // 3 seconds
   });
 
   useEffect(() => {
-    mutate();
-  }, [pathname, mutate]);
+    if (user) {
+      console.log('SidebarHistory: Fetching chat history for user', {
+        userId: user.id ? `${user.id.substring(0, 5)}...` : null,
+        email: user.email ? `${user.email.split('@')[0]}@...` : null,
+      });
+      mutate();
+    }
+  }, [pathname, mutate, user]);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -205,7 +222,28 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     );
   }
 
+  if (error) {
+    console.log('SidebarHistory: Error state', { errorMessage: error.message });
+    return (
+      <SidebarGroup>
+        <SidebarGroupContent>
+          <div className="px-2 text-red-500 w-full flex flex-col justify-center items-center text-sm gap-2 py-4">
+            <p>Error loading chat history</p>
+            <p className="text-xs text-red-400">{error.message || 'Unknown error'}</p>
+            <button 
+              onClick={() => mutate()} 
+              className="px-3 py-1 bg-red-100 dark:bg-red-900 rounded-md text-xs mt-2 hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    );
+  }
+
   if (isLoading) {
+    console.log('SidebarHistory: Loading state');
     return (
       <SidebarGroup>
         <div className="px-2 py-1 text-xs text-sidebar-foreground/50">
@@ -234,17 +272,26 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     );
   }
 
-  if (history?.length === 0) {
+  if (!history || history.length === 0) {
+    console.log('SidebarHistory: Empty state');
     return (
       <SidebarGroup>
         <SidebarGroupContent>
-          <div className="px-2 text-zinc-500 w-full flex flex-row justify-center items-center text-sm gap-2">
-            Your conversations will appear here once you start chatting!
+          <div className="px-2 text-zinc-500 w-full flex flex-col justify-center items-center text-sm gap-2 py-4">
+            <p>Your conversations will appear here once you start chatting!</p>
+            <Link 
+              href="/"
+              className="px-3 py-1 bg-primary/10 rounded-md text-xs mt-2 hover:bg-primary/20 transition-colors"
+            >
+              Start a new chat
+            </Link>
           </div>
         </SidebarGroupContent>
       </SidebarGroup>
     );
   }
+
+  console.log(`SidebarHistory: Rendering ${history.length} chats`);
 
   const groupChatsByDate = (chats: Chat[]): GroupedChats => {
     const now = new Date();
