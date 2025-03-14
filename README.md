@@ -24,6 +24,22 @@ This project has been updated to use OpenAI's new Responses API instead of the C
 - Built-in tools for web search, file search, and computer use
 - Clearer semantic events for better integration
 
+## Package Manager Update
+
+This project has been migrated from pnpm to npm. For more details about the migration, please refer to the [NPM Migration Guide](docs/NPM_MIGRATION.md).
+
+### Key Changes:
+
+1. Updated build and install commands in `vercel.json`
+2. Switched from `pnpm-lock.yaml` to `package-lock.json`
+3. Removed pnpm-specific configuration from `.npmrc`
+
+### Using the Project:
+
+- Install dependencies with: `npm install --legacy-peer-deps`
+- Run the development server with: `npm run dev`
+- Build the project with: `npm run build`
+
 ---
 
 A full-featured Next.js 14 and App Router-ready AI chatbot built with:

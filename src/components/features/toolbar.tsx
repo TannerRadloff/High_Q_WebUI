@@ -4,6 +4,13 @@ import { cn } from '@/lib/utils';
 interface ToolbarProps {
   children: ReactNode;
   className?: string;
+  isToolbarVisible?: boolean;
+  setIsToolbarVisible?: (visible: boolean) => void;
+  append?: any;
+  isLoading?: boolean;
+  stop?: () => void;
+  setMessages?: any;
+  artifactKind?: string;
 }
 
 function PureToolbar({ children, className }: ToolbarProps) {
@@ -19,4 +26,4 @@ function PureToolbar({ children, className }: ToolbarProps) {
   );
 }
 
-export const Toolbar = memo(PureToolbar); 
+export const Toolbar = memo(PureToolbar);

@@ -28,18 +28,8 @@ if (packagesToInstall.length === 0) {
   console.log(`📦 Installing ${packagesToInstall.length} TypeScript type packages...`);
   
   try {
-    // Check if using npm, yarn, or pnpm
-    const hasYarn = fs.existsSync(path.join(__dirname, '..', 'yarn.lock'));
-    const hasPnpm = fs.existsSync(path.join(__dirname, '..', 'pnpm-lock.yaml'));
-    
-    let installCommand;
-    if (hasPnpm) {
-      installCommand = `pnpm add -D ${packagesToInstall.join(' ')}`;
-    } else if (hasYarn) {
-      installCommand = `yarn add -D ${packagesToInstall.join(' ')}`;
-    } else {
-      installCommand = `npm install --save-dev ${packagesToInstall.join(' ')}`;
-    }
+    // Using npm for package installation
+    const installCommand = `npm install --save-dev ${packagesToInstall.join(' ')} --legacy-peer-deps`;
     
     console.log(`🔧 Running: ${installCommand}`);
     execSync(installCommand, { stdio: 'inherit', cwd: path.join(__dirname, '..') });
