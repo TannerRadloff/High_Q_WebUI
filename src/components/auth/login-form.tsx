@@ -21,7 +21,6 @@ import { Input } from '@/src/components/ui/input'
 import { Label } from '@/src/components/ui/label'
 import { Separator } from '@/src/components/ui/separator'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/src/components/ui/card'
-import { FormErrorFallback } from '@/src/components/errors/form-error-fallback'
 
 interface EnvCheckResult {
   isValid: boolean;
