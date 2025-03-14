@@ -218,10 +218,11 @@ function PureMultimodalInput({
       
       // If there is no input and no attachments, don't submit
       if (!input.trim() && attachments.length === 0) {
+        console.log('[MultimodalInput] Prevented submission with no input and no attachments');
         return;
       }
       
-      console.log(`[MultimodalInput] Submitting with agent: ${selectedAgent}`);
+      console.log(`[MultimodalInput] Submitting with agent: ${selectedAgent} | Input: ${input ? 'present' : 'empty'} | Attachments: ${attachments.length}`);
       
       // Create a new options object with agent type and attachments
       const options: ChatRequestOptions = {};
@@ -232,7 +233,10 @@ function PureMultimodalInput({
       }
       
       // Add agent type to data
-      options.data = { agentType: selectedAgent };
+      options.data = { 
+        agentType: selectedAgent,
+        input: input.trim() // Add input to data to ensure it's available for validation
+      };
       
       // Handle the submission
       handleSubmit(event, options);
@@ -268,11 +272,16 @@ function PureMultimodalInput({
         if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
           e.preventDefault();
           
-          const usedAttachments = [...attachments];
-          handleAgentSubmit();
-          setAttachments([]);
-          // Reset height only if no shift key
-          resetHeight();
+          // Only submit if there's either input or attachments
+          if (input.trim() || attachments.length > 0) {
+            const usedAttachments = [...attachments];
+            handleAgentSubmit();
+            setAttachments([]);
+            // Reset height only if no shift key
+            resetHeight();
+          } else {
+            console.log('[MultimodalInput] Prevented keyboard submission with no input and no attachments');
+          }
         }
       }}
     >
@@ -280,10 +289,16 @@ function PureMultimodalInput({
         className="flex flex-col gap-3"
         onSubmit={e => {
           e.preventDefault();
-          const usedAttachments = [...attachments];
-          handleAgentSubmit();
-          setAttachments([]);
-          resetHeight();
+          
+          // Only submit if there's either input or attachments
+          if (input.trim() || attachments.length > 0) {
+            const usedAttachments = [...attachments];
+            handleAgentSubmit();
+            setAttachments([]);
+            resetHeight();
+          } else {
+            console.log('[MultimodalInput] Prevented form submission with no input and no attachments');
+          }
         }}
       >
         {/* Agent selector */}

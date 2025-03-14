@@ -45,6 +45,14 @@ const logError = (error: any, context: string) => {
     console.error('2. Server timeout');
     console.error('3. Client navigation away from page');
   }
+  
+  // Handle specific API errors
+  if (error.message && error.message.includes('No user message found')) {
+    console.error('No user message found error. This could be due to:');
+    console.error('1. Submitting an empty form');
+    console.error('2. Message format issues');
+    console.error('3. API expecting user message but receiving none');
+  }
 };
 
 export function Chat({
@@ -369,6 +377,12 @@ export function Chat({
         options.data = { agentType: 'default' };
       } else if (!options.data.agentType) {
         options.data.agentType = 'default';
+      }
+      
+      // Don't submit if there's no input and no attachments
+      if (options.data && !options.data.input && (!options.experimental_attachments || options.experimental_attachments.length === 0)) {
+        console.log('[CHAT] Prevented submission with no input and no attachments');
+        return Promise.resolve();
       }
       
       return handleSubmit(event, options);

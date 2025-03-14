@@ -100,7 +100,14 @@ export async function POST(request: Request) {
     // If there's no user message but there are artifacts, this is an initial artifact-only state
     // We'll create a chat but won't require a user message yet
     if (!userMessage && !hasArtifacts) {
-      return NextResponse.json({ error: 'No user message found' }, { status: 400 });
+      // Only return an error if this isn't an empty initialization request
+      if (messages.length > 0) {
+        console.log(`[API] Error: No user message found in ${messages.length} messages`);
+        return NextResponse.json({ error: 'No user message found' }, { status: 400 });
+      }
+      
+      // For empty initialization requests, we'll just create or return the chat without an error
+      console.log(`[API] Chat initialization without messages for ID: ${id}`);
     }
 
     // Get or create the chat
