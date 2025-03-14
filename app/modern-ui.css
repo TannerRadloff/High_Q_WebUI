@@ -27,9 +27,63 @@
   opacity: 0;
 }
 
+/* Improved focus styles for accessibility */
+:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+}
+
+button:focus-visible, 
+a:focus-visible {
+  box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--primary));
+  outline: none;
+}
+
 /* Error recovery UI */
+#error-recovery-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background-color: hsla(var(--background) / 0.8);
+  backdrop-filter: blur(8px);
+  z-index: 50;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.3s ease;
+  opacity: 0;
+}
+
 #error-recovery-overlay.visible {
   display: flex;
+  animation: fadeIn 0.3s ease forwards;
+}
+
+#error-recovery-overlay .bg-card {
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+#retry-button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  background-size: 200% auto;
+  background-image: linear-gradient(to right, hsl(var(--primary)), hsl(var(--primary) / 0.8), hsl(var(--primary)));
+}
+
+#retry-button:hover {
+  background-position: right center;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 /* Enhanced Message UI */
@@ -70,40 +124,113 @@
   background-color: hsl(var(--background) / 0.95);
 }
 
+/* Improved skeleton loading animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.bg-sidebar-accent-foreground\/10 {
+  animation: shimmer 2s infinite linear;
+  background-image: linear-gradient(
+    90deg,
+    hsl(var(--sidebar-accent-foreground) / 0.05) 0%,
+    hsl(var(--sidebar-accent-foreground) / 0.1) 50%,
+    hsl(var(--sidebar-accent-foreground) / 0.05) 100%
+  );
+  background-size: 200% 100%;
+}
+
 /* Chat welcome message */
 .welcome-grid-item {
   transition: all 0.2s ease-in-out;
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.5rem;
-  padding: 0.75rem;
+  position: relative;
+  overflow: hidden;
 }
 
 .welcome-grid-item:hover {
-  background-color: hsl(var(--primary) / 0.05);
-  border-color: hsl(var(--primary) / 0.2);
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(to right, hsl(var(--primary) / 0.05), transparent);
+}
+
+.welcome-grid-item:active {
+  transform: translateY(0);
 }
 
 /* Enhanced input area */
 .enhanced-input {
+  position: relative;
+  z-index: 10;
   border: 1px solid hsl(var(--border));
-  background-color: hsl(var(--background) / 0.6);
-  backdrop-filter: blur(8px);
-  border-radius: 0.75rem;
+  background-color: hsl(var(--background));
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border-radius: 0.5rem;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
 }
 
 .enhanced-input:focus-within {
-  border-color: hsl(var(--primary) / 0.5);
-  box-shadow: 0 4px 12px -1px rgb(0 0 0 / 0.1), 0 0 0 2px hsl(var(--primary) / 0.1);
+  border-color: hsl(var(--primary));
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 0 0 2px hsl(var(--primary) / 0.1);
 }
 
-/* Ensure error message is visible */
+/* Smooth page transitions */
+.page-transition-enter {
+  opacity: 0;
+}
+
+.page-transition-enter-active {
+  opacity: 1;
+  transition: opacity 0.3s;
+}
+
+.page-transition-exit {
+  opacity: 1;
+}
+
+.page-transition-exit-active {
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+/* Error loading history styles */
 .error-loading-history {
-  display: block;
-  padding: 1rem;
-  text-align: center;
-  color: hsl(var(--destructive));
-  font-size: 0.875rem;
+  border-radius: 0.5rem;
+  background-color: hsl(var(--destructive) / 0.05);
+  border: 1px solid hsl(var(--destructive) / 0.2);
+  margin: 1rem;
+  transition: all 0.2s ease;
+}
+
+.error-loading-history button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.error-loading-history button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.error-loading-history button:active {
+  transform: translateY(0);
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  #error-recovery-overlay .bg-card {
+    max-width: 90%;
+    margin: 0 auto;
+  }
+  
+  .welcome-grid-item {
+    transition: background-color 0.2s ease;
+  }
+  
+  .welcome-grid-item:hover {
+    transform: none;
+    box-shadow: none;
+    background-color: hsl(var(--primary) / 0.05);
+  }
 } 

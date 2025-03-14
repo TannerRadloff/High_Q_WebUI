@@ -4,7 +4,7 @@ import { isToday, isYesterday, subMonths, subWeeks } from 'date-fns';
 import Link from 'next/link';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import type { User } from '@supabase/supabase-js';
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import useSWR from 'swr';
 
@@ -195,18 +195,25 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     },
   });
 
-  // Add a manual retry function
-  const retryLoadHistory = () => {
+  // Add a manual retry function with debounce
+  const retryLoadHistory = useCallback(() => {
     console.log('Manually retrying history load');
     toast.loading('Retrying to load chat history...', { id: 'retry-history' });
-    mutate().then(() => {
-      toast.dismiss('retry-history');
-      toast.success('Chat history refreshed');
-    }).catch(err => {
-      toast.dismiss('retry-history');
-      console.error('Manual retry failed:', err);
-    });
-  };
+    
+    // Add a small delay before retry to ensure the UI has time to update
+    setTimeout(() => {
+      mutate()
+        .then(() => {
+          toast.dismiss('retry-history');
+          toast.success('Chat history refreshed');
+        })
+        .catch(err => {
+          toast.dismiss('retry-history');
+          console.error('Manual retry failed:', err);
+          toast.error('Retry failed. Please try again later.');
+        });
+    }, 300);
+  }, [mutate]);
 
   // Check for errors and show retry button if needed
   const hasError = error !== undefined;
@@ -217,8 +224,16 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
         userId: user.id ? `${user.id.substring(0, 5)}...` : null,
         email: user.email ? `${user.email.split('@')[0]}@...` : null,
       });
-      mutate();
+      mutate().catch(error => {
+        console.error('Error in initial history load:', error);
+      });
     }
+    
+    // Clean up any toast messages when component unmounts
+    return () => {
+      toast.dismiss('sidebar-history-error');
+      toast.dismiss('retry-history');
+    };
   }, [pathname, mutate, user]);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -262,22 +277,40 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
   }
 
   if (error) {
-    console.log('SidebarHistory: Error state', { errorMessage: error.message });
+    // Dispatch custom event for global error handling
+    if (typeof window !== 'undefined') {
+      const errorEvent = new CustomEvent('historyLoadError', { 
+        detail: { 
+          message: error instanceof Error ? error.message : 'Failed to load chat history',
+          timestamp: new Date().toISOString()
+        } 
+      });
+      document.dispatchEvent(errorEvent);
+    }
+    
     return (
-      <SidebarGroup>
-        <SidebarGroupContent>
-          <div className="px-2 text-red-500 w-full flex flex-col justify-center items-center text-sm gap-2 py-4">
+      <div className="error-loading-history p-4">
+        <div className="py-4 text-center">
+          <div className="text-destructive mb-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
             <p>Error loading chat history</p>
-            <p className="text-xs text-red-400">{error.message || 'Unknown error'}</p>
-            <button 
-              onClick={retryLoadHistory} 
-              className="px-3 py-1 bg-red-100 dark:bg-red-900 rounded-md text-xs mt-2 hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
-            >
-              Try Again
-            </button>
           </div>
-        </SidebarGroupContent>
-      </SidebarGroup>
+          <p className="text-sm text-muted-foreground mb-3">
+            We couldn't load your chat history. Please try again.
+          </p>
+          <button 
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 transition-colors"
+            onClick={retryLoadHistory}
+            aria-label="Retry loading chat history"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
     );
   }
 

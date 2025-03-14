@@ -71,16 +71,29 @@ export function Chat({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   
+  // Optimize scroll behavior to bottom of messages
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior });
+    }
+  }, []);
+  
   // Handle network status and display
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      toast.success('Connection restored');
+      toast.success('Connection restored', { 
+        id: 'connection-status',
+        duration: 3000 
+      });
     };
     
     const handleOffline = () => {
       setIsOnline(false);
-      toast.error('Network connection lost');
+      toast.error('Network connection lost', { 
+        id: 'connection-status',
+        duration: Infinity
+      });
     };
     
     window.addEventListener('online', handleOnline);
@@ -92,6 +105,8 @@ export function Chat({
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      // Dismiss the toast when component unmounts
+      toast.dismiss('connection-status');
     };
   }, []);
 
@@ -113,9 +128,9 @@ export function Chat({
 
   // Scroll to bottom of messages when new ones arrive
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    // Use immediate scroll for initial messages
+    const behavior = isFirstLoad ? 'auto' : 'smooth';
+    scrollToBottom(behavior);
     
     // Show sparkle animation on first message from AI
     if (isFirstLoad && initialMessages.length > 0) {
@@ -127,7 +142,7 @@ export function Chat({
         setTimeout(() => setShowSparkles(false), 1500);
       }, 500);
     }
-  }, [initialMessages, isFirstLoad]);
+  }, [initialMessages, isFirstLoad, scrollToBottom]);
 
   // Handle new chat creation
   useEffect(() => {
@@ -262,32 +277,40 @@ export function Chat({
   };
 
   // Handle custom form submission with animation
-  const customHandleSubmit = (
-    event?: { preventDefault?: () => void } | undefined,
-    chatRequestOptions?: ChatRequestOptions
-  ) => {
-    if (event && event.preventDefault) {
-      event.preventDefault();
-    }
-    
-    // If user is offline, show a toast
-    if (!isOnline) {
-      toast.error('You are currently offline. Please reconnect to use the chat.');
-      return;
-    }
-    
-    // Add subtle animation when sending a message
-    if (chatContainerRef.current) {
-      chatContainerRef.current.classList.add('chat-sending-pulse');
-      setTimeout(() => {
-        if (chatContainerRef.current) {
-          chatContainerRef.current.classList.remove('chat-sending-pulse');
-        }
-      }, 300);
-    }
-    
-    handleSubmit(event, chatRequestOptions);
-  };
+  const customHandleSubmit = useCallback(
+    (
+      event?: { preventDefault?: () => void } | undefined,
+      chatRequestOptions?: ChatRequestOptions
+    ) => {
+      if (event && event.preventDefault) {
+        event.preventDefault();
+      }
+      
+      // If user is offline, show a toast
+      if (!isOnline) {
+        toast.error('You are currently offline. Please reconnect to use the chat.', {
+          id: 'offline-submit-error'
+        });
+        return;
+      }
+      
+      // Add subtle animation when sending a message
+      if (chatContainerRef.current) {
+        chatContainerRef.current.classList.add('chat-sending-pulse');
+        setTimeout(() => {
+          if (chatContainerRef.current) {
+            chatContainerRef.current.classList.remove('chat-sending-pulse');
+          }
+        }, 300);
+      }
+      
+      // Reset any previous errors
+      setHasError(false);
+      
+      handleSubmit(event, chatRequestOptions);
+    },
+    [handleSubmit, isOnline]
+  );
 
   return (
     <div 
@@ -307,6 +330,13 @@ export function Chat({
           </motion.div>
         )}
       </AnimatePresence>
+      
+      {/* Ensure animation container exists for client-side rendering */}
+      {typeof window !== 'undefined' && (
+        <div id="animation-container-placeholder" className="sr-only">
+          {/* This div ensures the animation containers exist in the DOM */}
+        </div>
+      )}
       
       {/* Sparkles Animation */}
       <AnimatePresence>
@@ -356,10 +386,11 @@ export function Chat({
         selectedModelId={selectedChatModel}
         selectedVisibilityType={selectedVisibilityType}
         isReadonly={isReadonly}
+        isLoading={isLoading}
       />
       
       {/* Main Chat Content */}
-      <div className="flex-1 overflow-y-auto pb-32 pt-4 px-4 relative">
+      <div className="flex-1 overflow-y-auto pb-32 pt-4 px-4 relative" aria-live="polite">
         {/* Show a welcome message if this is a new chat */}
         {showWelcome && (
           <motion.div
@@ -375,31 +406,45 @@ export function Chat({
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6 text-left">
               <button
-                className="p-3 rounded-md border border-border hover:bg-primary/5 transition-colors text-left"
+                className="p-3 rounded-md border border-border hover:bg-primary/5 transition-colors text-left welcome-grid-item"
                 onClick={() => setInput("What can you help me with?")}
+                aria-label="Ask: What can you help me with?"
               >
                 <span className="text-sm font-medium">What can you help me with?</span>
               </button>
               <button
-                className="p-3 rounded-md border border-border hover:bg-primary/5 transition-colors text-left"
+                className="p-3 rounded-md border border-border hover:bg-primary/5 transition-colors text-left welcome-grid-item"
                 onClick={() => setInput("Create a short story about a space explorer.")}
+                aria-label="Ask: Create a creative story"
               >
                 <span className="text-sm font-medium">Generate a creative story</span>
               </button>
               <button
-                className="p-3 rounded-md border border-border hover:bg-primary/5 transition-colors text-left"
+                className="p-3 rounded-md border border-border hover:bg-primary/5 transition-colors text-left welcome-grid-item"
                 onClick={() => setInput("Explain the concept of quantum computing in simple terms.")}
+                aria-label="Ask: Explain a complex topic"
               >
                 <span className="text-sm font-medium">Explain a complex topic</span>
               </button>
               <button
-                className="p-3 rounded-md border border-border hover:bg-primary/5 transition-colors text-left"
+                className="p-3 rounded-md border border-border hover:bg-primary/5 transition-colors text-left welcome-grid-item"
                 onClick={() => setInput("Help me debug this code snippet: function sum(a, b) { retur a + b; }")}
+                aria-label="Ask: Debug some code"
               >
                 <span className="text-sm font-medium">Debug some code</span>
               </button>
             </div>
           </motion.div>
+        )}
+        
+        {/* Loading indicator when no messages yet */}
+        {isLoading && messages.length === 0 && !showWelcome && (
+          <div className="flex justify-center items-center h-32">
+            <div className="animate-pulse flex flex-col items-center">
+              <div className="h-4 bg-primary/10 rounded w-24 mb-2.5"></div>
+              <div className="h-2 bg-primary/10 rounded w-32"></div>
+            </div>
+          </div>
         )}
       
         {/* Chat Messages */}
@@ -414,40 +459,54 @@ export function Chat({
           isArtifactVisible={isArtifactVisible}
         />
         
-        {/* Visible when artifacts are open */}
-        {isArtifactVisible && (
-          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 flex items-center justify-center overflow-auto">
-            <Artifact 
-              attachments={attachments}
-              /* Passing minimal required props to avoid TypeScript errors */
-            />
-          </div>
-        )}
-        
-        {/* Error Message */}
-        {hasError && (
-          <div className="p-4 mb-4 bg-destructive/10 border border-destructive rounded-lg max-w-2xl mx-auto">
-            <p className="text-sm text-destructive">An error occurred. Please try again or refresh the page.</p>
-            <div className="mt-2 flex gap-2">
-              <button
-                onClick={() => reload()}
-                className="px-3 py-1 text-xs rounded-md bg-primary text-primary-foreground"
-              >
-                Try Again
-              </button>
-              <button
-                onClick={() => window.location.reload()}
-                className="px-3 py-1 text-xs rounded-md bg-secondary text-secondary-foreground"
-              >
-                Refresh Page
-              </button>
-            </div>
-          </div>
-        )}
-        
         {/* Used to scroll to bottom of messages */}
         <div ref={messagesEndRef} />
       </div>
+      
+      {/* Visible when artifacts are open */}
+      {isArtifactVisible && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 flex items-center justify-center overflow-auto">
+          <Artifact 
+            chatId={chatId}
+            input={input}
+            setInput={setInput}
+            isLoading={isLoading}
+            stop={stop}
+            attachments={attachments}
+            setAttachments={setAttachments}
+            messages={messages}
+            setMessages={setMessages}
+            append={append}
+            handleSubmit={customHandleSubmit}
+            reload={reload}
+            votes={votes}
+            isReadonly={isReadonly}
+          />
+        </div>
+      )}
+        
+      {/* Error Message */}
+      {hasError && (
+        <div className="p-4 mb-4 bg-destructive/10 border border-destructive rounded-lg max-w-2xl mx-auto" role="alert">
+          <p className="text-sm text-destructive">An error occurred. Please try again or refresh the page.</p>
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={() => reload()}
+              className="px-3 py-1 text-xs rounded-md bg-primary text-primary-foreground"
+              aria-label="Try reloading the chat"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-3 py-1 text-xs rounded-md bg-secondary text-secondary-foreground"
+              aria-label="Reload the page"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Input Area */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background to-transparent pt-10 pb-4 px-4">
@@ -464,7 +523,7 @@ export function Chat({
             setMessages={setMessages}
             append={append}
             handleSubmit={customHandleSubmit}
-            className="relative z-10 border border-border bg-background shadow-lg rounded-lg"
+            className="enhanced-input"
           />
           
           {/* Model info at the bottom */}
