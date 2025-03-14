@@ -5,8 +5,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 import { Button } from '@/src/components/ui/button'
-import { useAuth } from '@/components/auth/auth-provider'
-import { LogoutButton } from '@/components/auth/logout-button'
+import { useAuth } from '@/src/components/auth/auth-provider'
+import { LogoutButton } from '@/src/components/auth/logout-button'
 import { UserAuthStatus } from '@/src/components/auth/user-auth-status'
 import { BotIcon, HomeIcon } from '@/src/components/common/icons'
 

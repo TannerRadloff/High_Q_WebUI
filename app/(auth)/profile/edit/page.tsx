@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { useAuth } from '@/components/auth/auth-provider'
+import { useAuth } from '@/src/components/auth/auth-provider'
 import { Button } from '@/src/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/src/components/ui/card'
 import { Input } from '@/src/components/ui/input'

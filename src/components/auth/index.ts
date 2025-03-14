@@ -7,4 +7,8 @@
 
 export * from './auth-form';
 export * from './sign-out-form';
-export * from './user-auth-status'; 
+export * from './user-auth-status';
+export * from './auth-provider';
+export * from './login-form';
+export * from './logout-button';
+export * from './register-form'; 
