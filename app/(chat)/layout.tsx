@@ -8,216 +8,107 @@ import Script from 'next/script';
 
 export const experimental_ppr = true;
 
-// Script to ensure animations are properly initialized
+// Optimized animation script with error handling
 const ANIMATION_INIT_SCRIPT = `\
 (function() {
-  // Set animation variables
-  document.documentElement.style.setProperty('--animation-play-state', 'running');
-  document.documentElement.style.setProperty('--animation-opacity', '1');
-  document.documentElement.style.setProperty('--nebula-opacity', '0.9');
-  document.documentElement.style.setProperty('--stars-opacity', '1');
-  document.documentElement.style.setProperty('--shooting-stars-display', 'block');
-  document.documentElement.style.setProperty('--body-before-opacity', '1');
-  document.documentElement.style.setProperty('--body-after-opacity', '1');
-  
-  // Function to generate random stars
-  function generateRandomStars() {
-    // Generate a unique seed for this session
-    const sessionSeed = Math.floor(Math.random() * 1000000);
+  try {
+    // Set animation variables with optimized defaults
+    document.documentElement.style.setProperty('--animation-play-state', 'running');
+    document.documentElement.style.setProperty('--animation-opacity', '1');
+    document.documentElement.style.setProperty('--nebula-opacity', '0.8');
+    document.documentElement.style.setProperty('--stars-opacity', '0.9');
+    document.documentElement.style.setProperty('--shooting-stars-display', 'block');
+    document.documentElement.style.setProperty('--body-before-opacity', '1');
+    document.documentElement.style.setProperty('--body-after-opacity', '1');
     
-    // Simple random function with seed
-    function seededRandom() {
-      const x = Math.sin(sessionSeed++) * 10000;
-      return x - Math.floor(x);
+    // Generate stars with reduced computational load
+    function generateRandomStars() {
+      const sessionSeed = Math.floor(Math.random() * 1000000);
+      
+      function seededRandom() {
+        const x = Math.sin(sessionSeed++) * 10000;
+        return x - Math.floor(x);
+      }
+      
+      const randomStars = document.createElement('div');
+      randomStars.className = 'random-stars';
+      
+      // Reduce total star count for better performance
+      const starTypeSettings = [
+        { count: 80, size: [0.5, 2.5], brightness: [0.4, 0.6], className: 'random-star' },
+        { count: 40, size: [0.5, 3], brightness: [0.5, 0.7], className: 'random-star' },
+        { count: 20, size: [1.5, 3], brightness: [0.7, 0.9], className: 'random-star bright', glow: true },
+        { count: 5, size: [2, 4], brightness: [0.9, 1], className: 'random-star extra-bright', extraGlow: true }
+      ];
+      
+      starTypeSettings.forEach(settings => {
+        for (let i = 0; i < settings.count; i++) {
+          const star = document.createElement('div');
+          star.className = settings.className;
+          
+          const top = seededRandom() * 100;
+          const left = seededRandom() * 100;
+          const size = settings.size[0] + seededRandom() * (settings.size[1] - settings.size[0]);
+          const brightness = settings.brightness[0] + seededRandom() * (settings.brightness[1] - settings.brightness[0]);
+          const delay = seededRandom() * 8;
+          const duration = 2 + seededRandom() * 2;
+          
+          star.style.top = \`\${top}%\`;
+          star.style.left = \`\${left}%\`;
+          star.style.width = \`\${size}px\`;
+          star.style.height = \`\${size}px\`;
+          star.style.opacity = brightness.toString();
+          star.style.setProperty('--original-opacity', brightness.toString());
+          star.style.animationDelay = \`\${delay}s\`;
+          star.style.animationDuration = \`\${duration}s\`;
+          
+          if (settings.glow) {
+            star.style.boxShadow = \`0 0 \${Math.floor(size * 2)}px \${Math.floor(size)}px rgba(255, 255, 255, 0.7)\`;
+          }
+          
+          if (settings.extraGlow) {
+            star.style.boxShadow = \`0 0 \${Math.floor(size * 3)}px \${Math.floor(size * 1.5)}px rgba(255, 255, 255, 0.8), 
+                                   0 0 \${Math.floor(size * 6)}px \${Math.floor(size * 3)}px rgba(255, 255, 255, 0.4)\`;
+          }
+          
+          randomStars.appendChild(star);
+        }
+      });
+      
+      return randomStars;
     }
     
-    // Create random star field
-    const randomStars = document.createElement('div');
-    randomStars.className = 'random-stars';
-    
-    // Generate stars in different regions with varying densities
-    
-    // Dense cluster region (120-180 stars) - increased from 80-120
-    const clusterStarCount = 120 + Math.floor(seededRandom() * 60);
-    const clusterCenterX = 20 + seededRandom() * 60; // 20-80% of screen width
-    const clusterCenterY = 20 + seededRandom() * 60; // 20-80% of screen height
-    
-    for (let i = 0; i < clusterStarCount; i++) {
-      const star = document.createElement('div');
-      star.className = 'random-star';
+    // Create the cosmic animation container
+    let cosmicContainer = document.querySelector('.cosmic-animation-container');
+    if (!cosmicContainer) {
+      cosmicContainer = document.createElement('div');
+      cosmicContainer.className = 'cosmic-animation-container';
       
-      // Position within cluster (Gaussian-like distribution)
-      const angle = seededRandom() * Math.PI * 2;
-      const distance = seededRandom() * seededRandom() * 30; // Concentrate toward center
-      const top = clusterCenterY + Math.sin(angle) * distance;
-      const left = clusterCenterX + Math.cos(angle) * distance;
+      let messagesBackground = document.querySelector('.messages-background');
+      if (!messagesBackground) {
+        messagesBackground = document.createElement('div');
+        messagesBackground.className = 'messages-background';
+        document.body.prepend(messagesBackground);
+      }
       
-      // Random size (0.5px - 3.5px) - increased max size
-      const size = 0.5 + seededRandom() * 3;
-      
-      // Random brightness
-      const brightness = 0.5 + seededRandom() * 0.5;
-      
-      // Random twinkle animation delay and duration
-      const delay = seededRandom() * 10;
-      // Shorter duration for more noticeable twinkling (1.5-3.5s)
-      const duration = 1.5 + seededRandom() * 2;
-      
-      // Apply styles
-      star.style.top = \`\${top}%\`;
-      star.style.left = \`\${left}%\`;
-      star.style.width = \`\${size}px\`;
-      star.style.height = \`\${size}px\`;
-      star.style.opacity = brightness.toString();
-      star.style.setProperty('--original-opacity', brightness.toString());
-      star.style.animationDelay = \`\${delay}s\`;
-      star.style.animationDuration = \`\${duration}s\`;
-      
-      randomStars.appendChild(star);
+      messagesBackground.appendChild(cosmicContainer);
+      cosmicContainer.appendChild(generateRandomStars());
     }
     
-    // Scattered stars throughout (100-150 stars) - increased from 70-100
-    const scatteredStarCount = 100 + Math.floor(seededRandom() * 50);
-    
-    for (let i = 0; i < scatteredStarCount; i++) {
-      const star = document.createElement('div');
-      star.className = 'random-star';
-      
-      // Random position across entire screen
-      const top = seededRandom() * 100;
-      const left = seededRandom() * 100;
-      
-      // Random size (0.5px - 2.5px) - increased max size
-      const size = 0.5 + seededRandom() * 2;
-      
-      // Random brightness
-      const brightness = 0.4 + seededRandom() * 0.6;
-      
-      // Random twinkle animation delay and duration
-      const delay = seededRandom() * 10;
-      // Shorter duration for more noticeable twinkling (1.5-3.5s)
-      const duration = 1.5 + seededRandom() * 2;
-      
-      // Apply styles
-      star.style.top = \`\${top}%\`;
-      star.style.left = \`\${left}%\`;
-      star.style.width = \`\${size}px\`;
-      star.style.height = \`\${size}px\`;
-      star.style.opacity = brightness.toString();
-      star.style.setProperty('--original-opacity', brightness.toString());
-      star.style.animationDelay = \`\${delay}s\`;
-      star.style.animationDuration = \`\${duration}s\`;
-      
-      randomStars.appendChild(star);
-    }
-    
-    // Bright highlight stars (25-40 stars) - increased from 15-25
-    const brightStarCount = 25 + Math.floor(seededRandom() * 15);
-    
-    for (let i = 0; i < brightStarCount; i++) {
-      const star = document.createElement('div');
-      star.className = 'random-star bright';
-      
-      // Random position across entire screen
-      const top = seededRandom() * 100;
-      const left = seededRandom() * 100;
-      
-      // Larger size (2px - 5px) - increased max size
-      const size = 2 + seededRandom() * 3;
-      
-      // High brightness
-      const brightness = 0.8 + seededRandom() * 0.2;
-      
-      // Random twinkle animation delay and duration
-      const delay = seededRandom() * 10;
-      // Shorter duration for more noticeable twinkling (2-4s)
-      const duration = 2 + seededRandom() * 2;
-      
-      // Apply styles
-      star.style.top = \`\${top}%\`;
-      star.style.left = \`\${left}%\`;
-      star.style.width = \`\${size}px\`;
-      star.style.height = \`\${size}px\`;
-      star.style.opacity = brightness.toString();
-      star.style.setProperty('--original-opacity', brightness.toString());
-      star.style.animationDelay = \`\${delay}s\`;
-      star.style.animationDuration = \`\${duration}s\`;
-      star.style.boxShadow = \`0 0 \${Math.floor(size * 3)}px \${Math.floor(size * 1.5)}px rgba(255, 255, 255, 0.8)\`;
-      
-      randomStars.appendChild(star);
-    }
-    
-    // Add extra-bright stars (5-10 stars) - new category
-    const extraBrightStarCount = 5 + Math.floor(seededRandom() * 5);
-    
-    for (let i = 0; i < extraBrightStarCount; i++) {
-      const star = document.createElement('div');
-      star.className = 'random-star extra-bright';
-      
-      // Random position across entire screen
-      const top = seededRandom() * 100;
-      const left = seededRandom() * 100;
-      
-      // Larger size (3px - 6px)
-      const size = 3 + seededRandom() * 3;
-      
-      // Maximum brightness
-      const brightness = 0.9 + seededRandom() * 0.1;
-      
-      // Random twinkle animation delay and duration
-      const delay = seededRandom() * 10;
-      // Shorter duration for more noticeable twinkling (1.5-3s)
-      const duration = 1.5 + seededRandom() * 1.5;
-      
-      // Apply styles
-      star.style.top = \`\${top}%\`;
-      star.style.left = \`\${left}%\`;
-      star.style.width = \`\${size}px\`;
-      star.style.height = \`\${size}px\`;
-      star.style.opacity = brightness.toString();
-      star.style.setProperty('--original-opacity', brightness.toString());
-      star.style.animationDelay = \`\${delay}s\`;
-      star.style.animationDuration = \`\${duration}s\`;
-      star.style.boxShadow = \`0 0 \${Math.floor(size * 4)}px \${Math.floor(size * 2)}px rgba(255, 255, 255, 0.9), 
-                               0 0 \${Math.floor(size * 8)}px \${Math.floor(size * 4)}px rgba(255, 255, 255, 0.4)\`;
-      
-      randomStars.appendChild(star);
-    }
-    
-    return randomStars;
-  }
-  
-  // Force animation restart by briefly pausing and resuming
-  setTimeout(function() {
-    document.documentElement.style.setProperty('--animation-play-state', 'paused');
-    setTimeout(function() {
-      document.documentElement.style.setProperty('--animation-play-state', 'running');
-    }, 50);
-  }, 100);
-  
-  // Check if animation elements exist, if not, create them
-  const body = document.body;
-  
-  // Create the cosmic animation container if it doesn't exist
-  let cosmicContainer = document.querySelector('.cosmic-animation-container');
-  if (!cosmicContainer) {
-    cosmicContainer = document.createElement('div');
-    cosmicContainer.className = 'cosmic-animation-container';
-    
-    // Create the messages background if it doesn't exist
-    let messagesBackground = document.querySelector('.messages-background');
-    if (!messagesBackground) {
-      messagesBackground = document.createElement('div');
-      messagesBackground.className = 'messages-background';
-      body.prepend(messagesBackground);
-    }
-    
-    // Add the cosmic container to the messages background
-    messagesBackground.appendChild(cosmicContainer);
-    
-    // Add random stars to the cosmic container
-    const randomStars = generateRandomStars();
-    cosmicContainer.appendChild(randomStars);
+    // Make randomStars globally accessible with error handling
+    window.generateRandomStars = function() {
+      try {
+        return generateRandomStars();
+      } catch (e) {
+        console.error('Error generating random stars:', e);
+        return document.createElement('div');
+      }
+    };
+  } catch (e) {
+    console.error('Error initializing animations:', e);
+    // Fallback to basic styling if animations fail
+    document.documentElement.style.setProperty('--animation-opacity', '0');
+    document.documentElement.style.setProperty('--nebula-opacity', '0');
   }
 })();`;
 
@@ -243,8 +134,25 @@ export default async function Layout({
       <Script src="/animation-diagnostic.js" strategy="afterInteractive" />
       <AppSidebar user={session?.user} />
       <SidebarInset className="flex-1 overflow-auto">
-        {/* Animation elements are now created by the script if they don't exist */}
-        {children}
+        <div className="relative w-full h-full">
+          {children}
+          
+          {/* Error recovery overlay - appears when there's an error loading chat */}
+          <div id="error-recovery-overlay" className="hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="bg-card rounded-lg shadow-lg p-6 max-w-md w-full">
+              <h2 className="text-xl font-semibold mb-4">Connection Issue</h2>
+              <p className="mb-4">We're having trouble loading your chat history. This could be due to a temporary network issue.</p>
+              <div className="flex justify-end gap-2">
+                <button 
+                  id="retry-button"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+                  onClick={() => window.location.reload()}>
+                  Retry
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </SidebarInset>
     </div>
   );

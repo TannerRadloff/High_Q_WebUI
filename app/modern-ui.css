@@ -1,0 +1,109 @@
+/* HighQ - Modern UI Enhancements */
+
+/* Enhanced Chat UI */
+.chat-sending-pulse {
+  animation: pulse 0.3s ease-in-out;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.995); }
+  100% { transform: scale(1); }
+}
+
+.sparkles-container {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.sparkle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  opacity: 0;
+}
+
+/* Error recovery UI */
+#error-recovery-overlay.visible {
+  display: flex;
+}
+
+/* Enhanced Message UI */
+.message {
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.message:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.message-from-ai {
+  position: relative;
+  overflow: hidden;
+}
+
+.message-from-ai::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to right, rgba(var(--primary), 0.05), transparent);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.message-from-ai:hover::before {
+  opacity: 1;
+}
+
+/* Sidebar enhancement */
+.bg-sidebar {
+  background-color: hsl(var(--background) / 0.95);
+}
+
+/* Chat welcome message */
+.welcome-grid-item {
+  transition: all 0.2s ease-in-out;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.welcome-grid-item:hover {
+  background-color: hsl(var(--primary) / 0.05);
+  border-color: hsl(var(--primary) / 0.2);
+  transform: translateY(-2px);
+}
+
+/* Enhanced input area */
+.enhanced-input {
+  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--background) / 0.6);
+  backdrop-filter: blur(8px);
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);
+}
+
+.enhanced-input:focus-within {
+  border-color: hsl(var(--primary) / 0.5);
+  box-shadow: 0 4px 12px -1px rgb(0 0 0 / 0.1), 0 0 0 2px hsl(var(--primary) / 0.1);
+}
+
+/* Ensure error message is visible */
+.error-loading-history {
+  display: block;
+  padding: 1rem;
+  text-align: center;
+  color: hsl(var(--destructive));
+  font-size: 0.875rem;
+} 

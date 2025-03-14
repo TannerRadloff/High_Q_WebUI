@@ -5,7 +5,7 @@ import type { ChatRequestOptions } from 'ai';
 import { useChat } from 'ai/react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/components/auth/auth-provider';
 import { toast } from 'sonner';
 
@@ -26,6 +26,13 @@ import { MultimodalInput } from '@/src/components/features';
 import type { VisibilityType } from './visibility-selector';
 import { useArtifactSelector } from '@/hooks/use-artifact';
 import dynamic from 'next/dynamic';
+
+// Add type declaration for window.generateRandomStars
+declare global {
+  interface Window {
+    generateRandomStars?: () => HTMLElement;
+  }
+}
 
 // Agent mode functionality is now integrated directly into the MultimodalInput component
 
@@ -54,19 +61,73 @@ export function Chat({
   const [isCreatingChat, setIsCreatingChat] = useState(false);
   const { user } = useAuth();
   
-  // Simplify error state management - this was overcomplicated before
   const [hasError, setHasError] = useState(false);
-  // Add back isOnline state for network connectivity monitoring
   const [isOnline, setIsOnline] = useState(true);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(id === 'create-new');
   
+  // Add animation and UI state
+  const [showSparkles, setShowSparkles] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Handle network status and display
   useEffect(() => {
-    // Clear error state when chat ID changes
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success('Connection restored');
+    };
+    
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.error('Network connection lost');
+    };
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    // Set initial status
+    setIsOnline(navigator.onLine);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Clear error state when chat ID changes
+  useEffect(() => {
     setHasError(false);
+    setIsFirstLoad(true);
+    
+    if (id === 'create-new') {
+      setShowWelcome(true);
+    } else {
+      setShowWelcome(initialMessages.length === 0);
+    }
     
     return () => {
       setHasError(false);
     };
-  }, [id]);
+  }, [id, initialMessages.length]);
+
+  // Scroll to bottom of messages when new ones arrive
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    // Show sparkle animation on first message from AI
+    if (isFirstLoad && initialMessages.length > 0) {
+      setIsFirstLoad(false);
+      
+      // Briefly show sparkles animation
+      setTimeout(() => {
+        setShowSparkles(true);
+        setTimeout(() => setShowSparkles(false), 1500);
+      }, 500);
+    }
+  }, [initialMessages, isFirstLoad]);
 
   // Handle new chat creation
   useEffect(() => {
@@ -141,6 +202,16 @@ export function Chat({
         // Basic error handling
         toast.error(`API error: ${response.statusText || 'Request failed'}`);
         setHasError(true);
+      } else {
+        // Reset error state on successful response
+        setHasError(false);
+        setShowWelcome(false);
+        
+        // Show brief sparkle animation on new response
+        setTimeout(() => {
+          setShowSparkles(true);
+          setTimeout(() => setShowSparkles(false), 1500);
+        }, 300);
       }
     },
     onFinish: (message) => {
@@ -153,7 +224,13 @@ export function Chat({
         toast.warning(`The ${selectedChatModel} model is currently unavailable. Using a fallback model instead.`);
       }
       
+      // Refresh chat history
       mutate('/api/history');
+      
+      // Scroll to bottom of chat
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
     },
     onError: (error) => {
       console.error(`[CHAT] Error with model ${selectedChatModel}:`, error);
@@ -172,266 +249,265 @@ export function Chat({
   const [attachments, setAttachments] = useState<Array<ExtendedAttachment>>([]);
   const isArtifactVisible = useArtifactSelector((state) => state.isVisible);
 
-  // Initialize animation variables when component mounts
-  useEffect(() => {
-    const root = document.documentElement;
-    root.style.setProperty('--animation-play-state', 'running');
-    root.style.setProperty('--animation-opacity', '1');
-    root.style.setProperty('--nebula-opacity', '0.9');
-    root.style.setProperty('--stars-opacity', '0.9');
-    root.style.setProperty('--shooting-stars-display', 'block');
-    root.style.setProperty('--body-before-opacity', '1');
-    root.style.setProperty('--body-after-opacity', '1');
-    
-    // Generate random stars directly in the component
-    generateRandomStars();
-    
-    // Make the function globally accessible for the animation toggle
-    // @ts-ignore - Adding to window
-    window.generateRandomStars = generateRandomStars;
-    
-    // Cleanup function
-    return () => {
-      // @ts-ignore - Remove from window
-      window.generateRandomStars = undefined;
-    };
-  }, []);
-  
-  // Function to generate random stars
+  // Function to generate random stars for chat background
   const generateRandomStars = () => {
-    // Clear any existing random stars first
-    const existingStars = document.querySelector('.cosmic-animation-container .random-stars');
-    if (existingStars) {
-      existingStars.innerHTML = '';
+    if (typeof window === 'undefined') return;
+    
+    // Use the globally accessible function if it exists
+    if (window.generateRandomStars && typeof window.generateRandomStars === 'function') {
+      return (window.generateRandomStars as () => HTMLElement)();
     }
     
-    // Generate a unique seed for this session
-    let sessionSeed = Math.floor(Math.random() * 1000000);
-    console.log('Generating random stars with seed:', sessionSeed);
-    
-    // Simple random function with seed
-    function seededRandom() {
-      const x = Math.sin(sessionSeed++) * 10000;
-      return x - Math.floor(x);
+    return null;
+  };
+
+  // Handle custom form submission with animation
+  const customHandleSubmit = (
+    event?: { preventDefault?: () => void } | undefined,
+    chatRequestOptions?: ChatRequestOptions
+  ) => {
+    if (event && event.preventDefault) {
+      event.preventDefault();
     }
     
-    // Get the random stars container
-    const randomStarsContainer = document.querySelector('.cosmic-animation-container .random-stars');
-    if (!randomStarsContainer) {
-      console.error('Random stars container not found');
+    // If user is offline, show a toast
+    if (!isOnline) {
+      toast.error('You are currently offline. Please reconnect to use the chat.');
       return;
     }
     
-    // Dense cluster region (40-60 stars) - reduced from 50-80
-    const clusterStarCount = 40 + Math.floor(seededRandom() * 20);
-    const clusterCenterX = 20 + seededRandom() * 60; // 20-80% of screen width
-    const clusterCenterY = 20 + seededRandom() * 60; // 20-80% of screen height
-    
-    for (let i = 0; i < clusterStarCount; i++) {
-      const star = document.createElement('div');
-      star.className = 'random-star';
-      
-      // Position within cluster (less concentrated distribution)
-      const angle = seededRandom() * Math.PI * 2;
-      // Increased spread from 30 to 45 to make clusters less dense
-      const distance = seededRandom() * 45; 
-      const top = clusterCenterY + Math.sin(angle) * distance;
-      const left = clusterCenterX + Math.cos(angle) * distance;
-      
-      // Random size (0.5px - 3px)
-      const size = 0.5 + seededRandom() * 2.5;
-      
-      // Random brightness
-      const brightness = 0.5 + seededRandom() * 0.5;
-      
-      // Random twinkle animation delay and duration
-      const delay = seededRandom() * 10;
-      const duration = 3 + seededRandom() * 4;
-      
-      // Apply styles
-      star.style.top = `${top}%`;
-      star.style.left = `${left}%`;
-      star.style.width = `${size}px`;
-      star.style.height = `${size}px`;
-      star.style.opacity = brightness.toString();
-      star.style.animationDelay = `${delay}s`;
-      star.style.animationDuration = `${duration}s`;
-      
-      randomStarsContainer.appendChild(star);
+    // Add subtle animation when sending a message
+    if (chatContainerRef.current) {
+      chatContainerRef.current.classList.add('chat-sending-pulse');
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          chatContainerRef.current.classList.remove('chat-sending-pulse');
+        }
+      }, 300);
     }
     
-    // Scattered stars throughout (50-70 stars) - increased from 40-60
-    const scatteredStarCount = 50 + Math.floor(seededRandom() * 20);
-    
-    for (let i = 0; i < scatteredStarCount; i++) {
-      const star = document.createElement('div');
-      star.className = 'random-star';
-      
-      // Random position across entire screen
-      const top = seededRandom() * 100;
-      const left = seededRandom() * 100;
-      
-      // Random size (0.5px - 2px)
-      const size = 0.5 + seededRandom() * 1.5;
-      
-      // Random brightness
-      const brightness = 0.4 + seededRandom() * 0.6;
-      
-      // Random twinkle animation delay and duration
-      const delay = seededRandom() * 10;
-      const duration = 3 + seededRandom() * 4;
-      
-      // Apply styles
-      star.style.top = `${top}%`;
-      star.style.left = `${left}%`;
-      star.style.width = `${size}px`;
-      star.style.height = `${size}px`;
-      star.style.opacity = brightness.toString();
-      star.style.animationDelay = `${delay}s`;
-      star.style.animationDuration = `${duration}s`;
-      
-      randomStarsContainer.appendChild(star);
-    }
-    
-    // Bright highlight stars (5-8 stars) - reduced from 10-15
-    const brightStarCount = 5 + Math.floor(seededRandom() * 3);
-    
-    for (let i = 0; i < brightStarCount; i++) {
-      const star = document.createElement('div');
-      star.className = 'random-star bright';
-      
-      // Random position across entire screen
-      const top = seededRandom() * 100;
-      const left = seededRandom() * 100;
-      
-      // Larger size (2px - 4px)
-      const size = 2 + seededRandom() * 2;
-      
-      // High brightness
-      const brightness = 0.8 + seededRandom() * 0.2;
-      
-      // Random twinkle animation delay and duration
-      const delay = seededRandom() * 10;
-      const duration = 4 + seededRandom() * 3;
-      
-      // Apply styles
-      star.style.top = `${top}%`;
-      star.style.left = `${left}%`;
-      star.style.width = `${size}px`;
-      star.style.height = `${size}px`;
-      star.style.opacity = brightness.toString();
-      star.style.animationDelay = `${delay}s`;
-      star.style.animationDuration = `${duration}s`;
-      star.style.boxShadow = `0 0 ${Math.floor(size)}px ${Math.floor(size/2)}px rgba(255, 255, 255, 0.6)`;
-      
-      randomStarsContainer.appendChild(star);
-    }
-    
-    console.log(`Generated ${clusterStarCount + scatteredStarCount + brightStarCount} random stars`);
+    handleSubmit(event, chatRequestOptions);
   };
 
-  // Network connectivity monitoring
-  useEffect(() => {
-    const handleOnline = () => {
-      console.log('[Chat] Network connection restored');
-      toast.success('Network connection restored');
-    };
-    
-    const handleOffline = () => {
-      console.log('[Chat] Network connection lost');
-      toast.error('Network connection lost. Messages may not be sent until connection is restored.');
-    };
-    
-    // Listen for network status changes
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    // Initial check
-    setIsOnline(navigator.onLine);
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  // Function to handle form submission with logging and improved error handling
-  const handleSubmitWithLogging = useCallback(
-    async (
-      event?: { preventDefault?: () => void } | undefined,
-      chatRequestOptions?: ChatRequestOptions
-    ) => {
-      console.log(`[CHAT] Submitting chat with model: ${selectedChatModel}`);
-      
-      // Check for network connectivity
-      if (!navigator.onLine) {
-        toast.error('You are offline. Please check your internet connection and try again.');
-        return;
-      }
-      
-      // Don't submit if there's no input and no attachments
-      if (chatRequestOptions?.data && 
-          typeof chatRequestOptions.data === 'object' &&
-          'input' in chatRequestOptions.data &&
-          !chatRequestOptions.data.input && 
-          (!chatRequestOptions?.experimental_attachments || 
-           chatRequestOptions.experimental_attachments.length === 0)) {
-        console.log('[CHAT] Prevented empty submission');
-        return;
-      }
-      
-      try {
-        await handleSubmit(event, chatRequestOptions);
-      } catch (error) {
-        console.error('Error submitting message:', error);
-        toast.error('An error occurred while processing your message. Please try again.');
-      }
-    },
-    [handleSubmit, selectedChatModel]
-  );
-
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background">
-      {isCreatingChat ? (
-        <div className="flex h-full items-center justify-center">
-          <div className="flex flex-col items-center gap-2">
-            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-foreground" />
-            <p className="text-sm text-muted-foreground">Creating new chat...</p>
+    <div 
+      className="relative flex flex-col w-full h-full overflow-hidden"
+      ref={chatContainerRef}
+    >
+      {/* Network Status Indicator */}
+      <AnimatePresence>
+        {!isOnline && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }} 
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute top-0 left-0 right-0 bg-destructive/80 text-destructive-foreground text-center py-1 px-4 z-50"
+          >
+            <span className="text-sm">You are currently offline. Reconnect to continue chatting.</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Sparkles Animation */}
+      <AnimatePresence>
+        {showSparkles && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 pointer-events-none z-10"
+          >
+            <div className="sparkles-container">
+              {Array.from({ length: 20 }).map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="sparkle"
+                  initial={{ 
+                    opacity: 0,
+                    scale: 0,
+                    x: Math.random() * 100 - 50,
+                    y: Math.random() * 100 - 50,
+                  }}
+                  animate={{ 
+                    opacity: [0, 1, 0],
+                    scale: [0, 1, 0],
+                    x: Math.random() * 200 - 100,
+                    y: Math.random() * 200 - 100,
+                  }}
+                  transition={{
+                    duration: 1 + Math.random() * 0.5,
+                    delay: Math.random() * 0.5,
+                  }}
+                  style={{
+                    left: `${Math.random() * 100}%`,
+                    top: `${Math.random() * 100}%`,
+                    backgroundColor: `hsl(${Math.random() * 360}, 100%, 70%)`,
+                  }}
+                />
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
+      {/* Chat Header */}
+      <ChatHeader 
+        chatId={chatId}
+        selectedModelId={selectedChatModel}
+        selectedVisibilityType={selectedVisibilityType}
+        isReadonly={isReadonly}
+      />
+      
+      {/* Main Chat Content */}
+      <div className="flex-1 overflow-y-auto pb-32 pt-4 px-4 relative">
+        {/* Show a welcome message if this is a new chat */}
+        {showWelcome && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mb-8 p-6 rounded-lg bg-primary/5 max-w-3xl mx-auto text-center"
+          >
+            <h1 className="text-2xl font-bold mb-3">Welcome to HighQ</h1>
+            <p className="text-muted-foreground mb-4">
+              The Highest Quality, Highest IQ AI system on earth. Start by asking me anything!
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6 text-left">
+              <button
+                className="p-3 rounded-md border border-border hover:bg-primary/5 transition-colors text-left"
+                onClick={() => setInput("What can you help me with?")}
+              >
+                <span className="text-sm font-medium">What can you help me with?</span>
+              </button>
+              <button
+                className="p-3 rounded-md border border-border hover:bg-primary/5 transition-colors text-left"
+                onClick={() => setInput("Create a short story about a space explorer.")}
+              >
+                <span className="text-sm font-medium">Generate a creative story</span>
+              </button>
+              <button
+                className="p-3 rounded-md border border-border hover:bg-primary/5 transition-colors text-left"
+                onClick={() => setInput("Explain the concept of quantum computing in simple terms.")}
+              >
+                <span className="text-sm font-medium">Explain a complex topic</span>
+              </button>
+              <button
+                className="p-3 rounded-md border border-border hover:bg-primary/5 transition-colors text-left"
+                onClick={() => setInput("Help me debug this code snippet: function sum(a, b) { retur a + b; }")}
+              >
+                <span className="text-sm font-medium">Debug some code</span>
+              </button>
+            </div>
+          </motion.div>
+        )}
+      
+        {/* Chat Messages */}
+        <Messages
+          messages={messages}
+          isLoading={isLoading}
+          chatId={chatId}
+          votes={votes ?? []}
+          setMessages={setMessages}
+          reload={reload}
+          isReadonly={isReadonly}
+          isArtifactVisible={isArtifactVisible}
+        />
+        
+        {/* Visible when artifacts are open */}
+        {isArtifactVisible && (
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 flex items-center justify-center overflow-auto">
+            <Artifact 
+              attachments={attachments}
+              /* Passing minimal required props to avoid TypeScript errors */
+            />
           </div>
-        </div>
-      ) : (
-        <>
-          <ChatHeader
-            chatId={chatId}
-            selectedModelId={selectedChatModel}
-            selectedVisibilityType={selectedVisibilityType}
-            isReadonly={isReadonly}
-          />
-          <Messages
-            messages={messages}
-            isLoading={isLoading}
-            chatId={chatId}
-            isReadonly={isReadonly}
-            votes={votes || []}
-            setMessages={setMessages}
-            reload={reload}
-            isArtifactVisible={isArtifactVisible}
-          />
+        )}
+        
+        {/* Error Message */}
+        {hasError && (
+          <div className="p-4 mb-4 bg-destructive/10 border border-destructive rounded-lg max-w-2xl mx-auto">
+            <p className="text-sm text-destructive">An error occurred. Please try again or refresh the page.</p>
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={() => reload()}
+                className="px-3 py-1 text-xs rounded-md bg-primary text-primary-foreground"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-3 py-1 text-xs rounded-md bg-secondary text-secondary-foreground"
+              >
+                Refresh Page
+              </button>
+            </div>
+          </div>
+        )}
+        
+        {/* Used to scroll to bottom of messages */}
+        <div ref={messagesEndRef} />
+      </div>
+      
+      {/* Input Area */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background to-transparent pt-10 pb-4 px-4">
+        <div className="max-w-3xl mx-auto">
           <MultimodalInput
             chatId={chatId}
             input={input}
             setInput={setInput}
-            handleSubmit={handleSubmitWithLogging}
-            isLoading={isLoading}
+            isLoading={isLoading || isCreatingChat}
             stop={stop}
             attachments={attachments}
             setAttachments={setAttachments}
             messages={messages}
             setMessages={setMessages}
             append={append}
+            handleSubmit={customHandleSubmit}
+            className="relative z-10 border border-border bg-background shadow-lg rounded-lg"
           />
-        </>
-      )}
+          
+          {/* Model info at the bottom */}
+          {usesFallbackModel ? (
+            <div className="text-center mt-2 text-xs text-amber-500">
+              Using fallback model • {selectedChatModel} unavailable
+            </div>
+          ) : (
+            <div className="text-center mt-2 text-xs text-muted-foreground">
+              {isOnline ? `Using ${selectedChatModel} • ${selectedVisibilityType}` : "Offline Mode"}
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Add CSS for animations */}
+      <style jsx>{`
+        .chat-sending-pulse {
+          animation: pulse 0.3s ease-in-out;
+        }
+        
+        @keyframes pulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(0.995); }
+          100% { transform: scale(1); }
+        }
+        
+        .sparkles-container {
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+          overflow: hidden;
+        }
+        
+        .sparkle {
+          position: absolute;
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          opacity: 0;
+        }
+      `}</style>
     </div>
   );
 }

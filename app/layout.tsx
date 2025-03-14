@@ -8,6 +8,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next';
 import { LayoutContent } from './layout-content';
 
 import './globals.css';
+import './modern-ui.css';
 
 const inter = Inter({ subsets: ['latin'] });
 
