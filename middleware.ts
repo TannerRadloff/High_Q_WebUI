@@ -39,7 +39,7 @@ export function middleware(request: NextRequest) {
     // Development logging
     logRequest(pathname, request.method)
 
-    // Check for authentication cookies
+    // Check for authentication cookies - both access token and refresh token
     const hasAuthCookies = checkAuthCookies(request)
     
     // Path classification
@@ -50,6 +50,7 @@ export function middleware(request: NextRequest) {
       console.log('[Middleware] Route check:', {
         pathname,
         ...pathInfo,
+        hasAuthCookies,
         matchedPublicPath: PUBLIC_PATHS.find(path => pathname.startsWith(path))
       })
     }
@@ -82,14 +83,21 @@ export function middleware(request: NextRequest) {
  * Check if the request has valid authentication cookies
  */
 function checkAuthCookies(request: NextRequest): boolean {
-  const sessionCookie = request.cookies.get('sb-access-token')
-  const refreshCookie = request.cookies.get('sb-refresh-token')
-  const hasAuthCookies = !!sessionCookie || !!refreshCookie
+  // Check for both access token and refresh token
+  const accessToken = request.cookies.get('sb-access-token')
+  const refreshToken = request.cookies.get('sb-refresh-token')
+  
+  // Also check for supabase alternative cookie names
+  const supabaseAuth = request.cookies.get('sb-auth-token')
+  
+  const hasAuthCookies = !!accessToken || !!refreshToken || !!supabaseAuth
   
   if (DEV_MODE) {
     console.log('[Middleware] Auth check:', {
-      hasSessionCookie: !!sessionCookie,
-      hasRefreshCookie: !!refreshCookie
+      hasAccessToken: !!accessToken,
+      hasRefreshToken: !!refreshToken,
+      hasSupabaseAuth: !!supabaseAuth,
+      hasAuthCookies
     })
   }
   

@@ -1,8 +1,4 @@
 import { cookies } from 'next/headers';
-
-import { AppSidebar } from '@/src/components/layout/app-sidebar';
-import { SidebarInset } from '@/src/components/ui/sidebar';
-
 import { getServerSession } from '@/lib/auth';
 import Script from 'next/script';
 
@@ -99,11 +95,11 @@ export default async function Layout({
 }: {
   children: React.ReactNode;
 }) {
-  const [session, cookieStore] = await Promise.all([getServerSession(), cookies()]);
-  const isCollapsed = cookieStore.get('sidebar:state')?.value !== 'true';
+  // Get server session - no need to get or set sidebar collapse state here
+  const session = await getServerSession();
 
   return (
-    <div className="flex h-screen w-full overflow-hidden">
+    <div className="relative w-full h-full">
       <Script
         src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"
         strategy="beforeInteractive"
@@ -113,46 +109,41 @@ export default async function Layout({
           __html: MINIMAL_SCRIPT,
         }}
       />
-      <AppSidebar user={session?.user} />
-      <SidebarInset className="flex-1 overflow-auto">
-        <div className="relative w-full h-full">
-          {children}
-          
-          {/* Enhanced error recovery overlay - supports authentication and network errors */}
-          <div id="error-recovery-overlay" className="hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div className="bg-card rounded-lg shadow-lg p-6 max-w-md w-full">
-              <h2 id="error-title" className="text-xl font-semibold mb-4 flex items-center">
-                <svg className="w-5 h-5 mr-2 text-destructive" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" y1="8" x2="12" y2="12"></line>
-                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                Connection Issue
-              </h2>
-              <p id="error-message" className="mb-4 text-muted-foreground">
-                We're having trouble loading your chat history. This could be due to a temporary network issue.
-              </p>
-              <div className="flex justify-end gap-2">
-                <button 
-                  id="login-button"
-                  style={{ display: 'none' }}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                  aria-label="Sign in to continue"
-                >
-                  Sign In
-                </button>
-                <button 
-                  id="retry-button"
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                  aria-label="Retry loading chat history"
-                >
-                  Retry
-                </button>
-              </div>
-            </div>
+      {children}
+      
+      {/* Enhanced error recovery overlay - supports authentication and network errors */}
+      <div id="error-recovery-overlay" className="hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="bg-card rounded-lg shadow-lg p-6 max-w-md w-full">
+          <h2 id="error-title" className="text-xl font-semibold mb-4 flex items-center">
+            <svg className="w-5 h-5 mr-2 text-destructive" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            Connection Issue
+          </h2>
+          <p id="error-message" className="mb-4 text-muted-foreground">
+            We're having trouble loading your chat history. This could be due to a temporary network issue.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button 
+              id="login-button"
+              style={{ display: 'none' }}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              aria-label="Sign in to continue"
+            >
+              Sign In
+            </button>
+            <button 
+              id="retry-button"
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              aria-label="Retry loading chat history"
+            >
+              Retry
+            </button>
           </div>
         </div>
-      </SidebarInset>
+      </div>
     </div>
   );
 }

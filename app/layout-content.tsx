@@ -38,14 +38,14 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
           enableSystem
           disableTransitionOnChange
         >
-          <SidebarProvider defaultWidth={280} defaultOpen={false}>
+          <SidebarProvider defaultWidth={280} defaultOpen={isChat}>
             <div className={cn(
               "min-h-screen",
               isAuth ? "flex-center-col" : "flex-row"
             )}>
               {!isAuth && !isChat && <NavBar />}
               <main className={cn(
-                "flex-1",
+                "flex-1 w-full h-full",
                 !isAuth && !isChat && "pl-4",
                 isAuth && "flex-center"
               )}>

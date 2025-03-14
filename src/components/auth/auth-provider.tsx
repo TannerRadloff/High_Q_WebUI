@@ -27,11 +27,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const supabase = createClient()
   
-  // Track if we've already redirected to prevent loops
-  const hasInitialized = useState(false)
+  // Track if we've already initialized to prevent double initialization
+  const [hasInitialized, setHasInitialized] = useState(false)
   
   // Initial session check
   useEffect(() => {
+    // Prevent duplicate initialization
+    if (hasInitialized) return
+    
     // Check if API keys are available
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       console.error('Missing Supabase environment variables')
@@ -63,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.error('[AuthProvider] Unexpected error during auth init:', e)
       } finally {
         setIsLoading(false)
-        hasInitialized[1](true)
+        setHasInitialized(true)
       }
     }
     
@@ -115,7 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription?.unsubscribe()
     }
-  }, [router, pathname, supabase])
+  }, [router, pathname, supabase, hasInitialized])
   
   /**
    * Sign in with email and password

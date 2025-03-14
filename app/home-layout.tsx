@@ -11,7 +11,7 @@ export default function HomeLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const pathname = usePathname();
   const isHomePage = pathname === '/';
   const { setOpen } = useSidebar();
@@ -25,8 +25,8 @@ export default function HomeLayout({
     setMounted(true);
   }, [isHomePage, setOpen]);
 
-  // Only render the sidebar layout if we're on the home page and the component has mounted
-  if (!isHomePage || !mounted) {
+  // Only render the sidebar layout if the component has mounted
+  if (!mounted) {
     return <>{children}</>;
   }
 
