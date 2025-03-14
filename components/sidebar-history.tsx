@@ -162,15 +162,53 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     fallbackData: [],
     onError: (err) => {
       console.error('Error fetching chat history:', err);
-      toast.error('Failed to load chat history. Please try refreshing the page.');
+      
+      // Debug the error with more details
+      console.log('Chat history fetch error details:', {
+        error: err,
+        errorMessage: err instanceof Error ? err.message : String(err),
+        errorStack: err instanceof Error ? err.stack : 'No stack trace',
+        user: user ? `User ID: ${user.id.substring(0, 5)}...` : 'No user',
+        isAuthenticated: !!user,
+        requestUrl: '/api/history'
+      });
+      
+      // Clear any existing error toasts before showing a new one
+      // to prevent stacking of error messages
+      toast.dismiss();
+      
+      // Show a clear error message to the user
+      toast.error('Failed to load chat history. Please try refreshing the page.', {
+        duration: 5000,
+        id: 'history-error' // Using an ID prevents duplicate toasts
+      });
     },
-    revalidateOnFocus: true,
+    revalidateOnFocus: false, // Change to false to reduce unnecessary requests when tab is focused
     revalidateOnReconnect: true,
-    dedupingInterval: 5000, // 5 seconds
+    dedupingInterval: 10000, // Increase to 10 seconds to reduce API load
     shouldRetryOnError: true,
-    errorRetryCount: 3,
-    errorRetryInterval: 3000, // 3 seconds
+    errorRetryCount: 3, // Limit retry attempts
+    errorRetryInterval: 3000, // Retry every 3 seconds
+    onLoadingSlow: () => {
+      console.log('Chat history loading is taking longer than expected');
+    },
   });
+
+  // Add a manual retry function
+  const retryLoadHistory = () => {
+    console.log('Manually retrying history load');
+    toast.loading('Retrying to load chat history...', { id: 'retry-history' });
+    mutate().then(() => {
+      toast.dismiss('retry-history');
+      toast.success('Chat history refreshed');
+    }).catch(err => {
+      toast.dismiss('retry-history');
+      console.error('Manual retry failed:', err);
+    });
+  };
+
+  // Check for errors and show retry button if needed
+  const hasError = error !== undefined;
 
   useEffect(() => {
     if (user) {
@@ -231,7 +269,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
             <p>Error loading chat history</p>
             <p className="text-xs text-red-400">{error.message || 'Unknown error'}</p>
             <button 
-              onClick={() => mutate()} 
+              onClick={retryLoadHistory} 
               className="px-3 py-1 bg-red-100 dark:bg-red-900 rounded-md text-xs mt-2 hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
             >
               Try Again
