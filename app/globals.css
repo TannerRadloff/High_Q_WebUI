@@ -193,98 +193,84 @@
         overflow-x: hidden;
     }
 
-    /* Hide body background animations by default */
-    body::before, body::after {
+    /* Remove all body::before and body::after animation styles for star and nebula effects */
+    body::before {
+        content: none;
+    }
+
+    body::after {
+        content: none;
+    }
+
+    /* Remove all animation classes */
+    .shooting-star,
+    .cosmic-dust,
+    .pulsating-stars,
+    .parallax-stars,
+    .aurora,
+    .random-stars,
+    .cosmic-animation-container {
         display: none;
     }
 
-    /* Enhanced cosmic background with multiple layers */
-    body::before {
-        content: '';
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        background: 
-            radial-gradient(1px 1px at 10% 10%, rgba(255, 255, 255, 0.9), transparent),
-            radial-gradient(1px 1px at 25% 30%, rgba(255, 255, 255, 0.9), transparent),
-            radial-gradient(1px 1px at 40% 40%, rgba(255, 255, 255, 0.8), transparent),
-            radial-gradient(1px 1px at 50% 50%, rgba(255, 255, 255, 0.8), transparent),
-            radial-gradient(1px 1px at 60% 60%, rgba(255, 255, 255, 0.8), transparent),
-            radial-gradient(1.5px 1.5px at 75% 70%, rgba(255, 255, 255, 0.9), transparent),
-            radial-gradient(1.5px 1.5px at 90% 90%, rgba(255, 255, 255, 0.9), transparent),
-            radial-gradient(2px 2px at 5% 20%, rgba(255, 255, 255, 0.7), transparent),
-            radial-gradient(2px 2px at 20% 20%, rgba(255, 255, 255, 0.7), transparent),
-            radial-gradient(2px 2px at 35% 60%, rgba(255, 255, 255, 0.8), transparent),
-            radial-gradient(2px 2px at 65% 40%, rgba(255, 255, 255, 0.9), transparent),
-            radial-gradient(2px 2px at 80% 15%, rgba(255, 255, 255, 0.8), transparent),
-            radial-gradient(2.5px 2.5px at 15% 75%, rgba(255, 255, 255, 0.6), transparent),
-            radial-gradient(2.5px 2.5px at 30% 85%, rgba(255, 255, 255, 0.7), transparent),
-            radial-gradient(2.5px 2.5px at 55% 25%, rgba(255, 255, 255, 0.8), transparent),
-            radial-gradient(2.5px 2.5px at 70% 55%, rgba(255, 255, 255, 0.7), transparent),
-            radial-gradient(3px 3px at 85% 25%, rgba(255, 255, 255, 0.7), transparent),
-            radial-gradient(3px 3px at 95% 45%, rgba(255, 255, 255, 0.8), transparent),
-            radial-gradient(3px 3px at 45% 95%, rgba(255, 255, 255, 0.7), transparent),
-            radial-gradient(3.5px 3.5px at 25% 40%, rgba(255, 255, 255, 0.8), transparent),
-            radial-gradient(3.5px 3.5px at 75% 80%, rgba(255, 255, 255, 0.7), transparent),
-            radial-gradient(4px 4px at 50% 10%, rgba(255, 255, 255, 0.9), transparent),
-            radial-gradient(4px 4px at 15% 35%, rgba(255, 255, 255, 0.8), transparent),
-            radial-gradient(4px 4px at 60% 75%, rgba(255, 255, 255, 0.8), transparent);
-        background-size: 550px 550px, 350px 350px, 250px 250px, 150px 150px, 100px 100px, 200px 200px, 300px 300px, 400px 400px, 
-                         250px 250px, 300px 300px, 200px 200px, 350px 350px, 400px 400px, 300px 300px, 250px 250px, 350px 350px,
-                         200px 200px, 300px 300px, 250px 250px, 350px 350px, 400px 400px, 300px 300px, 250px 250px, 200px 200px;
-        opacity: calc(var(--stars-opacity) * var(--body-before-opacity));
-        z-index: -1;
-        animation: twinkling 90s linear infinite;
-        animation-play-state: var(--animation-play-state);
+    /* Remove animation z-index rules */
+    .messages-container .aurora,
+    .messages-container .cosmic-dust,
+    .messages-container .parallax-stars,
+    .messages-container .pulsating-stars,
+    .messages-container .shooting-star,
+    .messages-container .random-stars {
+        display: none;
     }
 
-    /* Nebula effect - Enhanced with more structure and vibrant colors */
-    body::after {
-        content: '';
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        background: 
-            /* Bright nebula core - pink/purple region */
-            radial-gradient(ellipse at 20% 30%, rgba(255, 150, 220, 0.25) 0%, rgba(255, 150, 220, 0.05) 30%, rgba(255, 150, 220, 0.0) 50%),
-            
-            /* Blue nebula region with structure */
-            radial-gradient(ellipse at 80% 20%, rgba(100, 200, 255, 0.2) 0%, rgba(100, 200, 255, 0.05) 40%, rgba(100, 200, 255, 0.0) 60%),
-            
-            /* Cyan/teal emission cloud */
-            radial-gradient(ellipse at 65% 75%, rgba(0, 255, 230, 0.15) 0%, rgba(0, 255, 230, 0.05) 30%, transparent 50%),
-            
-            /* Golden/yellow star formation region */
-            radial-gradient(circle at 30% 65%, rgba(255, 220, 100, 0.15) 0%, rgba(255, 220, 100, 0.05) 20%, transparent 40%),
-            
-            /* Red/orange emission nebula */
-            radial-gradient(circle at 75% 45%, rgba(255, 100, 50, 0.12) 0%, rgba(255, 100, 50, 0.04) 25%, transparent 45%),
-            
-            /* Subtle green nebula wisp */
-            radial-gradient(ellipse at 40% 20%, rgba(150, 255, 180, 0.1) 0%, rgba(150, 255, 180, 0.03) 35%, transparent 60%),
-            
-            /* Dark dust lane - subtle shadow effect */
-            radial-gradient(ellipse at 50% 50%, rgba(30, 0, 60, 0.08) 0%, rgba(30, 0, 60, 0.04) 50%, transparent 70%),
-            
-            /* Bright star cluster region */
-            radial-gradient(circle at 25% 55%, rgba(255, 255, 220, 0.2) 0%, rgba(255, 255, 220, 0.05) 15%, transparent 30%),
-            
-            /* Subtle background glow */
-            radial-gradient(ellipse at 50% 50%, rgba(100, 70, 150, 0.05) 0%, transparent 100%);
-            
-        /* Improved filters for more definition */
-        filter: blur(15px) contrast(1.1) saturate(1.2);
-        mix-blend-mode: screen;
-        opacity: calc(var(--nebula-opacity) * var(--body-after-opacity) * 0.6);
-        z-index: -2;
-        animation: nebula-drift 180s ease-in-out infinite alternate, nebula-rotate 360s linear infinite;
-        animation-play-state: var(--animation-play-state);
+    /* Empty keyframes for backward compatibility */
+    @keyframes twinkling {
+        0%, 100% { opacity: 0; }
+    }
+    @keyframes nebula-drift {
+        0%, 100% { opacity: 0; }
+    }
+    @keyframes shooting-up {
+        0%, 100% { opacity: 0; }
+    }
+    @keyframes shooting-rtl {
+        0%, 100% { opacity: 0; }
+    }
+    @keyframes shooting-fast {
+        0%, 100% { opacity: 0; }
+    }
+    @keyframes pulse {
+        0%, 100% { opacity: 0; }
+    }
+    @keyframes parallax-1 {
+        0%, 100% { opacity: 0; }
+    }
+    @keyframes parallax-2 {
+        0%, 100% { opacity: 0; }
+    }
+    @keyframes parallax-3 {
+        0%, 100% { opacity: 0; }
+    }
+    @keyframes aurora-shift {
+        0%, 100% { opacity: 0; }
+    }
+    @keyframes light-rays {
+        0%, 100% { opacity: 0; }
+    }
+    @keyframes random-star-twinkle {
+        0%, 100% { opacity: 0; }
+    }
+    @keyframes random-star-twinkle-bright {
+        0%, 100% { opacity: 0; }
+    }
+    @keyframes random-star-twinkle-extra-bright {
+        0%, 100% { opacity: 0; }
+    }
+    @keyframes shooting {
+        0%, 100% { opacity: 0; }
+    }
+    @keyframes dust-drift {
+        0%, 100% { opacity: 0; }
     }
 
     /* Additional nebula layer for depth and complexity */
@@ -323,56 +309,6 @@
         z-index: -3;
         animation: nebula-drift-secondary 240s ease-in-out infinite alternate;
         animation-play-state: var(--animation-play-state);
-    }
-
-    @keyframes twinkling {
-        0% {
-            background-position: 
-                0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0,
-                0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0,
-                0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
-        }
-        100% {
-            background-position: 
-                550px 550px, -350px 350px, 250px -250px, -150px 150px, 100px -100px, -200px 200px, 300px -300px, -400px 400px,
-                250px 250px, -300px 300px, 200px -200px, -350px 350px, 400px -400px, -300px 300px, 250px -250px, -350px 350px,
-                200px 200px, -300px 300px, 250px -250px, -350px 350px, 400px -400px, -300px 300px, 250px -250px, -200px 200px;
-        }
-    }
-
-    @keyframes nebula-drift {
-        0% {
-            background-position: 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%;
-            opacity: calc(var(--nebula-opacity) * 0.5);
-            filter: blur(15px) contrast(1.1) saturate(1.2);
-        }
-        25% {
-            filter: blur(17px) contrast(1.05) saturate(1.15);
-            opacity: calc(var(--nebula-opacity) * 0.55);
-        }
-        50% {
-            filter: blur(14px) contrast(1.15) saturate(1.25);
-            opacity: calc(var(--nebula-opacity) * 0.6);
-        }
-        75% {
-            filter: blur(16px) contrast(1.1) saturate(1.2);
-            opacity: calc(var(--nebula-opacity) * 0.55);
-        }
-        100% {
-            background-position: 3% 4%, -3% -4%, 4% -3%, -4% 3%, 2% 3%, -2% -3%, 3% -2%, -3% 2%, 3% 3%;
-            opacity: calc(var(--nebula-opacity) * 0.5);
-            filter: blur(15px) contrast(1.1) saturate(1.2);
-        }
-    }
-
-    /* New animation for nebula rotation */
-    @keyframes nebula-rotate {
-        0% {
-            transform: rotate(0deg);
-        }
-        100% {
-            transform: rotate(360deg);
-        }
     }
 
     @keyframes nebula-drift-secondary {
@@ -551,246 +487,6 @@
             background-position: 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%;
             opacity: calc(var(--nebula-opacity) * 0.3);
             filter: blur(5px) contrast(1.3) saturate(1.1);
-        }
-    }
-
-    /* Shooting stars */
-    .shooting-star {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        z-index: -1;
-        overflow: hidden;
-        display: var(--shooting-stars-display);
-    }
-
-    /* Main shooting star with focal point and trail */
-    .shooting-star::before {
-        content: "";
-        position: absolute;
-        width: 200px; /* Length of the streak */
-        height: 3px; /* Height of the streak */
-        background: linear-gradient(to right, 
-            rgba(255, 255, 255, 0) 0%, 
-            rgba(255, 255, 255, 0.3) 50%, 
-            rgba(255, 255, 255, 0.8) 90%, 
-            rgba(255, 255, 255, 1) 100%);
-        border-radius: 3px;
-        animation: shooting 60s linear infinite; /* Slowed down from 30s */
-        animation-play-state: var(--animation-play-state);
-        opacity: 0;
-        top: 20%;
-        left: 10%;
-        transform: rotate(35deg);
-        transform-origin: right center;
-        /* Add glow to create focal point effect */
-        filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.8));
-    }
-
-    /* Second shooting star - top to bottom */
-    .shooting-star::after {
-        content: "";
-        position: absolute;
-        width: 150px; /* Length of the streak */
-        height: 2px; /* Height of the streak */
-        background: linear-gradient(to right, 
-            rgba(255, 255, 255, 0) 0%, 
-            rgba(255, 255, 255, 0.2) 40%, 
-            rgba(255, 255, 255, 0.7) 90%, 
-            rgba(255, 255, 255, 0.9) 100%);
-        border-radius: 2px;
-        animation: shooting-vertical 80s linear infinite 25s; /* Vertical movement, delayed */
-        animation-play-state: var(--animation-play-state);
-        opacity: 0;
-        top: 5%;
-        left: 70%;
-        transform: rotate(80deg);
-        transform-origin: right center;
-        filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.6));
-    }
-
-    /* Third shooting star - diagonal bottom to top */
-    .shooting-star .star-1::before {
-        content: "";
-        position: absolute;
-        width: 180px; /* Length of the streak */
-        height: 2px; /* Height of the streak */
-        background: linear-gradient(to right, 
-            rgba(200, 220, 255, 0) 0%, 
-            rgba(200, 220, 255, 0.2) 40%, 
-            rgba(200, 220, 255, 0.6) 80%, 
-            rgba(255, 255, 255, 0.9) 100%);
-        border-radius: 2px;
-        animation: shooting-up 70s linear infinite 15s; /* Upward diagonal, delayed */
-        animation-play-state: var(--animation-play-state);
-        opacity: 0;
-        bottom: 10%;
-        left: 20%;
-        transform: rotate(-30deg);
-        transform-origin: right center;
-        filter: drop-shadow(0 0 1px rgba(200, 220, 255, 0.7));
-    }
-
-    /* Fourth shooting star - horizontal right to left */
-    .shooting-star .star-2::before {
-        content: "";
-        position: absolute;
-        width: 120px; /* Length of the streak */
-        height: 1.5px; /* Height of the streak */
-        background: linear-gradient(to right, 
-            rgba(255, 240, 200, 0) 0%, 
-            rgba(255, 240, 200, 0.2) 40%, 
-            rgba(255, 240, 200, 0.5) 80%, 
-            rgba(255, 255, 255, 0.8) 100%);
-        border-radius: 1.5px;
-        animation: shooting-rtl 90s linear infinite 40s; /* Right to left, delayed */
-        animation-play-state: var(--animation-play-state);
-        opacity: 0;
-        top: 40%;
-        right: 5%;
-        transform: rotate(180deg);
-        transform-origin: right center;
-        filter: drop-shadow(0 0 1px rgba(255, 240, 200, 0.5));
-    }
-
-    /* Fifth shooting star - brightest and fastest */
-    .shooting-star .star-3::before {
-        content: "";
-        position: absolute;
-        width: 250px; /* Length of the streak */
-        height: 3px; /* Height of the streak */
-        background: linear-gradient(to right, 
-            rgba(255, 255, 255, 0) 0%, 
-            rgba(255, 255, 255, 0.3) 50%, 
-            rgba(255, 255, 255, 0.6) 80%, 
-            rgba(255, 255, 255, 0.8) 95%,
-            rgba(255, 255, 255, 1) 100%);
-        border-radius: 3px;
-        animation: shooting-fast 50s linear infinite 5s; /* Slowed from 15s, delayed */
-        animation-play-state: var(--animation-play-state);
-        opacity: 0;
-        top: 65%;
-        left: 60%;
-        transform: rotate(-15deg);
-        transform-origin: right center;
-        filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
-    }
-
-    /* Standard shooting star animation - top left to bottom right */
-    @keyframes shooting {
-        0%, 98% {
-            opacity: 0;
-            transform: rotate(35deg) translateX(0);
-        }
-        98.2% {
-            opacity: 1;
-            transform: rotate(35deg) translateX(0);
-        }
-        98.5% {
-            opacity: 1;
-        }
-        99.2% {
-            opacity: 0.7;
-            transform: rotate(35deg) translateX(250px);
-        }
-        100% {
-            opacity: 0;
-            transform: rotate(35deg) translateX(500px);
-        }
-    }
-    
-    /* Vertical shooting star animation - top to bottom */
-    @keyframes shooting-vertical {
-        0%, 98.5% {
-            opacity: 0;
-            transform: rotate(80deg) translateX(0);
-        }
-        98.7% {
-            opacity: 1;
-            transform: rotate(80deg) translateX(0);
-        }
-        99% {
-            opacity: 1;
-        }
-        99.5% {
-            opacity: 0.6;
-            transform: rotate(80deg) translateX(150px);
-        }
-        100% {
-            opacity: 0;
-            transform: rotate(80deg) translateX(300px);
-        }
-    }
-    
-    /* Upward diagonal shooting star animation - bottom to top */
-    @keyframes shooting-up {
-        0%, 98.6% {
-            opacity: 0;
-            transform: rotate(-30deg) translateX(0);
-        }
-        98.8% {
-            opacity: 1;
-            transform: rotate(-30deg) translateX(0);
-        }
-        99.2% {
-            opacity: 1;
-        }
-        99.6% {
-            opacity: 0.5;
-            transform: rotate(-30deg) translateX(200px);
-        }
-        100% {
-            opacity: 0;
-            transform: rotate(-30deg) translateX(400px);
-        }
-    }
-    
-    /* Right to left shooting star animation */
-    @keyframes shooting-rtl {
-        0%, 98.7% {
-            opacity: 0;
-            transform: rotate(180deg) translateX(0);
-        }
-        98.9% {
-            opacity: 1;
-            transform: rotate(180deg) translateX(0);
-        }
-        99.3% {
-            opacity: 1;
-        }
-        99.7% {
-            opacity: 0.4;
-            transform: rotate(180deg) translateX(175px);
-        }
-        100% {
-            opacity: 0;
-            transform: rotate(180deg) translateX(350px);
-        }
-    }
-    
-    /* Fast shooting star animation */
-    @keyframes shooting-fast {
-        0%, 98.4% {
-            opacity: 0;
-            transform: rotate(-15deg) translateX(0);
-        }
-        98.6% {
-            opacity: 1;
-            transform: rotate(-15deg) translateX(0);
-        }
-        99.2% {
-            opacity: 1;
-        }
-        99.6% {
-            opacity: 0.5;
-            transform: rotate(-15deg) translateX(300px);
-        }
-        100% {
-            opacity: 0;
-            transform: rotate(-15deg) translateX(600px);
         }
     }
 
@@ -1247,10 +943,10 @@
 
 /* Animation elements z-index hierarchy */
 .messages-container .aurora,
-.messages-container .shooting-star,
 .messages-container .cosmic-dust,
+.messages-container .parallax-stars,
 .messages-container .pulsating-stars,
-.messages-container .parallax-stars {
+.messages-container .shooting-star {
   position: absolute;
   width: 100%;
   height: 100%;

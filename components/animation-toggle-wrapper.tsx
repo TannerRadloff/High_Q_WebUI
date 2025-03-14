@@ -4,8 +4,6 @@
 
 'use client';
 
-import React from 'react';
-
 export default function AnimationToggleWrapper() {
   // Return null as we've removed the animation toggle feature
   return null;

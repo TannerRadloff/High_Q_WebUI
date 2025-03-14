@@ -4,9 +4,6 @@
 
 'use client';
 
-import { useState } from 'react';
-import { Button } from '@/src/components/ui/button';
-
 export function AnimationToggle() {
   // Return a simple null component - we're removing this feature
   return null;
