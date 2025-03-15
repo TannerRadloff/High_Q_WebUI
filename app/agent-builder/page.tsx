@@ -277,6 +277,9 @@ export default function AgentBuilder() {
       // Select the newly created agent
       setSelectedAgentId(newAgent.id);
     }
+    
+    // Always reset the active drag ID when drag ends, regardless of where it was dropped
+    setActiveDragId(null);
   };
 
   // Handle agent selection
