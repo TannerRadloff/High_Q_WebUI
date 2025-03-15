@@ -262,7 +262,7 @@ function PureMultimodalInput({
   // Restore the resetTextarea function
   const resetTextarea = useCallback(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = '98px';
+      textareaRef.current.style.height = '60px';
     }
   }, []);
 
@@ -312,7 +312,7 @@ function PureMultimodalInput({
                 name="message"
                 placeholder={getPlaceholderText()}
                 className={cn(
-                  'max-h-64 min-h-[98px] grow whitespace-break-spaces text-secondary-foreground resize-none',
+                  'max-h-64 min-h-[60px] grow whitespace-break-spaces text-secondary-foreground resize-none',
                   'bg-transparent p-0 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0',
                   'relative z-10 h-full border-none outline-none placeholder:text-muted-foreground/70',
                   'transition-colors duration-300',
@@ -456,7 +456,7 @@ function PureStopButton({
       type="button"
       size="icon"
       variant="ghost"
-      className="absolute bottom-1 right-1 size-8 rounded-xl hover:bg-destructive/10 hover:text-destructive z-20"
+      className="absolute bottom-2 right-2 size-8 rounded-xl hover:bg-destructive/10 hover:text-destructive z-20"
       onClick={() => {
         stop();
         setMessages((messages) => sanitizeUIMessages(messages));
@@ -484,7 +484,7 @@ function PureSendButton({
       type="button"
       size="icon"
       variant="ghost"
-      className="absolute bottom-1 right-1 size-8 rounded-xl hover:bg-primary/10 hover:text-primary z-20"
+      className="absolute bottom-2 right-2 size-8 rounded-xl hover:bg-primary/10 hover:text-primary z-20"
       disabled={!input.trim() && uploadQueue.length === 0}
       onClick={() => submitForm(input)}
     >

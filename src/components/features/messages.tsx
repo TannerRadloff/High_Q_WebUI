@@ -42,7 +42,7 @@ function PureMessages({
   return (
     <div
       ref={messagesContainerRef}
-      className="flex-col min-w-0 gap-6 flex-1 overflow-y-scroll pt-4 relative messages-container"
+      className="flex-col min-w-0 gap-3 flex-1 overflow-y-scroll pt-2 pb-2 relative messages-container"
     >
       {messages.length === 0 && <Overview />}
 
@@ -69,7 +69,7 @@ function PureMessages({
 
       <div
         ref={messagesEndRef}
-        className="shrink-0 min-w-[24px] min-h-[24px]"
+        className="shrink-0 min-w-[16px] min-h-[16px]"
       />
     </div>
   );
