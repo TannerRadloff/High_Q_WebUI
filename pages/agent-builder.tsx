@@ -25,7 +25,7 @@ import {
   AgentType, 
   Connection, 
   AGENT_TEMPLATES
-} from '../agents-dashboard/types';
+} from '../components/agents-dashboard/types';
 
 /**
  * Agent Builder Dashboard
@@ -159,7 +159,7 @@ const AgentBuilder = () => {
         <meta name="description" content="Build AI agent workflows with a visual interface" />
       </Head>
       
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50">
         <header className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Agent Builder</h1>
           <div className="flex gap-2">
@@ -175,7 +175,7 @@ const AgentBuilder = () => {
           </div>
         </header>
         
-        <div className="flex h-[calc(100vh-65px)]">
+        <div className="flex flex-1 overflow-hidden">
           {/* Sidebar with available agents */}
           <div className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 overflow-y-auto">
             <h2 className="text-lg font-medium mb-4">Available Agents</h2>
@@ -229,10 +229,12 @@ const AgentBuilder = () => {
           </div>
           
           {/* Properties panel */}
-          <PropertiesPanel 
-            selectedAgent={selectedAgent} 
-            onAgentUpdate={handleAgentUpdate} 
-          />
+          <div className="w-80 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 overflow-y-auto">
+            <PropertiesPanel 
+              selectedAgent={selectedAgent} 
+              onAgentUpdate={handleAgentUpdate} 
+            />
+          </div>
         </div>
       </div>
     </>

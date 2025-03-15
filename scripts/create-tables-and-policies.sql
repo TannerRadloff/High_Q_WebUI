@@ -55,12 +55,21 @@ CREATE TABLE IF NOT EXISTS public.document (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Create the todos table
+CREATE TABLE IF NOT EXISTS public.todos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  is_complete BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS chat_user_id_idx ON public.chat(user_id);
 CREATE INDEX IF NOT EXISTS message_chat_id_idx ON public.message(chat_id);
 CREATE INDEX IF NOT EXISTS vote_chat_id_idx ON public.vote(chat_id);
 CREATE INDEX IF NOT EXISTS vote_message_id_idx ON public.vote(message_id);
 CREATE INDEX IF NOT EXISTS document_user_id_idx ON public.document(user_id);
+CREATE INDEX IF NOT EXISTS todos_created_at_idx ON public.todos(created_at);
 
 -- ================================================
 -- PART 2: ENABLE ROW LEVEL SECURITY
@@ -71,6 +80,7 @@ ALTER TABLE public.chat ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.message ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vote ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.document ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.todos ENABLE ROW LEVEL SECURITY;
 
 -- ================================================
 -- PART 3: CREATE HELPER FUNCTIONS
@@ -216,6 +226,14 @@ CREATE POLICY "Users can update their own documents"
 CREATE POLICY "Users can delete their own documents" 
   ON public.document FOR DELETE 
   USING (user_id = auth.uid() OR user_id IS NULL);
+
+-- Policies for the todos table
+DROP POLICY IF EXISTS "Allow public access to todos" ON public.todos;
+
+CREATE POLICY "Allow public access to todos" 
+  ON public.todos 
+  USING (true) 
+  WITH CHECK (true);
 
 -- ================================================
 -- Done! Your tables and RLS policies are now set up
