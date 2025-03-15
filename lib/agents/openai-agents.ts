@@ -19,6 +19,16 @@ type AgentConfig = {
     [key: string]: any;
   };
   tools?: any[];
+  handoffs?: (Agent | HandoffConfig)[];
+};
+
+type HandoffConfig = {
+  agent: Agent;
+  toolNameOverride?: string;
+  toolDescriptionOverride?: string;
+  inputSchema?: Record<string, any>;
+  contextFilter?: (history: any[]) => any[];
+  onHandoff?: (from: string, to: string, reason: string, data?: any) => void;
 };
 
 type RunConfig = {
@@ -41,7 +51,7 @@ type RunConfig = {
 type StreamCallbacks = {
   onStart?: () => void;
   onToken?: (token: string) => void;
-  onHandoff?: (from: string, to: string) => void;
+  onHandoff?: (from: string, to: string, reason: string, data?: any) => void;
   onError?: (error: any) => void;
   onComplete?: (result: any) => void;
 };
@@ -66,13 +76,79 @@ type TraceSpan = {
   ended_at?: Date;
 };
 
+// Handoff class implementation
+export class Handoff {
+  agent: Agent;
+  toolName: string;
+  toolDescription: string;
+  inputSchema: Record<string, any>;
+  contextFilter?: (history: any[]) => any[];
+  onHandoff?: (from: string, to: string, reason: string, data?: any) => void;
+
+  constructor(config: HandoffConfig) {
+    this.agent = config.agent;
+    this.toolName = config.toolNameOverride || `handoff_to_${config.agent.name.toLowerCase().replace(/\s+/g, '_')}`;
+    this.toolDescription = config.toolDescriptionOverride || `Transfer the conversation to the ${config.agent.name}`;
+    
+    // Default schema with reason field
+    this.inputSchema = config.inputSchema || {
+      type: 'object',
+      properties: {
+        reason: {
+          type: 'string',
+          description: 'The reason for handing off to this agent'
+        }
+      },
+      required: ['reason']
+    };
+    
+    this.contextFilter = config.contextFilter;
+    this.onHandoff = config.onHandoff;
+  }
+
+  // Generate the function tool schema for this handoff
+  generateToolSchema() {
+    return {
+      type: 'function',
+      function: {
+        name: this.toolName,
+        description: this.toolDescription,
+        parameters: this.inputSchema
+      }
+    };
+  }
+
+  // Process handoff and apply context filtering if needed
+  processHandoff(from: string, history: any[], handoffData: any) {
+    // Apply context filter if provided
+    const filteredHistory = this.contextFilter ? this.contextFilter(history) : history;
+    
+    // Call onHandoff callback if provided
+    if (this.onHandoff) {
+      this.onHandoff(from, this.agent.name, handoffData.reason || 'No reason provided', handoffData);
+    }
+    
+    return {
+      agent: this.agent,
+      history: filteredHistory,
+      reason: handoffData.reason || 'No reason provided',
+      data: handoffData
+    };
+  }
+}
+
+// Helper function to create a handoff
+export function handoff(config: HandoffConfig): Handoff {
+  return new Handoff(config);
+}
+
 // Agent class implementation
 export class Agent {
   name: string;
   instructions: string;
   model: string;
   modelSettings: Record<string, any>;
-  handoffs: Agent[];
+  handoffs: Handoff[];
   tools: any[];
 
   constructor(config: AgentConfig) {
@@ -80,8 +156,22 @@ export class Agent {
     this.instructions = config.instructions;
     this.model = config.model || 'gpt-4o';
     this.modelSettings = config.modelSettings || { temperature: 0.7 };
-    this.handoffs = [];
     this.tools = config.tools || [];
+    
+    // Process handoffs
+    this.handoffs = [];
+    if (config.handoffs && config.handoffs.length > 0) {
+      config.handoffs.forEach(h => {
+        if (h instanceof Agent) {
+          // Convert Agent to Handoff
+          this.handoffs.push(new Handoff({ agent: h }));
+        } else if (h instanceof Handoff) {
+          this.handoffs.push(h);
+        } else {
+          this.handoffs.push(new Handoff(h as HandoffConfig));
+        }
+      });
+    }
   }
 
   // Clone with overrides
@@ -91,12 +181,22 @@ export class Agent {
       instructions: overrides.instructions || this.instructions,
       model: overrides.model || this.model,
       modelSettings: { ...this.modelSettings, ...overrides.modelSettings },
-      tools: overrides.tools || this.tools
+      tools: overrides.tools || this.tools,
+      handoffs: overrides.handoffs || this.handoffs
     });
   }
 
   // Process a message through this agent
-  async process(message: string, history: any[] = []): Promise<{ content: string; handoff?: { agent: Agent; reason: string } }> {
+  async process(message: string, history: any[] = []): Promise<{ 
+    content: string; 
+    handoff?: { 
+      handoff: Handoff; 
+      agent: Agent; 
+      reason: string; 
+      data: any; 
+      history: any[]
+    } 
+  }> {
     const client = getOpenAIClient();
     
     // Prepare messages for OpenAI
@@ -110,24 +210,7 @@ export class Agent {
     let tools = [...this.tools];
     
     if (this.handoffs.length > 0) {
-      const handoffTools = this.handoffs.map(agent => ({
-        type: 'function',
-        function: {
-          name: `handoff_to_${agent.name.toLowerCase().replace(/\s+/g, '_')}`,
-          description: `Transfer the conversation to the ${agent.name}`,
-          parameters: {
-            type: 'object',
-            properties: {
-              reason: {
-                type: 'string',
-                description: 'The reason for handing off to this agent'
-              }
-            },
-            required: ['reason']
-          }
-        }
-      }));
-      
+      const handoffTools = this.handoffs.map(handoff => handoff.generateToolSchema());
       tools = [...tools, ...handoffTools];
     }
     
@@ -147,22 +230,23 @@ export class Agent {
       const toolCall = response.choices[0].message.tool_calls[0];
       const toolName = toolCall.function.name;
       
-      if (toolName.startsWith('handoff_to_')) {
-        const targetAgentName = toolName.replace('handoff_to_', '').replace(/_/g, ' ');
-        const targetAgent = this.handoffs.find(a => 
-          a.name.toLowerCase().replace(/\s+/g, '_') === targetAgentName.toLowerCase().replace(/\s+/g, '_')
-        );
+      // Find matching handoff by tool name
+      const matchedHandoff = this.handoffs.find(h => h.toolName === toolName);
+      
+      if (matchedHandoff) {
+        const handoffData = JSON.parse(toolCall.function.arguments);
+        const handoffResult = matchedHandoff.processHandoff(this.name, history, handoffData);
         
-        if (targetAgent) {
-          const args = JSON.parse(toolCall.function.arguments);
-          return {
-            content,
-            handoff: {
-              agent: targetAgent,
-              reason: args.reason || 'No reason provided'
-            }
-          };
-        }
+        return {
+          content,
+          handoff: {
+            handoff: matchedHandoff,
+            agent: handoffResult.agent,
+            reason: handoffResult.reason,
+            data: handoffResult.data,
+            history: handoffResult.history
+          }
+        };
       }
     }
     
@@ -206,20 +290,33 @@ export class Runner {
       
       // Handle handoffs
       let handoffPath = [currentAgent.name];
+      let handoffData: Record<string, any>[] = [];
       
       while (result.handoff && turns < maxTurns) {
         turns++;
         
-        // Create handoff span
+        // Create handoff span with enhanced data
         let handoffSpan = this.startHandoffSpan(
           currentAgent.name, 
           result.handoff.agent.name, 
-          result.handoff.reason
+          result.handoff.reason,
+          result.handoff.data
         );
+        
+        // Track handoff data
+        handoffData.push({
+          from: currentAgent.name,
+          to: result.handoff.agent.name,
+          reason: result.handoff.reason,
+          data: result.handoff.data
+        });
         
         // Switch to the target agent
         currentAgent = result.handoff.agent;
         handoffPath.push(currentAgent.name);
+        
+        // Use filtered history if provided
+        history = result.handoff.history;
         
         // Create new agent span
         agentSpan = this.startAgentSpan(currentAgent.name, query);
@@ -246,6 +343,7 @@ export class Runner {
         final_output: result.content,
         metadata: {
           handoffPath,
+          handoffData,
           executionTimeMs: Date.now() - startTime,
           last_agent_name: currentAgent.name,
           last_agent_id: currentAgent.name,
@@ -281,41 +379,169 @@ export class Runner {
     
     const startTime = Date.now();
     let currentAgent = this.agent;
+    let history: any[] = [];
+    let maxTurns = 10;
+    let turns = 0;
     
     try {
-      // Get the OpenAI client
-      const client = getOpenAIClient();
+      let result: { 
+        content: string; 
+        handoff?: { 
+          handoff: Handoff; 
+          agent: Agent; 
+          reason: string; 
+          data: any; 
+          history: any[] 
+        } 
+      } = { content: '' };
       
-      // Create streaming completion
-      const response = await client.chat.completions.create({
-        model: currentAgent.model,
-        messages: [
+      let handoffPath = [currentAgent.name];
+      let handoffData: Record<string, any>[] = [];
+      
+      do {
+        // Get the OpenAI client
+        const client = getOpenAIClient();
+        
+        // Prepare messages
+        const messages = [
           { role: 'system', content: currentAgent.instructions },
+          ...history,
           { role: 'user', content: query }
-        ],
-        temperature: currentAgent.modelSettings.temperature,
-        stream: true
-      });
-      
-      // Process streaming response
-      let fullContent = '';
-      
-      for await (const chunk of response) {
-        const content = chunk.choices[0]?.delta?.content || '';
-        if (content) {
-          fullContent += content;
-          if (callbacks.onToken) {
-            callbacks.onToken(content);
+        ];
+        
+        // Prepare tools
+        let tools = [...currentAgent.tools];
+        if (currentAgent.handoffs.length > 0) {
+          const handoffTools = currentAgent.handoffs.map(handoff => handoff.generateToolSchema());
+          tools = [...tools, ...handoffTools];
+        }
+        
+        // Create streaming completion
+        const response = await client.chat.completions.create({
+          model: currentAgent.model,
+          messages,
+          temperature: currentAgent.modelSettings.temperature,
+          tools: tools.length > 0 ? tools : undefined,
+          stream: true
+        });
+        
+        // Process streaming response
+        let fullContent = '';
+        let messageToolCalls: any[] = [];
+        
+        for await (const chunk of response) {
+          const content = chunk.choices[0]?.delta?.content || '';
+          
+          // Handle tool calls in chunks
+          if (chunk.choices[0]?.delta?.tool_calls) {
+            const toolCallChunks = chunk.choices[0].delta.tool_calls;
+            for (const toolCallChunk of toolCallChunks) {
+              // Initialize or update tool calls
+              if (!messageToolCalls[toolCallChunk.index]) {
+                messageToolCalls[toolCallChunk.index] = {
+                  id: toolCallChunk.id || `call_${uuidv4()}`,
+                  type: 'function',
+                  function: { name: '', arguments: '' }
+                };
+              }
+              
+              if (toolCallChunk.function?.name) {
+                messageToolCalls[toolCallChunk.index].function.name += toolCallChunk.function.name;
+              }
+              
+              if (toolCallChunk.function?.arguments) {
+                messageToolCalls[toolCallChunk.index].function.arguments += toolCallChunk.function.arguments;
+              }
+            }
+          }
+          
+          if (content) {
+            fullContent += content;
+            if (callbacks.onToken) {
+              callbacks.onToken(content);
+            }
           }
         }
-      }
+        
+        // Process tool calls if any
+        if (messageToolCalls.length > 0) {
+          const toolCall = messageToolCalls[0]; // Just handle first tool call for now
+          const toolName = toolCall.function.name;
+          
+          // Find matching handoff
+          const matchedHandoff = currentAgent.handoffs.find(h => h.toolName === toolName);
+          
+          if (matchedHandoff) {
+            try {
+              const handoffArgs = JSON.parse(toolCall.function.arguments);
+              const handoffResult = matchedHandoff.processHandoff(currentAgent.name, history, handoffArgs);
+              
+              // Notify about handoff
+              if (callbacks.onHandoff) {
+                callbacks.onHandoff(
+                  currentAgent.name, 
+                  matchedHandoff.agent.name, 
+                  handoffResult.reason,
+                  handoffResult.data
+                );
+              }
+              
+              // Track handoff
+              handoffData.push({
+                from: currentAgent.name,
+                to: matchedHandoff.agent.name,
+                reason: handoffResult.reason,
+                data: handoffResult.data
+              });
+              
+              // Update agent and history
+              currentAgent = matchedHandoff.agent;
+              handoffPath.push(currentAgent.name);
+              history = handoffResult.history;
+              
+              // Add handoff message to history
+              history.push({ 
+                role: 'assistant', 
+                content: `I'm transferring you to our ${currentAgent.name}. ${handoffResult.reason}`
+              });
+              
+              // Continue to next turn with new agent
+              turns++;
+              result = { 
+                content: fullContent, 
+                handoff: { 
+                  handoff: matchedHandoff, 
+                  agent: currentAgent, 
+                  reason: handoffResult.reason, 
+                  data: handoffResult.data, 
+                  history 
+                }
+              };
+            } catch (error) {
+              console.error('Error during handoff:', error);
+              result.handoff = undefined;
+            }
+          } else {
+            // Not a handoff, process normal tool call response
+            result.handoff = undefined;
+          }
+        } else {
+          // No tool calls, just regular message
+          history.push({ role: 'user', content: query });
+          history.push({ role: 'assistant', content: fullContent });
+          result = { content: fullContent, handoff: undefined };
+        }
+        
+      } while (result.handoff && turns < maxTurns);
       
       // Complete the stream
       if (callbacks.onComplete) {
         callbacks.onComplete({
-          content: fullContent,
+          content: result.content,
           metadata: {
             executionTimeMs: Date.now() - startTime,
+            handoffPath,
+            handoffData,
             last_agent_name: currentAgent.name,
             trace_id: this.currentTrace?.id
           }
@@ -329,10 +555,12 @@ export class Runner {
       
       return {
         success: true,
-        output: fullContent,
-        final_output: fullContent,
+        output: result.content,
+        final_output: result.content,
         metadata: {
           executionTimeMs: Date.now() - startTime,
+          handoffPath,
+          handoffData,
           last_agent_name: currentAgent.name,
           trace_id: this.currentTrace?.id
         }
@@ -392,7 +620,7 @@ export class Runner {
     span.data.output = output;
   }
   
-  private startHandoffSpan(sourceAgent: string, targetAgent: string, reason: string): TraceSpan {
+  private startHandoffSpan(sourceAgent: string, targetAgent: string, reason: string, data?: any): TraceSpan {
     const span: TraceSpan = {
       id: `span_${uuidv4()}`,
       type: 'handoff',
@@ -400,7 +628,8 @@ export class Runner {
       data: {
         source_agent: sourceAgent,
         target_agent: targetAgent,
-        reason
+        reason,
+        handoff_data: data
       },
       started_at: new Date()
     };

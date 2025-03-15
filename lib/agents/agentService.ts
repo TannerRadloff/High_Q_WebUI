@@ -1,4 +1,4 @@
-import { Agent, Runner, set_default_openai_key, set_tracing_export_api_key, set_tracing_disabled } from './openai-agents';
+import { Agent, Runner, set_default_openai_key, set_tracing_export_api_key, set_tracing_disabled, handoff, Handoff } from './openai-agents';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,6 +13,7 @@ export interface AgentStatus {
   startTime: Date;
   endTime?: Date;
   result?: string;
+  handoffData?: Record<string, any>;
 }
 
 // Define specialized agent types that extend the base Agent
@@ -24,6 +25,12 @@ interface AgentDefinition {
   model: string;
   icon: string;
   specialization?: string;
+}
+
+// Handoff data schema
+export interface HandoffData {
+  reason: string;
+  metadata?: Record<string, any>;
 }
 
 // Map to store initialized agent instances
@@ -83,6 +90,29 @@ export async function getAgent(definition: AgentDefinition): Promise<Agent> {
   agentInstances.set(definition.id, agent);
   
   return agent;
+}
+
+/**
+ * Create a handoff to a specialized agent
+ */
+export function createAgentHandoff(
+  targetAgent: Agent,
+  options?: {
+    toolNameOverride?: string;
+    toolDescriptionOverride?: string;
+    inputSchema?: Record<string, any>;
+    contextFilter?: (history: any[]) => any[];
+    onHandoff?: (from: string, to: string, reason: string, data?: any) => void;
+  }
+): Handoff {
+  return handoff({
+    agent: targetAgent,
+    toolNameOverride: options?.toolNameOverride,
+    toolDescriptionOverride: options?.toolDescriptionOverride,
+    inputSchema: options?.inputSchema,
+    contextFilter: options?.contextFilter,
+    onHandoff: options?.onHandoff
+  });
 }
 
 /**
@@ -214,7 +244,8 @@ export async function processWithAgents(
         progress: 100,
         startTime: new Date(),
         endTime: new Date(),
-        result: result.output
+        result: result.output,
+        handoffData: result.metadata?.handoffData
       });
     }
     
@@ -238,7 +269,9 @@ export async function processWithAgents(
     return {
       response: result.output,
       agent: agentInfo,
-      handoffId: result.metadata?.trace_id
+      handoffId: result.metadata?.trace_id,
+      handoffPath: result.metadata?.handoffPath,
+      handoffData: result.metadata?.handoffData
     };
   } catch (error) {
     console.error('Error processing with agents:', error);
@@ -256,6 +289,7 @@ export async function streamWithAgents(
     onStart?: () => void;
     onToken?: (token: string) => void;
     onAgentChange?: (agent: any) => void;
+    onHandoffData?: (handoffData: any) => void;
     onComplete?: (result: any) => void;
     onError?: (error: any) => void;
   }
@@ -283,15 +317,27 @@ export async function streamWithAgents(
       
       onToken: callbacks.onToken,
       
-      onHandoff: (from: string, to: string) => {
+      onHandoff: (from: string, to: string, reason: string, data: any) => {
         if (callbacks.onAgentChange) {
           callbacks.onAgentChange({
             from,
-            to
+            to,
+            reason,
+            data
           });
         }
+
+        if (callbacks.onHandoffData) {
+          callbacks.onHandoffData({
+            from,
+            to,
+            reason,
+            data
+          });
+        }
+        
         if (callbacks.onToken) {
-          callbacks.onToken(`\n\n_Handing off from ${from} to ${to}..._\n\n`);
+          callbacks.onToken(`\n\n_Handing off from ${from} to ${to}: ${reason}_\n\n`);
         }
       },
       
@@ -342,13 +388,81 @@ async function getDelegationAgent(): Promise<Agent> {
     model: 'gpt-4o'
   });
   
-  // Add specialized agent handoffs
+  // Add specialized agent handoffs with custom data schemas
   const researchAgent = await createSpecializedAgent('research', 'Research Agent');
   const codingAgent = await createSpecializedAgent('coding', 'Coding Agent');
   const writingAgent = await createSpecializedAgent('writing', 'Writing Agent');
   
+  // Create handoffs with enhanced configuration
+  const handoffs = [
+    createAgentHandoff(researchAgent, {
+      inputSchema: {
+        type: 'object',
+        properties: {
+          reason: {
+            type: 'string',
+            description: 'The reason for handing off to the Research Agent'
+          },
+          topic: {
+            type: 'string',
+            description: 'The specific topic to research'
+          },
+          depth: {
+            type: 'string',
+            enum: ['basic', 'moderate', 'in-depth'],
+            description: 'How deep the research should be'
+          }
+        },
+        required: ['reason', 'topic']
+      },
+      onHandoff: (from, to, reason, data) => {
+        console.log(`Research handoff: ${from} -> ${to}, Topic: ${data?.topic || 'Unknown'}`);
+      }
+    }),
+    createAgentHandoff(codingAgent, {
+      inputSchema: {
+        type: 'object',
+        properties: {
+          reason: {
+            type: 'string',
+            description: 'The reason for handing off to the Coding Agent'
+          },
+          language: {
+            type: 'string',
+            description: 'The programming language involved'
+          },
+          task: {
+            type: 'string',
+            description: 'The specific coding task to complete'
+          }
+        },
+        required: ['reason']
+      }
+    }),
+    createAgentHandoff(writingAgent, {
+      inputSchema: {
+        type: 'object',
+        properties: {
+          reason: {
+            type: 'string',
+            description: 'The reason for handing off to the Writing Agent'
+          },
+          style: {
+            type: 'string',
+            description: 'The writing style to use'
+          },
+          format: {
+            type: 'string',
+            description: 'The format of the content'
+          }
+        },
+        required: ['reason']
+      }
+    })
+  ];
+  
   // Define the handoffs
-  agent.handoffs = [researchAgent, codingAgent, writingAgent];
+  agent.handoffs = handoffs;
   
   // Store the delegation agent
   agentInstances.set(delegationId, agent);
