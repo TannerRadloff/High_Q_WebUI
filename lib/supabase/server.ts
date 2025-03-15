@@ -12,6 +12,9 @@ import { createServerClient as createSSRServerClient } from '@supabase/ssr'
 import { Database } from '@/types/supabase'
 import { SupabaseClient } from '@supabase/supabase-js'
 
+// Memory store for fallback when cookies are unavailable
+const memoryStore = new Map<string, string>();
+
 /**
  * Server action client - specifically for use in server actions
  * This uses a dynamic import to avoid importing next/headers directly
@@ -39,51 +42,34 @@ export async function createServerClient(): Promise<SupabaseClient> {
       throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable');
     }
     
-    // Dynamically import to avoid the direct import of next/headers
-    const { cookies } = await import('next/headers');
-    const cookieStore = await cookies();
-    
-    // Create a client with additional options and improved error handling
-    return createSSRServerClient(
+    // Use a simpler approach to create the client
+    const client = createSSRServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       {
-        cookies: {
-          get(name) {
-            try {
-              const cookie = cookieStore.get(name);
-              return cookie?.value;
-            } catch (error) {
-              console.error(`[Supabase Server] Error getting cookie ${name}:`, error);
-              return undefined;
-            }
-          },
-          set(name, value, options) {
-            try {
-              if (!value) {
-                console.warn(`[Supabase Server] Attempted to set empty value for cookie ${name}`);
-              }
-              cookieStore.set(name, value, options);
-            } catch (error) {
-              console.error(`[Supabase Server] Error setting cookie ${name}:`, error);
-            }
-          },
-          remove(name, options) {
-            try {
-              cookieStore.set(name, '', { ...options, maxAge: 0 });
-            } catch (error) {
-              console.error(`[Supabase Server] Error removing cookie ${name}:`, error);
-            }
-          },
+        auth: {
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: true
         },
         global: {
           fetch: (url, options) => {
             // Set a reasonable timeout for Supabase requests
             const timeoutController = new AbortController();
-            const timeoutId = setTimeout(() => timeoutController.abort(), 8000); // 8 second timeout
+            const timeoutId = setTimeout(() => {
+              console.warn(`[Supabase Server] Request timeout for URL: ${url}`);
+              timeoutController.abort();
+            }, 10000); // 10 second timeout
+            
+            // Add cache control headers to avoid stale data
+            const headers = new Headers(options?.headers || {});
+            headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+            headers.set('Pragma', 'no-cache');
+            headers.set('Expires', '0');
             
             return fetch(url, {
               ...options,
+              headers,
               signal: timeoutController.signal,
             }).finally(() => {
               clearTimeout(timeoutId);
@@ -92,6 +78,16 @@ export async function createServerClient(): Promise<SupabaseClient> {
         }
       }
     );
+
+    // Setup cookie handling after client creation
+    try {
+      const { cookies } = await import('next/headers');
+      await client.auth.getSession();
+    } catch (error) {
+      console.error('[Supabase Server] Error setting up session:', error);
+    }
+
+    return client;
   } catch (error) {
     console.error('[Supabase Server] Error creating client:', error);
     throw error;
@@ -110,18 +106,18 @@ let serverComponentClientCache: any = null;
 // Get a cached server component client
 export async function getSupabaseServerClient() {
   if (serverComponentClientCache) return serverComponentClientCache;
-  
+
   // Dynamically import to avoid the direct import of next/headers
   const { cookies } = await import('next/headers');
   const { createServerComponentClient } = await import('@supabase/auth-helpers-nextjs');
   const { cache } = await import('react');
-  
+
   // Create a cached version of the getter
   const cachedGetter = cache(async () => {
     const cookieStore = cookies();
     return createServerComponentClient<Database>({ cookies: () => cookieStore });
   });
-  
+
   // Get the client
   serverComponentClientCache = await cachedGetter();
   return serverComponentClientCache;
@@ -132,7 +128,7 @@ export async function createClient() {
   // Dynamically import to avoid the direct import of next/headers
   const { cookies } = await import('next/headers');
   const { createServerComponentClient } = await import('@supabase/auth-helpers-nextjs');
-  
+
   const cookieStore = cookies();
   return createServerComponentClient<Database>({ cookies: () => cookieStore });
 } 

@@ -24,7 +24,8 @@ import {
   Agent, 
   AgentType, 
   Connection, 
-  AGENT_TEMPLATES
+  AGENT_TEMPLATES,
+  ModelType
 } from '../components/agents-dashboard/types';
 
 /**
@@ -100,7 +101,7 @@ const AgentBuilder = () => {
           config: {
             name: template.config?.name || `${agentType} Agent`,
             instructions: template.config?.instructions || '',
-            model: template.config?.model || 'gpt-4o',
+            model: template.config?.model || ModelType.GPT_4,
             tools: template.config?.tools || []
           }
         };
