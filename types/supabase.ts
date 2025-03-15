@@ -32,6 +32,64 @@ export interface Database {
           visibility?: 'private' | 'public'
         }
       }
+      agent_workflow: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          description: string
+          created_at: string
+          updated_at: string
+          is_active: boolean
+          entry_point_agent_id: string
+        }
+        Insert: {
+          id: string
+          user_id: string
+          name: string
+          description?: string
+          created_at?: string
+          updated_at?: string
+          is_active?: boolean
+          entry_point_agent_id?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          description?: string
+          created_at?: string
+          updated_at?: string
+          is_active?: boolean
+          entry_point_agent_id?: string
+        }
+      }
+      agent_workflow_version: {
+        Row: {
+          id: string
+          workflow_id: string
+          version: number
+          agents: Json
+          connections: Json
+          created_at: string
+        }
+        Insert: {
+          id: string
+          workflow_id: string
+          version: number
+          agents: Json
+          connections: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workflow_id?: string
+          version?: number
+          agents?: Json
+          connections?: Json
+          created_at?: string
+        }
+      }
       message: {
         Row: {
           id: string

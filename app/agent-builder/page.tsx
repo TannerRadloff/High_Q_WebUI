@@ -1,14 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DndContext, DragEndEvent, DragOverEvent } from '@dnd-kit/core';
 import { v4 as uuidv4 } from 'uuid';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { toast } from 'sonner';
 
 // Import existing components
 import Canvas from '@/components/agents-dashboard/Canvas';
 import AgentItem from '@/components/agents-dashboard/AgentItem';
 import PropertiesPanel from '@/components/agents-dashboard/PropertiesPanel';
 import { Agent, AgentType, AGENT_TEMPLATES, Connection } from '@/components/agents-dashboard/types';
+
+// Import workflow API functions
+import { createWorkflow, updateWorkflow, fetchWorkflow } from '@/lib/agent-workflow';
 
 /**
  * AgentBuilder - A page for building agent workflows using a drag-and-drop interface
@@ -24,9 +29,55 @@ export default function AgentBuilder() {
   // State for connection creation
   const [isCreatingConnection, setIsCreatingConnection] = useState(false);
   const [connectionSource, setConnectionSource] = useState<string | null>(null);
+  
+  // State for workflow management
+  const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
   // Get the selected agent
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId) || null;
+
+  // Load workflow if workflow ID is provided in URL
+  useEffect(() => {
+    const workflowId = searchParams?.get('workflow');
+    if (workflowId) {
+      loadWorkflow(workflowId);
+    }
+  }, [searchParams]);
+
+  // Load a workflow from the server
+  const loadWorkflow = async (workflowId: string) => {
+    try {
+      setIsLoading(true);
+      const workflow = await fetchWorkflow(workflowId);
+      
+      if (workflow) {
+        setWorkflowName(workflow.name);
+        setWorkflowDescription(workflow.description);
+        setCurrentWorkflowId(workflow.id);
+        
+        // Set agents and connections if available
+        if (workflow.agents) {
+          setAgents(workflow.agents);
+        }
+        
+        if (workflow.connections) {
+          setConnections(workflow.connections);
+        }
+        
+        toast.success(`Workflow "${workflow.name}" loaded successfully`);
+      }
+    } catch (error) {
+      console.error('Error loading workflow:', error);
+      toast.error('Failed to load workflow');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Handle drag end event (when an agent is dropped on the canvas)
   const handleDragEnd = (event: DragEndEvent) => {
@@ -138,24 +189,72 @@ export default function AgentBuilder() {
   };
 
   // Save the workflow
-  const handleSaveWorkflow = () => {
-    const workflow = {
-      id: uuidv4(),
-      name: workflowName,
-      description: workflowDescription,
-      agents,
-      connections,
-      entryPointAgentId: agents.length > 0 ? agents[0].id : '',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+  const handleSaveWorkflow = async () => {
+    try {
+      if (!workflowName.trim()) {
+        toast.error('Please enter a workflow name');
+        return;
+      }
+
+      setIsSaving(true);
+      
+      // Determine the entry point agent (first agent for now)
+      const entryPointAgentId = agents.length > 0 ? agents[0].id : '';
+      
+      // Either update an existing workflow or create a new one
+      if (currentWorkflowId) {
+        await updateWorkflow(
+          currentWorkflowId,
+          workflowName,
+          workflowDescription,
+          agents,
+          connections,
+          entryPointAgentId
+        );
+        toast.success('Workflow updated successfully');
+      } else {
+        const { workflowId } = await createWorkflow(
+          workflowName,
+          workflowDescription,
+          agents,
+          connections,
+          entryPointAgentId
+        );
+        setCurrentWorkflowId(workflowId);
+        toast.success('Workflow saved successfully');
+        
+        // Update URL to include the new workflow ID without a full page reload
+        const newUrl = `/agent-builder?workflow=${workflowId}`;
+        window.history.pushState({ path: newUrl }, '', newUrl);
+      }
+    } catch (error) {
+      console.error('Error saving workflow:', error);
+      toast.error('Failed to save workflow');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Reset to a new workflow
+  const handleNewWorkflow = () => {
+    if (agents.length > 0 && !confirm('Are you sure you want to create a new workflow? Unsaved changes will be lost.')) {
+      return;
+    }
     
-    // For now, just log the workflow to console
-    // In a real app, this would save to a database
-    console.log('Saving workflow:', workflow);
+    setAgents([]);
+    setConnections([]);
+    setSelectedAgentId(null);
+    setWorkflowName('New Workflow');
+    setWorkflowDescription('');
+    setCurrentWorkflowId(null);
     
-    // Show a success message
-    alert('Workflow saved successfully!');
+    // Remove workflow ID from URL
+    router.push('/agent-builder');
+  };
+
+  // Navigate to workflows page
+  const handleViewWorkflows = () => {
+    router.push('/agent-builder/workflows');
   };
 
   return (
@@ -169,7 +268,7 @@ export default function AgentBuilder() {
               Build agent workflows using the OpenAI Agents SDK
             </p>
           </div>
-          <div className="flex space-x-4">
+          <div className="flex space-x-4 items-center">
             <input
               type="text"
               value={workflowName}
@@ -177,15 +276,51 @@ export default function AgentBuilder() {
               className="px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900"
               placeholder="Workflow Name"
             />
-            <button
-              onClick={handleSaveWorkflow}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-            >
-              Save Workflow
-            </button>
+            <input
+              type="text"
+              value={workflowDescription}
+              onChange={(e) => setWorkflowDescription(e.target.value)}
+              className="px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 w-48 md:w-auto"
+              placeholder="Description (optional)"
+            />
+            <div className="flex space-x-2">
+              <button
+                onClick={handleNewWorkflow}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white rounded-md"
+              >
+                New
+              </button>
+              <button
+                onClick={handleViewWorkflows}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white rounded-md"
+              >
+                My Workflows
+              </button>
+              <button
+                onClick={handleSaveWorkflow}
+                disabled={isSaving || isLoading}
+                className={`px-4 py-2 rounded-md ${
+                  isSaving || isLoading
+                    ? 'bg-blue-400 dark:bg-blue-800 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                } text-white`}
+              >
+                {isSaving ? 'Saving...' : currentWorkflowId ? 'Update' : 'Save'}
+              </button>
+            </div>
           </div>
         </div>
       </header>
+
+      {/* Loading overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-slate-800/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-lg shadow-lg flex flex-col items-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mb-4" />
+            <p>Loading workflow...</p>
+          </div>
+        </div>
+      )}
 
       {/* Connection creation mode indicator */}
       {isCreatingConnection && (

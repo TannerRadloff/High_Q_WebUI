@@ -441,3 +441,36 @@ using (true);
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Supabase Documentation](https://supabase.io/docs)
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+
+## Agent Builder
+
+This project includes an Agent Builder that allows you to create, save, and manage agent workflows using the OpenAI Agents SDK.
+
+### Features:
+
+- Visual drag-and-drop interface for building agent workflows
+- Connect different agent types to create complex workflows
+- Configure agent properties including instructions, model, and tools
+- Save and load workflows from a database
+- Version history for each workflow
+
+### Setting Up the Database Schema
+
+The Agent Builder requires additional database tables in Supabase. To set up these tables:
+
+1. Navigate to your Supabase project dashboard
+2. Go to the "SQL Editor" section
+3. Copy the contents of the SQL script from `scripts/create-agent-workflow-tables.sql`
+4. Paste the SQL script into the editor and execute it
+
+This script will create the necessary tables with proper relationships and row-level security policies to ensure user data is protected.
+
+### Using the Agent Builder
+
+1. Navigate to `/agent-builder` in the application
+2. Create a new workflow by dragging agent types from the palette to the canvas
+3. Configure each agent's properties using the properties panel
+4. Create connections between agents to define the workflow
+5. Save your workflow to use it later
+
+You can view and manage your saved workflows at `/agent-builder/workflows`.
