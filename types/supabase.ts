@@ -9,39 +9,116 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      // Add your database tables here
-      todos: {
+      chat: {
         Row: {
           id: string
+          user_id: string
           title: string
-          completed: boolean
           created_at: string
-          user_id: string | null
+          visibility: 'private' | 'public'
         }
         Insert: {
-          id?: string
+          id: string
+          user_id: string
           title: string
-          completed?: boolean
           created_at?: string
-          user_id?: string | null
+          visibility?: 'private' | 'public'
         }
         Update: {
           id?: string
+          user_id?: string
           title?: string
-          completed?: boolean
           created_at?: string
-          user_id?: string | null
+          visibility?: 'private' | 'public'
+        }
+      }
+      message: {
+        Row: {
+          id: string
+          role: 'system' | 'user' | 'assistant' | 'data'
+          content: string
+          chat_id: string
+          created_at: string
+          document_id?: string
+          artifact_title?: string
+        }
+        Insert: {
+          id: string
+          role: 'system' | 'user' | 'assistant' | 'data'
+          content: string
+          chat_id: string
+          created_at?: string
+          document_id?: string
+          artifact_title?: string
+        }
+        Update: {
+          id?: string
+          role?: 'system' | 'user' | 'assistant' | 'data'
+          content?: string
+          chat_id?: string
+          created_at?: string
+          document_id?: string
+          artifact_title?: string
+        }
+      }
+      vote: {
+        Row: {
+          id: string
+          chat_id: string
+          message_id: string
+          is_upvoted: boolean
+          created_at?: string
+        }
+        Insert: {
+          id?: string
+          chat_id: string
+          message_id: string
+          is_upvoted: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          chat_id?: string
+          message_id?: string
+          is_upvoted?: boolean
+          created_at?: string
+        }
+      }
+      document: {
+        Row: {
+          id: string
+          content: string
+          kind: string
+          title?: string
+          user_id?: string
+          created_at: string
+        }
+        Insert: {
+          id: string
+          content: string
+          kind: string
+          title?: string
+          user_id?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          content?: string
+          kind?: string
+          title?: string
+          user_id?: string
+          created_at?: string
         }
       }
     }
     Views: {
-      // Add views here if you have any
+      // Views are not being used in this application
     }
     Functions: {
-      // Add functions here if you have any
+      // Custom functions are not being used in this application
     }
     Enums: {
-      // Add enums here if you have any
+      // Enums are not being used in this application
     }
   }
 } 

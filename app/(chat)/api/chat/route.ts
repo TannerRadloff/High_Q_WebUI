@@ -7,11 +7,11 @@ import { getServerSession } from '@/lib/auth';
 import { DEFAULT_CHAT_MODEL, chatModels } from '@/lib/ai/models';
 import { systemPrompt } from '@/lib/ai/prompts';
 import {
-  deleteChatById,
   getChatById,
   saveChat,
   saveMessages,
-} from '@/lib/db/queries';
+  deleteChatById
+} from '@/lib/supabase/queries';
 import {
   generateUUID,
   getMostRecentUserMessage,
@@ -170,7 +170,19 @@ export async function POST(request: Request) {
       chat = await getChatById({ id });
     } catch (dbError) {
       console.error('[API] Database error when fetching chat:', dbError);
-      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+      // Check for connection-related errors
+      const errorMessage = dbError instanceof Error ? dbError.message : String(dbError);
+      if (
+        errorMessage.includes('connection') || 
+        errorMessage.includes('timeout') || 
+        errorMessage.includes('ECONNREFUSED')
+      ) {
+        return NextResponse.json({ 
+          error: 'Database connection error', 
+          details: 'Unable to connect to the database. Please try again later.'
+        }, { status: 503 }); // Service Unavailable is appropriate for temporary DB issues
+      }
+      return NextResponse.json({ error: 'Database error', details: errorMessage }, { status: 500 });
     }
 
     if (!chat) {
@@ -189,7 +201,44 @@ export async function POST(request: Request) {
           }
         }
         
-        await saveChat({ id, userId: session.user.id, title });
+        // Retry logic for database operations
+        let retries = 3;
+        let saveSuccess = false;
+        let lastError;
+        
+        while (retries > 0 && !saveSuccess) {
+          try {
+            await saveChat({ id, userId: session.user.id, title });
+            saveSuccess = true;
+          } catch (saveError) {
+            lastError = saveError;
+            console.error(`[API] Error saving new chat (attempt ${4-retries}/3):`, saveError);
+            retries--;
+            // Wait briefly before retrying
+            if (retries > 0) {
+              await new Promise(resolve => setTimeout(resolve, 200));
+            }
+          }
+        }
+        
+        if (!saveSuccess) {
+          // Check for connection-related errors
+          const errorMessage = lastError instanceof Error ? lastError.message : String(lastError);
+          if (
+            errorMessage.includes('connection') || 
+            errorMessage.includes('timeout') || 
+            errorMessage.includes('ECONNREFUSED')
+          ) {
+            return NextResponse.json({ 
+              error: 'Database connection error', 
+              details: 'Unable to connect to the database. Please try again later.'
+            }, { status: 503 });
+          }
+          return NextResponse.json({ 
+            error: 'Failed to create chat', 
+            details: errorMessage
+          }, { status: 500 });
+        }
       } catch (saveError) {
         console.error('[API] Error saving new chat:', saveError);
         return NextResponse.json({ error: 'Failed to create chat' }, { status: 500 });

@@ -54,19 +54,48 @@ function getDbConnection() {
 }
 
 // Helper to ensure we have a database connection
-function ensureDbConnection() {
+async function ensureDbConnection() {
   if (!dbInstance) {
     console.log('Database connection not initialized, creating new connection');
-    try {
-      getDbConnection();
-      if (!dbInstance) {
-        console.error('Failed to initialize database connection');
-        throw new Error('Database connection could not be established');
+    
+    // Add retry logic for connection
+    let retries = 3;
+    let connected = false;
+    let lastError;
+    
+    while (retries > 0 && !connected) {
+      try {
+        getDbConnection();
+        if (!dbInstance) {
+          throw new Error('Database connection could not be established');
+        }
+        connected = true;
+        console.log('Database connection successfully established');
+      } catch (error) {
+        lastError = error;
+        console.error(`Error establishing database connection (attempt ${4-retries}/3):`, error);
+        retries--;
+        
+        // Wait before retrying with exponential backoff
+        if (retries > 0) {
+          const backoffTime = Math.pow(2, 3-retries) * 100; // 100ms, 200ms, 400ms
+          console.log(`Retrying database connection in ${backoffTime}ms...`);
+          await new Promise(resolve => setTimeout(resolve, backoffTime));
+        }
       }
-      console.log('Database connection successfully established');
-    } catch (error) {
-      console.error('Error establishing database connection:', error);
-      throw new Error('Failed to connect to database: ' + (error instanceof Error ? error.message : String(error)));
+    }
+    
+    if (!connected) {
+      // Enhanced error message for better diagnosis
+      const errorMessage = lastError instanceof Error ? lastError.message : String(lastError);
+      const connectionError = new Error(`Failed to connect to database after 3 attempts: ${errorMessage}`);
+      
+      // Add additional debugging info
+      if (lastError instanceof Error && lastError.stack) {
+        connectionError.stack = lastError.stack;
+      }
+      
+      throw connectionError;
     }
   }
   return dbInstance!;
@@ -74,7 +103,7 @@ function ensureDbConnection() {
 
 export async function getUser(email: string): Promise<Array<User>> {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     return await db.select().from(user).where(eq(user.email, email));
   } catch (error) {
     console.error('Failed to get user from database:', error);
@@ -84,7 +113,7 @@ export async function getUser(email: string): Promise<Array<User>> {
 
 export async function getUserByEmail(email: string): Promise<User | undefined> {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     const [selectedUser] = await db.select().from(user).where(eq(user.email, email));
     return selectedUser;
   } catch (error) {
@@ -100,7 +129,7 @@ export async function createOAuthUser(
   provider: string
 ) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     return await db.insert(user).values({ 
       email, 
       name: name || null,
@@ -119,7 +148,7 @@ export async function createUser(email: string, password: string) {
   const hash = hashSync(password, salt);
 
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     return await db.insert(user).values({ email, password: hash });
   } catch (error) {
     console.error('Failed to create user in database:', error);
@@ -137,7 +166,7 @@ export async function saveChat({
   title: string;
 }) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     
     // Validate inputs
     if (!id) throw new Error('Chat ID is required');
@@ -169,7 +198,7 @@ export async function saveChat({
 
 export async function deleteChatById({ id }: { id: string }) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     await db.delete(vote).where(eq(vote.chatId, id));
     await db.delete(message).where(eq(message.chatId, id));
 
@@ -183,7 +212,7 @@ export async function deleteChatById({ id }: { id: string }) {
 export async function getChatsByUserId({ id }: { id: string }) {
   try {
     console.log(`Database: Fetching chats for user ${id.substring(0, 5)}...`);
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     const chats = await db
       .select()
       .from(chat)
@@ -200,7 +229,7 @@ export async function getChatsByUserId({ id }: { id: string }) {
 
 export async function getChatById({ id }: { id: string }) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     const [selectedChat] = await db.select().from(chat).where(eq(chat.id, id));
     return selectedChat;
   } catch (error) {
@@ -211,7 +240,7 @@ export async function getChatById({ id }: { id: string }) {
 
 export async function saveMessages({ messages }: { messages: Array<Message> }) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     return await db.insert(message).values(messages);
   } catch (error) {
     console.error('Failed to save messages in database', error);
@@ -221,7 +250,7 @@ export async function saveMessages({ messages }: { messages: Array<Message> }) {
 
 export async function getMessagesByChatId({ id }: { id: string }) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     return await db
       .select()
       .from(message)
@@ -243,7 +272,7 @@ export async function voteMessage({
   type: 'up' | 'down';
 }) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     const [existingVote] = await db
       .select()
       .from(vote)
@@ -268,7 +297,7 @@ export async function voteMessage({
 
 export async function getVotesByChatId({ id }: { id: string }) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     return await db.select().from(vote).where(eq(vote.chatId, id));
   } catch (error) {
     console.error('Failed to get votes by chat id from database:', error);
@@ -290,7 +319,7 @@ export async function saveDocument({
   userId: string;
 }) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     
     // Validate inputs
     if (!id) throw new Error('Document ID is required');
@@ -327,7 +356,7 @@ export async function saveDocument({
 
 export async function getDocumentsById({ id }: { id: string }) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     const documents = await db
       .select()
       .from(document)
@@ -343,7 +372,7 @@ export async function getDocumentsById({ id }: { id: string }) {
 
 export async function getDocumentById({ id }: { id: string }) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     const [selectedDocument] = await db
       .select()
       .from(document)
@@ -365,7 +394,7 @@ export async function deleteDocumentsByIdAfterTimestamp({
   timestamp: Date;
 }) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     await db
       .delete(suggestion)
       .where(
@@ -392,7 +421,7 @@ export async function saveSuggestions({
   suggestions: Array<Suggestion>;
 }) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     return await db.insert(suggestion).values(suggestions);
   } catch (error) {
     console.error('Failed to save suggestions in database');
@@ -406,7 +435,7 @@ export async function getSuggestionsByDocumentId({
   documentId: string;
 }) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     return await db
       .select()
       .from(suggestion)
@@ -421,7 +450,7 @@ export async function getSuggestionsByDocumentId({
 
 export async function getMessageById({ id }: { id: string }) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     return await db.select().from(message).where(eq(message.id, id));
   } catch (error) {
     console.error('Failed to get message by id from database');
@@ -437,7 +466,7 @@ export async function deleteMessagesByChatIdAfterTimestamp({
   timestamp: Date;
 }) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     const messagesToDelete = await db
       .select({ id: message.id })
       .from(message)
@@ -476,7 +505,7 @@ export async function updateChatVisiblityById({
   visibility: 'private' | 'public';
 }) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     return await db.update(chat).set({ visibility }).where(eq(chat.id, chatId));
   } catch (error) {
     console.error('Failed to update chat visibility in database');
@@ -487,7 +516,7 @@ export async function updateChatVisiblityById({
 // Password reset functions
 export async function createPasswordResetToken(userId: string, token: string, expiresAt: Date) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     return await db.insert(passwordReset).values({
       userId,
       token,
@@ -503,7 +532,7 @@ export async function createPasswordResetToken(userId: string, token: string, ex
 
 export async function getPasswordResetByToken(token: string): Promise<PasswordReset | undefined> {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     const [resetToken] = await db
       .select()
       .from(passwordReset)
@@ -518,7 +547,7 @@ export async function getPasswordResetByToken(token: string): Promise<PasswordRe
 
 export async function markPasswordResetTokenAsUsed(id: string) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     return await db
       .update(passwordReset)
       .set({ used: true })
@@ -531,7 +560,7 @@ export async function markPasswordResetTokenAsUsed(id: string) {
 
 export async function getUserById(id: string): Promise<User | undefined> {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     const [selectedUser] = await db.select().from(user).where(eq(user.id, id));
     return selectedUser;
   } catch (error) {
@@ -542,7 +571,7 @@ export async function getUserById(id: string): Promise<User | undefined> {
 
 export async function updateUserPassword(userId: string, hashedPassword: string) {
   try {
-    const db = ensureDbConnection();
+    const db = await ensureDbConnection();
     return await db
       .update(user)
       .set({ password: hashedPassword })

@@ -82,6 +82,9 @@ export function Chat({
     }
   }, []);
   
+  // Add new state for chat creation
+  const [hasMadeInitialChatRequest, setHasMadeInitialChatRequest] = useState(false);
+  
   // Handle network status and display
   useEffect(() => {
     const handleOnline = () => {
@@ -148,14 +151,25 @@ export function Chat({
 
   // Handle new chat creation
   useEffect(() => {
+    // Create a flag to track if we're already attempting to create a chat
+    let isAttemptingCreate = false;
+    let chatCreationTimeout: NodeJS.Timeout;
+    
     async function createNewChat() {
-      if (id === 'create-new' && user) {
+      if (id === 'create-new' && user && !isAttemptingCreate && !isCreatingChat && !hasMadeInitialChatRequest) {
         try {
+          // Set both flags to prevent concurrent requests
+          isAttemptingCreate = true;
           setIsCreatingChat(true);
+          setHasMadeInitialChatRequest(true);
+          
           const newId = generateUUID();
           
-          // Add a small delay to ensure authentication is fully established
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Add a slightly longer delay to ensure authentication is fully established
+          // This helps prevent race conditions with the Supabase auth cookies
+          await new Promise(resolve => {
+            chatCreationTimeout = setTimeout(resolve, 1000);
+          });
           
           // Create a new chat in the database
           const response = await fetch('/api/chat', {
@@ -173,6 +187,16 @@ export function Chat({
           });
           
           if (!response.ok) {
+            // Handle specific status codes
+            if (response.status === 401) {
+              throw new Error('Authentication required. Please try logging in again.');
+            } else if (response.status === 429) {
+              throw new Error('Too many requests. Please try again in a moment.');
+            } else if (response.status >= 500) {
+              throw new Error('Server error. Please try again later.');
+            }
+            
+            // Try to parse error response
             const data = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
             console.error('Chat creation error:', data);
             throw new Error(data.error || `Failed to create chat: ${response.status} ${response.statusText}`);
@@ -181,6 +205,7 @@ export function Chat({
           const data = await response.json();
           
           if (data.id) {
+            console.log(`Successfully created chat with ID: ${data.id}`);
             setChatId(data.id);
             // Update the URL without refreshing the page
             window.history.replaceState({}, '', `/chat/${data.id}`);
@@ -200,18 +225,28 @@ export function Chat({
             setErrorMessage(error instanceof Error ? error.message : 'Failed to create new chat. Please try again.');
           }
           
-          toast.error(error instanceof Error ? error.message : 'Failed to create new chat. Please try again.');
+          // Reset hasMadeInitialChatRequest to allow one more attempt
+          setTimeout(() => {
+            setHasMadeInitialChatRequest(false);
+          }, 5000);
         } finally {
+          // Always reset the flags
+          isAttemptingCreate = false;
           setIsCreatingChat(false);
         }
       }
     }
 
-    // Only attempt to create a new chat if the user is authenticated
-    if (user) {
-      createNewChat();
-    }
-  }, [id, user, selectedVisibilityType]);
+    createNewChat();
+    
+    // Cleanup function
+    return () => {
+      isAttemptingCreate = false;
+      if (chatCreationTimeout) {
+        clearTimeout(chatCreationTimeout);
+      }
+    };
+  }, [id, user, selectedVisibilityType, hasMadeInitialChatRequest]);
 
   const {
     messages,

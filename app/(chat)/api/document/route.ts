@@ -1,10 +1,10 @@
 import { getServerSession } from '@/lib/auth';
-import type { ArtifactKind } from '@/src/components/features/artifact';
+import type { ArtifactKind } from '@/src/types/artifact';
 import {
   deleteDocumentsByIdAfterTimestamp,
   getDocumentsById,
   saveDocument,
-} from '@/lib/db/queries';
+} from '@/lib/supabase/queries';
 import { generateUUID } from '@/lib/utils';
 import { NextResponse } from 'next/server';
 
@@ -36,19 +36,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const documents = await getDocumentsById({ id });
-
-  const [document] = documents;
+  const document = await getDocumentsById({ id });
 
   if (!document) {
     return NextResponse.json({ error: 'Not Found' }, { status: 404 });
   }
 
-  if (document.userId !== session.user.id) {
+  if (document.user_id !== session.user.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  return NextResponse.json(documents, { status: 200 });
+  return NextResponse.json(document, { status: 200 });
 }
 
 export async function POST(request: Request) {
@@ -121,11 +119,13 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const documents = await getDocumentsById({ id });
+  const document = await getDocumentsById({ id });
 
-  const [document] = documents;
+  if (!document) {
+    return NextResponse.json({ error: 'Not Found' }, { status: 404 });
+  }
 
-  if (document.userId !== session.user.id) {
+  if (document.user_id !== session.user.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

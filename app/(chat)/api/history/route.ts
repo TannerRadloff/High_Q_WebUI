@@ -1,9 +1,10 @@
 import { getServerSession } from '@/lib/auth';
-import { getChatsByUserId } from '@/lib/db/queries';
+import { getChatsByUserId } from '@/lib/supabase/queries';
 import { NextResponse } from 'next/server';
+import type { Chat } from '@/lib/supabase/queries';
 
 // Simple mock data for debugging purposes - will be used if database call fails
-const MOCK_CHATS = [
+const MOCK_CHATS: Chat[] = [
   {
     id: 'debug-chat-1',
     createdAt: new Date(),
@@ -21,14 +22,14 @@ const MOCK_CHATS = [
 ];
 
 export async function GET() {
-  console.log('History API: Request received');
+  console.log('[History API] Request received');
   
   try {
     // Get the user session
     const session = await getServerSession();
     
     // Detailed session logging for debugging
-    console.log('History API: Session check', {
+    console.log('[History API] Session check', {
       hasSession: !!session,
       hasUser: !!(session?.user),
       userId: session?.user?.id ? `${session.user.id.substring(0, 5)}...` : null,
@@ -38,11 +39,11 @@ export async function GET() {
 
     // No session check - for debugging, return mock data
     if (!session || !session.user) {
-      console.log('History API: No authenticated user session found');
+      console.log('[History API] No authenticated user session found');
       
       // For development only - allow unauthenticated access with mock data
       if (process.env.NODE_ENV === 'development') {
-        console.log('History API: Development mode - returning mock data for unauthenticated request');
+        console.log('[History API] Development mode - returning mock data for unauthenticated request');
         return NextResponse.json(MOCK_CHATS);
       }
       
@@ -51,39 +52,62 @@ export async function GET() {
 
     // biome-ignore lint: Forbidden non-null assertion.
     const userId = session.user.id;
-    console.log(`History API: Fetching chats for user ${userId.substring(0, 5)}...`);
+    console.log(`[History API] Fetching chats for user ${userId.substring(0, 5)}...`);
     
     try {
       const chats = await getChatsByUserId({ id: userId });
-      console.log(`History API: Successfully fetched ${chats.length} chats`);
+      console.log(`[History API] Successfully fetched ${chats.length} chats`);
       
       // Return empty array instead of null/undefined to avoid client-side errors
       return NextResponse.json(chats || []);
     } catch (dbError: any) {
-      console.error('History API: Database error:', dbError);
+      console.error('[History API] Database error:', dbError);
+      
+      // Check for connection-related errors
+      if (
+        dbError.message?.includes('connection') || 
+        dbError.message?.includes('timeout') || 
+        dbError.code === 'ECONNREFUSED'
+      ) {
+        return NextResponse.json(
+          { 
+            error: 'Database connection error', 
+            details: 'Unable to connect to the database. Please try again later.'
+          },
+          { status: 503 }
+        );
+      }
       
       // For development only - return mock data on database error
       if (process.env.NODE_ENV === 'development') {
-        console.log('History API: Development mode - returning mock data due to database error');
+        console.log('[History API] Development mode - returning mock data due to database error');
         return NextResponse.json(MOCK_CHATS);
       }
       
       return NextResponse.json(
-        { error: 'Failed to fetch chat history from database', details: dbError?.message || 'Unknown database error' },
+        { 
+          error: 'Failed to fetch chat history from database', 
+          details: dbError?.message || 'Unknown database error',
+          errorCode: dbError?.code
+        },
         { status: 500 }
       );
     }
   } catch (error: any) {
-    console.error('History API: Unexpected error:', error);
+    console.error('[History API] Unexpected error:', error);
     
     // For development only - return mock data on any error
     if (process.env.NODE_ENV === 'development') {
-      console.log('History API: Development mode - returning mock data due to unexpected error');
+      console.log('[History API] Development mode - returning mock data due to unexpected error');
       return NextResponse.json(MOCK_CHATS);
     }
     
     return NextResponse.json(
-      { error: 'Failed to fetch chat history', details: error?.message || 'Unknown error' },
+      { 
+        error: 'Failed to fetch chat history', 
+        details: error?.message || 'Unknown error',
+        errorCode: error?.code
+      },
       { status: 500 }
     );
   }
