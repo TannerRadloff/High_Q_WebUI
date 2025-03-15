@@ -18,7 +18,6 @@ import {
   passwordReset,
   type PasswordReset,
 } from './schema';
-import type { ArtifactKind } from '@/src/components/features/artifact';
 
 // Create a database connection
 let client: postgres.Sql | null = null;
@@ -139,6 +138,13 @@ export async function saveChat({
 }) {
   try {
     const db = ensureDbConnection();
+    
+    // Validate inputs
+    if (!id) throw new Error('Chat ID is required');
+    if (!userId) throw new Error('User ID is required');
+    
+    console.log(`[DB] Saving chat with ID: ${id} for user: ${userId}`);
+    
     return await db.insert(chat).values({
       id,
       createdAt: new Date(),
@@ -146,8 +152,18 @@ export async function saveChat({
       title,
     });
   } catch (error) {
-    console.error('Failed to save chat in database');
-    throw error;
+    console.error('Failed to save chat in database:', error);
+    
+    // Check for specific error types
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // Check for common database errors
+    if (errorMessage.includes('duplicate key')) {
+      throw new Error(`Chat with ID ${id} already exists`);
+    }
+    
+    // Re-throw with more context
+    throw new Error(`Failed to save chat: ${errorMessage}`);
   }
 }
 
@@ -269,12 +285,22 @@ export async function saveDocument({
 }: {
   id: string;
   title: string;
-  kind: ArtifactKind;
+  kind: 'text' | 'code' | 'image' | 'sheet';
   content: string;
   userId: string;
 }) {
   try {
     const db = ensureDbConnection();
+    
+    // Validate inputs
+    if (!id) throw new Error('Document ID is required');
+    if (!userId) throw new Error('User ID is required');
+    if (!['text', 'code', 'image', 'sheet'].includes(kind)) {
+      throw new Error(`Invalid document kind: ${kind}. Must be one of: text, code, image, sheet`);
+    }
+    
+    console.log(`[DB] Saving document with ID: ${id}, kind: ${kind} for user: ${userId}`);
+    
     return await db.insert(document).values({
       id,
       title,
@@ -284,8 +310,18 @@ export async function saveDocument({
       createdAt: new Date(),
     });
   } catch (error) {
-    console.error('Failed to save document in database');
-    throw error;
+    console.error('Failed to save document in database:', error);
+    
+    // Check for specific error types
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    // Check for common database errors
+    if (errorMessage.includes('duplicate key')) {
+      throw new Error(`Document with ID ${id} already exists`);
+    }
+    
+    // Re-throw with more context
+    throw new Error(`Failed to save document: ${errorMessage}`);
   }
 }
 

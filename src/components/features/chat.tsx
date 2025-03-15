@@ -153,6 +153,10 @@ export function Chat({
         try {
           setIsCreatingChat(true);
           const newId = generateUUID();
+          
+          // Add a small delay to ensure authentication is fully established
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
           // Create a new chat in the database
           const response = await fetch('/api/chat', {
             method: 'POST',
@@ -161,15 +165,20 @@ export function Chat({
             },
             body: JSON.stringify({
               id: newId,
+              messages: [], // Explicitly provide empty messages array
               title: 'New Chat',
               visibility: selectedVisibilityType,
             }),
+            credentials: 'include', // Ensure cookies are sent with the request
           });
           
-          const data = await response.json();
           if (!response.ok) {
-            throw new Error(data.error || 'Failed to create chat');
+            const data = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
+            console.error('Chat creation error:', data);
+            throw new Error(data.error || `Failed to create chat: ${response.status} ${response.statusText}`);
           }
+          
+          const data = await response.json();
           
           if (data.id) {
             setChatId(data.id);
@@ -185,11 +194,12 @@ export function Chat({
           // Check if it's an auth error
           if (isAuthenticationError(error)) {
             setErrorType('authentication');
+            setErrorMessage('Authentication required. Please try logging in again.');
           } else {
             setErrorType('general');
+            setErrorMessage(error instanceof Error ? error.message : 'Failed to create new chat. Please try again.');
           }
           
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to create new chat. Please try again.');
           toast.error(error instanceof Error ? error.message : 'Failed to create new chat. Please try again.');
         } finally {
           setIsCreatingChat(false);
@@ -197,7 +207,10 @@ export function Chat({
       }
     }
 
-    createNewChat();
+    // Only attempt to create a new chat if the user is authenticated
+    if (user) {
+      createNewChat();
+    }
   }, [id, user, selectedVisibilityType]);
 
   const {

@@ -110,13 +110,21 @@ export async function POST(request: Request) {
     const session = await getServerSession();
     if (!session) {
       console.error('[API] Error: No session found');
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+      return NextResponse.json({ 
+        error: 'Authentication required', 
+        details: 'No valid session found. Please log in again.' 
+      }, { status: 401 });
     }
     
     if (!session.user || !session.user.id) {
       console.error('[API] Error: Invalid session - missing user ID');
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
+      return NextResponse.json({ 
+        error: 'Invalid session', 
+        details: 'User information is missing from session. Please log in again.' 
+      }, { status: 401 });
     }
+
+    console.log(`[API] Authenticated user: ${session.user.id}`);
 
     // Validate the selected model
     let modelToUse = DEFAULT_CHAT_MODEL;
