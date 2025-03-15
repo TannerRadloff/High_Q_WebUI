@@ -7,6 +7,21 @@ import { cn } from '@/lib/utils';
 import { ErrorBoundary } from '@/src/components/ui/error-boundary';
 import { useAuth } from '@/components/auth/auth-provider';
 
+// Helper functions for path types - using the same definition across the app
+function isAuthPage(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return pathname.includes('/login') || 
+         pathname.includes('/register') || 
+         pathname.includes('/signup') || 
+         pathname.includes('/forgot-password') ||
+         pathname.includes('/reset-password');
+}
+
+function isChatPage(pathname: string | null) {
+  if (!pathname) return false;
+  return pathname.startsWith('/chat') || pathname === '/';
+}
+
 // Initialize global error handlers
 function initGlobalErrorHandlers() {
   // Error handling for fetch requests
@@ -38,36 +53,24 @@ function initGlobalErrorHandlers() {
   });
 }
 
-// Helper functions for path types - using the same definition across the app
-function isAuthPage(pathname: string | null): boolean {
-  if (!pathname) return false;
-  return pathname.includes('/login') || 
-         pathname.includes('/register') || 
-         pathname.includes('/signup') || 
-         pathname.includes('/forgot-password') ||
-         pathname.includes('/reset-password');
-}
-
-function isChatPage(pathname: string | null) {
-  if (!pathname) return false;
-  return pathname.startsWith('/chat') || pathname === '/';
-}
-
 export default function ClientLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Call all hooks at the top level unconditionally
   const { theme } = useTheme();
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const { isLoading: isAuthLoading, user } = useAuth();
+  
+  // Derived state - not hooks
+  const isAuth = isAuthPage(pathname);
+  const isChat = isChatPage(pathname);
 
-  // Call all useEffect hooks together, before any conditional return
+  // Initialize on mount
   useEffect(() => {
     setMounted(true);
-    
-    // Initialize global error handlers
     initGlobalErrorHandlers();
     
     return () => {
@@ -75,16 +78,7 @@ export default function ClientLayout({
     };
   }, []);
 
-  // Don't render anything until mounted to avoid hydration issues
-  if (!mounted) {
-    return null;
-  }
-
-  const isAuth = isAuthPage(pathname);
-  const isChat = isChatPage(pathname);
-
-  // If we're authenticated but on an auth page, we should have been redirected
-  // This is a fallback in case the auth provider redirect didn't work
+  // Auth redirect effect
   useEffect(() => {
     if (mounted && user && isAuth) {
       console.log('Authenticated user on auth page - redirecting to home');
@@ -92,10 +86,14 @@ export default function ClientLayout({
     }
   }, [mounted, user, isAuth, pathname]);
 
-  // Show loading indicator while auth is loading
+  // Render logic - separate from hooks
+  if (!mounted) {
+    return null;
+  }
+
   if (isAuthLoading && !isAuth) {
     return (
-      <div className="flex h-full w-full items-center justify-center">
+      <div className="flex-center h-full w-full">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
@@ -105,7 +103,7 @@ export default function ClientLayout({
     <ErrorBoundary>
       <div className={cn(
         "w-full h-full", 
-        isAuth && "flex-center-col min-h-[calc(100vh-3.5rem)]",
+        isAuth && "flex-center min-h-[calc(100vh-3.5rem)]",
         isChat && "h-full" // Chat pages (including home) don't need extra height adjustment
       )}>
         {children}

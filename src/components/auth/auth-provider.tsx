@@ -210,7 +210,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast.success('Signed in successfully')
       
       // Manually redirect to ensure it happens
-      safeRedirect('/', true);
+      // Add a small delay to ensure state is updated before redirect
+      setTimeout(() => {
+        safeRedirect('/', true);
+      }, 300);
     } catch (error: any) {
       toast.error(error.message || 'Failed to sign in')
       throw error

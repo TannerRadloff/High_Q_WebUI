@@ -34,4 +34,9 @@ export const getSupabaseServerClient = cache(async () => {
 export async function getSupabaseActionClient() {
   const cookieStore = cookies()
   return createServerActionClient<Database>({ cookies: () => cookieStore })
+}
+
+// Simple createClient function for compatibility with the example code
+export function createClient(cookieStore: ReturnType<typeof cookies>) {
+  return createServerComponentClient<Database>({ cookies: () => cookieStore })
 } 

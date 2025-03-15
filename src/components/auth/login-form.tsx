@@ -167,7 +167,16 @@ function LoginFormContent() {
     try {
       // Call the auth context signIn function which handles redirect
       await signIn(email, password)
-      // No need to add additional redirect here - auth provider handles it
+      // Show success message
+      toast.success('Login successful! Redirecting to dashboard...')
+      
+      // Add a fallback redirect in case the auth provider's redirect doesn't work
+      setTimeout(() => {
+        if (window.location.pathname.includes('/login')) {
+          console.log('Fallback redirect triggered from login form')
+          window.location.href = '/'
+        }
+      }, 2000)
     } catch (error: any) {
       showErrorNotification(error.message || 'Failed to sign in')
       setIsLoading(false)
@@ -214,7 +223,7 @@ function LoginFormContent() {
   if (apiKeyError || dbError || clientError) {
     return (
       <motion.div 
-        className="w-full mx-auto max-w-md space-y-6 rounded-xl bg-gradient-to-b from-zinc-900/70 to-zinc-800/90 p-8 shadow-2xl shadow-zinc-900/30 backdrop-blur-sm border border-zinc-800/80"
+        className="auth-container"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 10 }}
@@ -258,18 +267,22 @@ function LoginFormContent() {
   }
 
   return (
-    <motion.div 
-      className="w-full mx-auto max-w-md"
+    <motion.div
+      className="auth-container"
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 10 }}
       transition={{ duration: 0.3 }}
     >
+      <div className="flex flex-col items-center space-y-2 text-center">
+        <LockIcon size={32} />
+        <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
+        <p className="text-sm text-muted-foreground">
+          Enter your credentials to sign in to your account
+        </p>
+      </div>
       <Card className="mx-auto max-w-sm shadow-xl border-zinc-800/60 bg-gradient-to-b from-zinc-900/70 to-zinc-800/90 backdrop-blur-sm">
         <CardHeader className="space-y-1">
-          <div className="flex justify-center items-center mb-2">
-            <LockIcon size={40} />
-          </div>
           <CardTitle className="text-2xl text-center">Sign in</CardTitle>
           <CardDescription className="text-center">
             Enter your email and password to access your account

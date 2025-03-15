@@ -10,24 +10,29 @@ export interface Database {
   public: {
     Tables: {
       // Add your database tables here
-      // For example:
-      // users: {
-      //   Row: {
-      //     id: string
-      //     name: string
-      //     email: string
-      //   }
-      //   Insert: {
-      //     id?: string
-      //     name: string
-      //     email: string
-      //   }
-      //   Update: {
-      //     id?: string
-      //     name?: string
-      //     email?: string
-      //   }
-      // }
+      todos: {
+        Row: {
+          id: string
+          title: string
+          completed: boolean
+          created_at: string
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          title: string
+          completed?: boolean
+          created_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          title?: string
+          completed?: boolean
+          created_at?: string
+          user_id?: string | null
+        }
+      }
     }
     Views: {
       // Add views here if you have any

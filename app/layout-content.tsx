@@ -10,13 +10,14 @@ import { NavBar } from '@/src/components/layout/nav-bar';
 import { SidebarProvider } from '@/src/components/ui/sidebar';
 import ClientLayout from './client-layout';
 
+// Helper functions for path types - using the same definition across the app
 function isAuthPage(pathname: string | null) {
   if (!pathname) return false;
-  return pathname.startsWith('/login') || 
-         pathname.startsWith('/signup') || 
-         pathname.startsWith('/register') ||
-         pathname.startsWith('/forgot-password') ||
-         pathname.startsWith('/reset-password');
+  return pathname.includes('/login') || 
+         pathname.includes('/signup') || 
+         pathname.includes('/register') ||
+         pathname.includes('/forgot-password') ||
+         pathname.includes('/reset-password');
 }
 
 function isChatPage(pathname: string | null) {
@@ -26,7 +27,10 @@ function isChatPage(pathname: string | null) {
 }
 
 export function LayoutContent({ children }: { children: React.ReactNode }) {
+  // Call all hooks at the top level unconditionally
   const pathname = usePathname();
+  
+  // Derived state - not hooks
   const isAuth = isAuthPage(pathname);
   const isChat = isChatPage(pathname);
 
@@ -42,7 +46,7 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
           <SidebarProvider defaultWidth={280} defaultOpen={isChat}>
             <div className={cn(
               "min-h-screen",
-              isAuth ? "flex-center-col" : "flex-row"
+              isAuth ? "flex-center" : "flex-row"
             )}>
               {!isAuth && !isChat && <NavBar />}
               <main className={cn(

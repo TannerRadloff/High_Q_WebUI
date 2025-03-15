@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { createClient } from '@/utils/supabase/middleware'
 
 // Define public routes that don't require authentication
 const PUBLIC_PATHS = [
@@ -30,58 +31,21 @@ const DEV_MODE = process.env.NODE_ENV === 'development'
  * 3. Redirects unauthenticated users to login for protected routes
  * 4. Includes enhanced logging in development mode
  */
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   try {
-    // Extract URL information
-    const url = new URL(request.url)
-    const pathname = url.pathname
-    
-    // Development logging
-    logRequest(pathname, request.method)
+    // Create a Supabase client configured to use cookies
+    const { supabase, response } = createClient(request)
 
-    // TEMPORARY FIX: In development mode, bypass auth checks to debug the issue
-    if (DEV_MODE && process.env.NEXT_PUBLIC_BYPASS_AUTH === 'true') {
-      console.log('[Middleware] Development mode: Bypassing all auth checks')
-      return NextResponse.next()
-    }
+    // Refresh session if expired - required for Server Components
+    // https://supabase.com/docs/guides/auth/auth-helpers/nextjs#managing-session-with-middleware
+    await supabase.auth.getSession()
 
-    // Check for all possible Supabase cookie names
-    const hasAuthCookies = checkSupabaseAuthCookies(request)
-    
-    // Path classification
-    const pathInfo = classifyPath(pathname)
-    
-    // Log path classification in development
-    if (DEV_MODE) {
-      console.log('[Middleware] Route check:', {
-        pathname,
-        ...pathInfo,
-        hasAuthCookies,
-        matchedPublicPath: PUBLIC_PATHS.find(path => pathname.startsWith(path))
-      })
-    }
-
-    // RULE 1: Allow public routes and home page without authentication
-    if (pathInfo.isPublicPath || pathInfo.isHomePage) {
-      logAllowAccess(pathname, 'public route')
-      return NextResponse.next()
-    }
-    
-    // RULE 2: Handle API routes
-    if (pathInfo.isApiRoute) {
-      return handleApiRoute(pathname, pathInfo.isAuthRelatedApi, hasAuthCookies)
-    }
-
-    // RULE 3: For protected routes, check authentication
-    if (!hasAuthCookies) {
-      return redirectToLogin(request, pathname)
-    }
-
-    // RULE 4: Allow authenticated access to protected routes
-    logAllowAccess(pathname, 'authenticated access')
+    return response
+  } catch (e) {
+    // If you are here, a Supabase client could not be created!
+    // This is likely because you have not set up environment variables.
+    // Check your env vars: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
     return NextResponse.next()
-  } catch (error) {
-    return handleMiddlewareError(error, request)
   }
 }
 
@@ -296,11 +260,13 @@ function logAllowAccess(pathname: string, reason: string) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
+     * Match all request paths except:
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - images/* (image files)
+     * - public/* (public files)
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|images/|public/).*)',
   ],
 } 

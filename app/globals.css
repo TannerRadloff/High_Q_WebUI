@@ -95,6 +95,14 @@
         @apply flex flex-row items-center justify-center;
     }
     
+    /* Auth container utility for login/signup pages */
+    .auth-container {
+        @apply flex-center-col w-full max-w-md mx-auto p-6 space-y-6 rounded-xl 
+               bg-gradient-to-b from-zinc-900/70 to-zinc-800/90 
+               shadow-2xl shadow-zinc-900/30 backdrop-blur-sm 
+               border border-zinc-800/80;
+    }
+    
     /* Modal utilities */
     .modal-overlay {
         @apply fixed inset-0 bg-black/50 flex items-center justify-center z-50;
