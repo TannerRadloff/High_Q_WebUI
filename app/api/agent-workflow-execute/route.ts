@@ -41,8 +41,8 @@ export async function POST(req: NextRequest) {
       message,
     });
     
-    // Return the response
-    return NextResponse.json({
+    // Format the response consistently
+    const formattedResponse = {
       response: typeof response === 'string' ? response : response.response || JSON.stringify(response),
       agent: {
         id: 'workflow-agent',
@@ -51,7 +51,10 @@ export async function POST(req: NextRequest) {
         icon: '🔄'
       },
       workflowId
-    });
+    };
+    
+    // Return the response
+    return NextResponse.json(formattedResponse);
   } catch (error) {
     console.error('Error executing workflow:', error);
     

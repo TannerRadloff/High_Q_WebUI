@@ -29,7 +29,6 @@ import { Button } from '@/src/components/ui/button';
 import { Textarea } from '@/src/components/ui/textarea';
 import { sanitizeUIMessages } from '@/utils/messages';
 import { agentTypeConfig } from '@/src/config/agent-types';
-import { AgentSelector } from '@/src/components/features/agent-selector';
 
 function PureMultimodalInput({
   chatId,
@@ -72,16 +71,6 @@ function PureMultimodalInput({
   const { width } = useWindowSize();
   const [isFocused, setIsFocused] = useState(false);
   const lockInput = isLoading;
-
-  // Direct agent integration - no longer behind a toggle
-  const [selectedAgentId, setSelectedAgentId] = useLocalStorage('selected-agent-id', 'default');
-
-  // Simplified height reset
-  const resetTextarea = useCallback(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = '98px';
-    }
-  }, []);
 
   const [localStorageInput, setLocalStorageInput] = useLocalStorage(
     'input',
@@ -220,30 +209,31 @@ function PureMultimodalInput({
     [setAttachments, uploadFile]
   );
   
-  // Handle form submission with agent metadata
-  const handleAgentSubmit = (userInput: string) => {
-    console.log(`[CHAT] Processing request with agent: ${selectedAgentId}`);
+  // Update the getPlaceholderText function to be memoized
+  const getPlaceholderText = useCallback(() => {
+    if (selectedWorkflowId) {
+      return "Send a message to your custom workflow...";
+    }
+    return "Send a message to Mimir...";
+  }, [selectedWorkflowId]);
+
+  // Optimize the handleAgentSubmit function
+  const handleAgentSubmit = useCallback((userInput: string) => {
+    // We're always using Mimir (default agent) first, but may include workflow metadata
+    const options: ChatRequestOptions = {
+      data: {
+        ...(selectedWorkflowId ? { workflowId: selectedWorkflowId } : {})
+      } as any // Use type assertion to avoid TypeScript errors
+    };
     
-    // Get the agent type name from config if not using default
-    const agentConfig = agentTypeConfig.find(agent => agent.id === selectedAgentId);
-    
-    // Only add agent metadata if a non-default agent is selected
-    if (selectedAgentId !== 'default' && agentConfig) {
-      // Add metadata to indicate which agent to use
-      const options: ChatRequestOptions = {
-        data: {
-          agentId: selectedAgentId,
-          agentType: agentConfig.name
-        }
-      };
-      
-      // Submit with agent metadata
+    // Only pass options if we have a selected workflow
+    if (selectedWorkflowId) {
       handleSubmit(undefined, options);
     } else {
       // Regular submission for default agent
       handleSubmit();
     }
-  };
+  }, [handleSubmit, selectedWorkflowId]);
 
   // Fix the function signature for these calls
   const handleKeyDown = useCallback(
@@ -269,6 +259,14 @@ function PureMultimodalInput({
     [lockInput, handleAgentSubmit, input, attachments]
   );
 
+  // Restore the resetTextarea function
+  const resetTextarea = useCallback(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '98px';
+    }
+  }, []);
+
+  // Later in the submitMessage function, restore the reference to resetTextarea
   const submitMessage = useCallback((e?: React.FormEvent) => {
     if (e) e.preventDefault();
     
@@ -281,14 +279,6 @@ function PureMultimodalInput({
       console.log('[MultimodalInput] Prevented form submission with no input and no attachments');
     }
   }, [input, attachments, handleAgentSubmit, setAttachments, resetTextarea]);
-
-  // Update the placeholder text based on workflow selection
-  const getPlaceholderText = () => {
-    if (selectedWorkflowId) {
-      return "Send a message to your custom workflow...";
-    }
-    return "Send a message to Mimir...";
-  };
 
   return (
     <div
@@ -305,26 +295,15 @@ function PureMultimodalInput({
         onSubmit={(e) => submitMessage(e)}
         className="flex flex-1 flex-col items-start gap-2 relative"
       >
-        {/* Agent Selector - Always shown */}
-        <div className="w-full mb-2">
-          <AgentSelector
-            selectedAgentId={selectedAgentId}
-            onAgentChange={setSelectedAgentId}
-            displayMode="buttons"
-            buttonSize="sm"
-            className="w-full"
-          />
-        </div>
-
         <div className="flex w-full flex-row items-end gap-2">
           <div className="relative flex-1">
             <div
               className={cn(
                 'flex relative w-full font-sans group/input border rounded-md overflow-hidden',
                 'border-input bg-background px-3 py-2 text-sm',
-                // Fixed conditional styling - only apply ring when focused
-                isFocused && 'ring-2 ring-purple-600 ring-offset-2 ring-offset-background',
                 'transition-shadow ease-in-out duration-300 ring-0',
+                // Fixed conditional styling - only apply ring when focused
+                isFocused && 'ring-1 ring-primary ring-offset-1 ring-offset-background',
               )}
             >
               <Textarea
@@ -477,7 +456,7 @@ function PureStopButton({
       type="button"
       size="icon"
       variant="ghost"
-      className="absolute bottom-1 right-1 size-8 rounded-xl hover:bg-destructive/10 hover:text-destructive"
+      className="absolute bottom-1 right-1 size-8 rounded-xl hover:bg-destructive/10 hover:text-destructive z-20"
       onClick={() => {
         stop();
         setMessages((messages) => sanitizeUIMessages(messages));
@@ -505,7 +484,7 @@ function PureSendButton({
       type="button"
       size="icon"
       variant="ghost"
-      className="absolute bottom-1 right-1 size-8 rounded-xl hover:bg-primary/10 hover:text-primary"
+      className="absolute bottom-1 right-1 size-8 rounded-xl hover:bg-primary/10 hover:text-primary z-20"
       disabled={!input.trim() && uploadQueue.length === 0}
       onClick={() => submitForm(input)}
     >

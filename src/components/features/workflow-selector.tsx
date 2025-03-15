@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import { motion } from 'framer-motion';
 import { fetchWorkflows } from '@/lib/agent-workflow';
 import { toast } from 'sonner';
@@ -23,7 +23,7 @@ interface WorkflowSelectorProps {
   className?: string;
 }
 
-export function WorkflowSelector({
+function WorkflowSelectorComponent({
   selectedWorkflowId,
   onWorkflowSelect,
   className = '',
@@ -40,7 +40,7 @@ export function WorkflowSelector({
     loadWorkflows();
   }, []);
 
-  const loadWorkflows = async () => {
+  const loadWorkflows = useCallback(async () => {
     try {
       setIsLoading(true);
       const workflowsData = await fetchWorkflows();
@@ -59,12 +59,12 @@ export function WorkflowSelector({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const handleSelect = (workflowId: string | null) => {
+  const handleSelect = useCallback((workflowId: string | null) => {
     onWorkflowSelect(workflowId);
     setIsOpen(false);
-  };
+  }, [onWorkflowSelect]);
 
   return (
     <div className={`relative ${className}`}>
@@ -126,4 +126,7 @@ export function WorkflowSelector({
       </DropdownMenu>
     </div>
   );
-} 
+}
+
+// Memoize the component to prevent unnecessary re-renders
+export const WorkflowSelector = memo(WorkflowSelectorComponent); 

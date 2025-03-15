@@ -442,8 +442,8 @@ export function Chat({
     window.location.href = '/login';
   }, []);
 
-  // Enhanced display of delegation status with workflow info
-  const renderDelegationStatus = () => {
+  // Optimize the renderDelegationStatus function with useCallback
+  const renderDelegationStatus = useCallback(() => {
     if (delegationStatus === 'idle' || isLoading) return null;
     
     return (
@@ -472,7 +472,7 @@ export function Chat({
         </div>
       </motion.div>
     );
-  };
+  }, [delegationStatus, isLoading, selectedWorkflowId, activeAgent, delegationReason]);
 
   // State for tracking active agents
   const [activeAgents, setActiveAgents] = useState<AgentStatus[]>([]);
@@ -489,28 +489,30 @@ export function Chat({
     icon: string;
   } | null>(null);
 
-  // Handle toggling the agent status panel
-  const toggleAgentPanel = () => {
+  // Optimize the toggleAgentPanel function with useCallback
+  const toggleAgentPanel = useCallback(() => {
     setIsAgentPanelOpen(prev => !prev);
-  };
+  }, []);
   
   // Update the chat with agent processing and track agent progress
-  const processMessageWithAgents = async (message: string, 
+  const processMessageWithAgents = async (
+    message: string, 
     previousMessages: any[] = [], 
     sourceAgentId: string | null = null, 
-    targetAgentId: string | null = null) => {
-    
+    targetAgentId: string | null = null,
+    useWorkflow: boolean = false
+  ) => {
     try {
       // Create a new agent status entry
       const agentId = targetAgentId || 'delegation-agent';
-      const agentName = targetAgentId ? currentAgent?.name || 'Specialized Agent' : 'Delegation Agent';
-      const agentIcon = targetAgentId ? currentAgent?.icon || '🤖' : '👨‍💼';
+      const agentName = targetAgentId ? currentAgent?.name || 'Specialized Agent' : useWorkflow ? 'Workflow Agent' : 'Delegation Agent';
+      const agentIcon = targetAgentId ? currentAgent?.icon || '🤖' : useWorkflow ? '🔄' : '👨‍💼';
       
       // Add agent to the active agents list
       const newAgentStatus: AgentStatus = {
         id: agentId,
         name: agentName,
-        type: targetAgentId ? 'specialized' : 'delegation',
+        type: targetAgentId ? 'specialized' : useWorkflow ? 'workflow' : 'delegation',
         originalTask: message,
         currentAction: 'Processing request...',
         status: 'working',
@@ -524,53 +526,36 @@ export function Chat({
       
       let response;
       
-      // If a workflow is selected, use it instead of the default agent handoff
-      if (selectedWorkflowId) {
+      // If a workflow is selected and we're using it, execute the workflow
+      if (selectedWorkflowId && useWorkflow) {
         setDelegationStatus('delegating');
         
-        // Execute the workflow
-        const result = await executeWorkflow({
-          workflowId: selectedWorkflowId,
-          chatId: id,
-          message,
-          onAgentStatusUpdate: (status) => {
-            // Update the agent status in the UI
-            setActiveAgents(prev => 
-              prev.map(agent => 
-                agent.id === status.id 
-                  ? { 
-                      ...agent, 
-                      currentAction: status.task || 'Processing',
-                      progress: status.progress,
-                      status: status.status === 'working' ? 'working' : 
-                              status.status === 'completed' ? 'completed' : 'failed',
-                      lastUpdateTime: new Date() 
-                    } 
-                  : agent
-              )
-            );
-            
-            // Update delegation status
-            if (status.status === 'completed') {
-              setDelegationStatus('delegated');
-              setActiveAgent(status.name);
-              setDelegationReason(`Workflow: ${status.type}`);
-            }
-          }
+        // Call the workflow execution API
+        const apiResponse = await fetch('/api/agent-workflow-execute', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            workflowId: selectedWorkflowId,
+            message,
+            chatId
+          })
         });
         
-        response = {
-          response: typeof result === 'string' ? result : result.response || JSON.stringify(result),
-          agent: {
-            id: 'workflow-agent',
-            name: 'Workflow Agent',
-            type: 'workflow',
-            icon: '🔄'
-          }
-        };
+        if (!apiResponse.ok) {
+          throw new Error('Failed to execute workflow');
+        }
+        
+        response = await apiResponse.json();
+        
+        // Update delegation status
+        setDelegationStatus('delegated');
+        setActiveAgent('Workflow Agent');
+        setDelegationReason(`Using workflow: ${selectedWorkflowId}`);
       } else {
         // Use the standard agent handoff
-        response = await fetch('/api/agent-handoff', {
+        const apiResponse = await fetch('/api/agent-handoff', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -579,10 +564,16 @@ export function Chat({
             message,
             sourceAgentId,
             targetAgentId,
-            chatId: id,
+            chatId,
             previousMessages
           })
-        }).then(res => res.json());
+        });
+        
+        if (!apiResponse.ok) {
+          throw new Error('Failed to process message with agent');
+        }
+        
+        response = await apiResponse.json();
       }
       
       // Update current agent
@@ -609,14 +600,13 @@ export function Chat({
       }, 10000);
       
       return response;
-      
     } catch (error) {
       console.error('Error processing message with agents:', error);
       
       // Update the status to failed
       setActiveAgents(prev => 
         prev.map(agent => 
-          agent.id === targetAgentId || (!targetAgentId && agent.type === 'delegation')
+          agent.id === targetAgentId || (!targetAgentId && (agent.type === 'delegation' || agent.type === 'workflow'))
             ? { 
                 ...agent, 
                 progress: 100, 
@@ -632,7 +622,7 @@ export function Chat({
     }
   };
   
-  // Replace the existing handleSubmitWithAgents function with this updated version
+  // Simplified handleSubmitWithAgents that uses the consolidated processMessageWithAgents
   const handleSubmitWithAgents = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -655,39 +645,14 @@ export function Chat({
         role: 'user'
       });
       
-      let delegationResult;
-      
-      // If a workflow is selected, use the workflow execution API
-      if (selectedWorkflowId) {
-        setDelegationStatus('delegating');
-        
-        // Call the workflow execution API
-        const response = await fetch('/api/agent-workflow-execute', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            workflowId: selectedWorkflowId,
-            message: input,
-            chatId
-          })
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to execute workflow');
-        }
-        
-        delegationResult = await response.json();
-        
-        // Update delegation status
-        setDelegationStatus('delegated');
-        setActiveAgent('Workflow Agent');
-        setDelegationReason(`Using workflow: ${selectedWorkflowId}`);
-      } else {
-        // Process with delegation agent
-        delegationResult = await processMessageWithAgents(input, chatMessages);
-      }
+      // Process with either workflow or delegation agent
+      const delegationResult = await processMessageWithAgents(
+        input, 
+        chatMessages, 
+        null, 
+        null, 
+        !!selectedWorkflowId // Use workflow if selected
+      );
       
       // Add agent response to UI
       const agentMessage = {
@@ -721,8 +686,8 @@ export function Chat({
     }
   };
 
-  // Simplify agent mode toggle handler
-  const handleAgentModeToggle = () => {
+  // Optimize the handleAgentModeToggle function with useCallback
+  const handleAgentModeToggle = useCallback(() => {
     setIsAgentMode(!isAgentMode);
     
     // Reset agent panel state when disabling agent mode
@@ -730,7 +695,7 @@ export function Chat({
       setIsAgentPanelOpen(false);
       setActiveAgents([]);
     }
-  };
+  }, [isAgentMode]);
 
   return (
     <div 
@@ -820,18 +785,25 @@ export function Chat({
             className="mb-8 p-6 rounded-lg bg-primary/5 max-w-3xl mx-auto text-center"
           >
             <h1 className="text-2xl font-bold mb-3">Welcome to HighQ</h1>
-            <p className="text-muted-foreground mb-4">
-              The Highest Quality, Highest IQ AI system on earth. Start by asking me anything!
+            <p className="text-muted-foreground mb-6">
+              Chat with Mimir, our intelligent delegation agent that routes your questions to specialized AI agents.
             </p>
             
-            {/* Add workflow selector to welcome message */}
-            <div className="mb-4 max-w-xs mx-auto">
-              <p className="text-sm text-muted-foreground mb-2">Select an agent workflow:</p>
-              <WorkflowSelector
-                selectedWorkflowId={selectedWorkflowId}
-                onWorkflowSelect={setSelectedWorkflowId}
-                className="w-full"
-              />
+            {/* Add workflow selector to welcome message with a better label */}
+            <div className="mb-6 max-w-md mx-auto">
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-sm font-medium mb-1">Select an optional agent workflow:</p>
+                <div className="w-full max-w-xs">
+                  <WorkflowSelector
+                    selectedWorkflowId={selectedWorkflowId}
+                    onWorkflowSelect={setSelectedWorkflowId}
+                    className="w-full"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Workflows define how specialized agents collaborate on your tasks
+                </p>
+              </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6 text-left">
@@ -941,17 +913,21 @@ export function Chat({
       {/* Input Area */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background to-transparent pt-10 pb-4 px-4">
         <div className="max-w-3xl mx-auto">
-          {/* Add workflow selector above input */}
+          {/* Workflow selector with a clear label */}
           {!showWelcome && (
-            <div className="mb-2 flex justify-end">
-              <WorkflowSelector
-                selectedWorkflowId={selectedWorkflowId}
-                onWorkflowSelect={setSelectedWorkflowId}
-                className="w-48"
-              />
+            <div className="mb-3 flex items-center justify-end">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Agent workflow:</span>
+                <WorkflowSelector
+                  selectedWorkflowId={selectedWorkflowId}
+                  onWorkflowSelect={setSelectedWorkflowId}
+                  className="w-48"
+                />
+              </div>
             </div>
           )}
           
+          {/* Chat input with Mimir as the default agent */}
           <MultimodalInput
             chatId={chatId}
             input={input}
@@ -975,7 +951,9 @@ export function Chat({
             </div>
           ) : (
             <div className="text-center mt-2 text-xs text-muted-foreground">
-              {isOnline ? `Using ${selectedChatModel} • ${selectedVisibilityType}${selectedWorkflowId ? ' • Custom Workflow' : ''}` : "Offline Mode"}
+              {isOnline 
+                ? `Mimir ${selectedWorkflowId ? '+ Custom Workflow' : ''} • ${selectedChatModel} • ${selectedVisibilityType}` 
+                : "Offline Mode"}
             </div>
           )}
         </div>
