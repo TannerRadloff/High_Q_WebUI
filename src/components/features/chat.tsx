@@ -25,6 +25,9 @@ import { MultimodalInput } from '@/src/components/features';
 import type { VisibilityType } from './visibility-selector';
 import { useArtifactSelector } from '@/hooks/use-artifact';
 import dynamic from 'next/dynamic';
+import AgentStatusPanel, { AgentStatus } from '@/src/components/features/agent-status-panel';
+import { v4 as uuidv4 } from 'uuid';
+import { processWithAgents } from '@/lib/agents/agentService';
 
 // Add type declaration for window.generateRandomStars
 declare global {
@@ -460,6 +463,180 @@ export function Chat({
     );
   };
 
+  // State for tracking active agents
+  const [activeAgents, setActiveAgents] = useState<AgentStatus[]>([]);
+  const [isAgentPanelOpen, setIsAgentPanelOpen] = useState(false);
+  const chatMessages = messages.map(msg => ({
+    id: msg.id,
+    role: msg.role,
+    content: msg.content
+  }));
+  const [currentAgent, setCurrentAgent] = useState<{
+    id: string;
+    name: string;
+    type: string;
+    icon: string;
+  } | null>(null);
+
+  // Handle toggling the agent status panel
+  const toggleAgentPanel = () => {
+    setIsAgentPanelOpen(prev => !prev);
+  };
+  
+  // Update the chat with agent processing and track agent progress
+  const processMessageWithAgents = async (message: string, 
+    previousMessages: any[] = [], 
+    sourceAgentId: string | null = null, 
+    targetAgentId: string | null = null) => {
+    
+    try {
+      // Create a new agent status entry
+      const agentId = targetAgentId || 'delegation-agent';
+      const agentName = targetAgentId ? currentAgent?.name || 'Specialized Agent' : 'Delegation Agent';
+      const agentIcon = targetAgentId ? currentAgent?.icon || '🤖' : '👨‍💼';
+      
+      // Add agent to the active agents list
+      const newAgentStatus: AgentStatus = {
+        id: agentId,
+        name: agentName,
+        type: targetAgentId ? 'specialized' : 'delegation',
+        originalTask: message,
+        currentAction: 'Processing request...',
+        status: 'working',
+        progress: 10,
+        startTime: new Date(),
+        lastUpdateTime: new Date(),
+        icon: agentIcon
+      };
+      
+      setActiveAgents(prev => [...prev, newAgentStatus]);
+      
+      // Make request to the agent handoff endpoint
+      const response = await fetch('/api/agent-handoff', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message,
+          sourceAgentId,
+          targetAgentId,
+          chatId: id,
+          previousMessages
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to process message with agent');
+      }
+      
+      const data = await response.json();
+      
+      // Update current agent
+      setCurrentAgent(data.agent);
+      
+      // Update the status to completed
+      setActiveAgents(prev => 
+        prev.map(agent => 
+          agent.id === agentId 
+            ? { 
+                ...agent, 
+                progress: 100, 
+                currentAction: 'Response completed', 
+                status: 'completed',
+                lastUpdateTime: new Date() 
+              } 
+            : agent
+        )
+      );
+      
+      // Remove completed agent after 10 seconds
+      setTimeout(() => {
+        setActiveAgents(prev => prev.filter(agent => agent.id !== agentId));
+      }, 10000);
+      
+      return data;
+      
+    } catch (error) {
+      console.error('Error processing message with agents:', error);
+      
+      // Update the status to failed
+      setActiveAgents(prev => 
+        prev.map(agent => 
+          agent.id === targetAgentId || (!targetAgentId && agent.type === 'delegation')
+            ? { 
+                ...agent, 
+                progress: 100, 
+                currentAction: 'Failed to process request', 
+                status: 'failed',
+                lastUpdateTime: new Date() 
+              } 
+            : agent
+        )
+      );
+      
+      throw error;
+    }
+  };
+  
+  // Replace the existing chat submit with one that uses agents
+  const handleSubmitWithAgents = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!input.trim() || isLoading) {
+      return;
+    }
+    
+    try {
+      // Add user message to UI
+      const userMessage = {
+        id: uuidv4(),
+        role: 'user',
+        content: input
+      };
+      
+      // Update chat using the existing append function to show user message
+      append({
+        id: userMessage.id,
+        content: userMessage.content,
+        role: 'user'
+      });
+      
+      // Process with delegation agent
+      const delegationResult = await processMessageWithAgents(input, chatMessages);
+      
+      // Add agent response to UI
+      const agentMessage = {
+        id: uuidv4(),
+        role: 'assistant',
+        content: delegationResult.response,
+        agentInfo: delegationResult.agent
+      };
+      
+      // Add the agent response
+      append({
+        id: agentMessage.id,
+        content: agentMessage.content,
+        role: 'assistant'
+      });
+      
+      // Clear input
+      setInput('');
+      
+      // Should we open the agent panel when first agent becomes active?
+      if (activeAgents.length === 1 && !isAgentPanelOpen) {
+        setIsAgentPanelOpen(true);
+      }
+      
+    } catch (error) {
+      console.error('Error submitting message with agents:', error);
+      toast.error('Failed to process your message');
+      
+      // Stop loading state on error
+      stop();
+    }
+  };
+
   return (
     <div 
       className="relative flex flex-col w-full h-full overflow-hidden"
@@ -686,6 +863,13 @@ export function Chat({
           )}
         </div>
       </div>
+      
+      {/* Agent status panel */}
+      <AgentStatusPanel 
+        agents={activeAgents}
+        isOpen={isAgentPanelOpen}
+        onToggle={toggleAgentPanel}
+      />
       
       {/* Add CSS for animations */}
       <style jsx>{`

@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import Canvas from '@/components/agents-dashboard/Canvas';
 import AgentItem from '@/components/agents-dashboard/AgentItem';
 import PropertiesPanel from '@/components/agents-dashboard/PropertiesPanel';
-import { Agent, AgentType, AGENT_TEMPLATES, Connection, ModelType } from '@/components/agents-dashboard/types';
+import { Agent, AgentType, AGENT_TEMPLATES, Connection, ModelType, SavedAgentConfig, BASE_AGENT_TEMPLATE } from '@/components/agents-dashboard/types';
 
 // Import workflow API functions
 import { createWorkflow, updateWorkflow, fetchWorkflow } from '@/lib/agent-workflow';
@@ -34,6 +34,10 @@ export default function AgentBuilder() {
   const [currentWorkflowId, setCurrentWorkflowId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // State for saved agent configurations
+  const [savedAgentConfigs, setSavedAgentConfigs] = useState<SavedAgentConfig[]>([]);
+  const [isLoadingConfigs, setIsLoadingConfigs] = useState(false);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -50,7 +54,29 @@ export default function AgentBuilder() {
       // Create example agents workflow
       createExampleWorkflow();
     }
+    
+    // Fetch saved agent configurations
+    fetchSavedAgentConfigurations();
   }, [searchParams]);
+
+  // Fetch saved agent configurations
+  const fetchSavedAgentConfigurations = async () => {
+    try {
+      setIsLoadingConfigs(true);
+      
+      const response = await fetch('/api/agent-config');
+      const data = await response.json();
+      
+      if (data.configurations) {
+        setSavedAgentConfigs(data.configurations);
+      }
+    } catch (error) {
+      console.error('Error fetching agent configurations:', error);
+      toast.error('Failed to load saved agent configurations');
+    } finally {
+      setIsLoadingConfigs(false);
+    }
+  };
 
   // Create an example workflow with delegation, research, and report writing agents
   const createExampleWorkflow = () => {
@@ -62,13 +88,14 @@ export default function AgentBuilder() {
     // Create the agents
     const delegator: Agent = {
       id: delegatorId,
-      type: AgentType.JUDGE,
+      type: AgentType.DELEGATE,
       position: { x: 100, y: 100 },
       config: {
         name: 'Delegation Agent',
         instructions: 'You are the primary delegation agent responsible for receiving user queries and directing them to the appropriate specialist agents. For research tasks, first understand what the user is asking for, then delegate to the Research Agent. Monitor the workflow and ensure tasks are properly handed off between agents.',
         model: ModelType.GPT_4O,
-        tools: []
+        tools: [],
+        icon: '👨‍💼'
       }
     };
     
@@ -80,7 +107,8 @@ export default function AgentBuilder() {
         name: 'Research Agent',
         instructions: 'As a specialized research agent, your role is to collect comprehensive information on topics delegated to you. Utilize search tools to find accurate, up-to-date information from reliable sources. Format your findings clearly, including citations and references. When research is complete, hand off your findings to the Report Writer Agent.',
         model: ModelType.GPT_4O,
-        tools: []
+        tools: [],
+        icon: '🔍'
       }
     };
     
@@ -92,7 +120,8 @@ export default function AgentBuilder() {
         name: 'Report Writer Agent',
         instructions: 'You are a specialized report writing agent. Your role is to take research data handed to you by the Research Agent and transform it into well-structured, professional reports. Organize information logically, highlight key findings, and ensure the report is easy to understand. Present the final report back to the user in a clear, readable format.',
         model: ModelType.GPT_4O,
-        tools: []
+        tools: [],
+        icon: '📊'
       }
     };
     
@@ -155,7 +184,44 @@ export default function AgentBuilder() {
     
     // Only proceed if the item was dropped over the canvas
     if (over && over.id === 'canvas') {
-      // Get the agent type from the dragged item ID
+      // Check if this is a saved agent configuration or a template
+      const agentId = active.id as string;
+      
+      // Check if it's a saved agent config (format: "saved-{configId}")
+      if (agentId.startsWith('saved-')) {
+        const configId = agentId.replace('saved-', '');
+        const savedConfig = savedAgentConfigs.find(config => config.id === configId);
+        
+        if (savedConfig) {
+          // Create a new agent from the saved config
+          const newAgent: Agent = {
+            id: uuidv4(),
+            type: savedConfig.type,
+            position: {
+              x: Math.round((Math.random() * 400 + 50) / 20) * 20, // Random position, snapped to grid
+              y: Math.round((Math.random() * 300 + 50) / 20) * 20,
+            },
+            config: {
+              name: savedConfig.name,
+              instructions: savedConfig.instructions,
+              model: savedConfig.model,
+              tools: savedConfig.tools,
+              icon: savedConfig.icon,
+              specialization: savedConfig.specialization,
+              isCustom: true
+            }
+          };
+          
+          // Add the new agent to the state
+          setAgents(prevAgents => [...prevAgents, newAgent]);
+          
+          // Select the newly created agent
+          setSelectedAgentId(newAgent.id);
+          return;
+        }
+      }
+      
+      // Regular agent type handling
       const agentType = active.id as AgentType;
       
       // Create a new agent with default position
@@ -163,7 +229,7 @@ export default function AgentBuilder() {
         id: uuidv4(),
         type: agentType,
         position: {
-          x: Math.round((Math.random() * 400 + 50) / 20) * 20, // Random position within the canvas, snapped to grid
+          x: Math.round((Math.random() * 400 + 50) / 20) * 20, // Random position, snapped to grid
           y: Math.round((Math.random() * 300 + 50) / 20) * 20,
         },
         config: {
@@ -396,15 +462,54 @@ export default function AgentBuilder() {
           <div className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 overflow-y-auto">
             <h2 className="text-lg font-medium mb-4">Agent Types</h2>
             <div className="space-y-3">
-              {Object.values(AgentType).map((type) => (
-                <AgentItem
-                  key={type}
-                  id={type}
-                  name={AGENT_TEMPLATES[type].config!.name}
-                  description={`${type.charAt(0).toUpperCase() + type.slice(1)} agent for specialized tasks`}
-                />
+              {/* Base agent as first option */}
+              <AgentItem
+                key={AgentType.BASE}
+                id={AgentType.BASE}
+                name={BASE_AGENT_TEMPLATE.config!.name}
+                description="Base agent that can be customized for any purpose"
+                icon={BASE_AGENT_TEMPLATE.config!.icon}
+              />
+              
+              {/* Other agent types */}
+              {Object.values(AgentType)
+                .filter(type => type !== AgentType.BASE) // Filter out the base agent
+                .map((type) => (
+                  <AgentItem
+                    key={type}
+                    id={type}
+                    name={AGENT_TEMPLATES[type].config!.name}
+                    description={`${type.charAt(0).toUpperCase() + type.slice(1)} agent for specialized tasks`}
+                    icon={AGENT_TEMPLATES[type].config!.icon}
+                  />
               ))}
             </div>
+            
+            {/* Saved agent configurations */}
+            {savedAgentConfigs.length > 0 && (
+              <div className="mt-6">
+                <h2 className="text-lg font-medium mb-3">Saved Agents</h2>
+                <div className="space-y-3">
+                  {savedAgentConfigs.map((config) => (
+                    <AgentItem
+                      key={`saved-${config.id}`}
+                      id={`saved-${config.id}`}
+                      name={config.name}
+                      description={config.specialization}
+                      icon={config.icon}
+                      isCustom={true}
+                      specialization={config.specialization}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {isLoadingConfigs && (
+              <div className="mt-4 flex justify-center">
+                <div className="animate-spin h-5 w-5 border-2 border-blue-500 rounded-full border-t-transparent"></div>
+              </div>
+            )}
             
             <div className="mt-8">
               <h2 className="text-lg font-medium mb-4">Instructions</h2>
@@ -415,6 +520,7 @@ export default function AgentBuilder() {
                 <li>Alternatively, click on connection nodes to create connections directly</li>
                 <li>Agents can be positioned along the grid</li>
                 <li>Configure each agent's name, instructions, and tools</li>
+                <li>Save custom agents to reuse them in other workflows</li>
                 <li>Save your workflow when finished</li>
               </ol>
             </div>
