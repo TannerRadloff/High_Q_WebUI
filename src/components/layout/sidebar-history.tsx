@@ -193,13 +193,18 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     },
     revalidateOnFocus: false,
     revalidateOnReconnect: true,
-    dedupingInterval: 10000,
+    dedupingInterval: 10000, // Don't refetch within 10 seconds
     shouldRetryOnError: true,
-    errorRetryCount: 3,
+    errorRetryCount: 3,     // Retry 3 times on error
+    errorRetryInterval: (retryCount) => Math.min(1000 * 2 ** retryCount, 30000), // Exponential backoff
   });
 
   // Use our centralized auth check function
   const isAuthError = error && isAuthenticationError(error);
+
+  // Track retry attempts to avoid infinite retries
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_MANUAL_RETRIES = 3;
 
   useEffect(() => {
     if (user) {
@@ -225,20 +230,34 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
   }, [pathname, mutate, user]);
 
   const retryLoadHistory = useCallback(() => {
+    if (retryCount >= MAX_MANUAL_RETRIES) {
+      toast.error('Multiple retry attempts failed. Please refresh the page or try again later.', { 
+        id: 'sidebar-history-error',
+        duration: 5000 
+      });
+      return;
+    }
+    
+    setRetryCount(prev => prev + 1);
+    
     toast.loading('Retrying...', { id: 'retry-history', duration: 3000 });
-    mutate().catch(error => {
-      console.error('Error retrying history load:', error);
-      // Handle errors in the retry operation
-      if (isAuthenticationError(error)) {
-        handleAPIError(error, 'History retry');
-      } else {
-        toast.error('Still unable to load chat history. Please try again later.', {
-          id: 'sidebar-history-error',
-          duration: 5000,
-        });
-      }
-    });
-  }, [mutate]);
+    
+    // Use a delayed retry with increasing timeout
+    setTimeout(() => {
+      mutate().catch(error => {
+        console.error('Error retrying history load:', error);
+        // Handle errors in the retry operation
+        if (isAuthenticationError(error)) {
+          handleAPIError(error, 'History retry');
+        } else {
+          toast.error('Still unable to load chat history. Please try again later.', {
+            id: 'sidebar-history-error',
+            duration: 5000,
+          });
+        }
+      });
+    }, Math.min(1000 * 2 ** retryCount, 5000)); // Exponential backoff with max 5s
+  }, [mutate, retryCount]);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);

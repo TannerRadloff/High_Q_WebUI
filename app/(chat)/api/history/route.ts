@@ -50,12 +50,21 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // biome-ignore lint: Forbidden non-null assertion.
     const userId = session.user.id;
     console.log(`[History API] Fetching chats for user ${userId.substring(0, 5)}...`);
     
     try {
-      const chats = await getChatsByUserId({ id: userId });
+      // Set a timeout for the database query to prevent long-running requests
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Database query timeout')), 5000);
+      });
+      
+      // Create a promise for the actual database query
+      const queryPromise = getChatsByUserId({ id: userId });
+      
+      // Race the timeout against the actual query
+      const chats = await Promise.race([queryPromise, timeoutPromise]) as Array<Chat>;
+      
       console.log(`[History API] Successfully fetched ${chats.length} chats`);
       
       // Return empty array instead of null/undefined to avoid client-side errors
@@ -63,11 +72,24 @@ export async function GET() {
     } catch (dbError: any) {
       console.error('[History API] Database error:', dbError);
       
+      // Enhanced error diagnosis for clearer debugging
+      const errorDetails = {
+        message: dbError.message || 'Unknown error',
+        code: dbError.code,
+        name: dbError.name || 'Unknown',
+        stack: dbError.stack ? dbError.stack.split('\n')[0] : null,
+        isTimeout: dbError.message?.includes('timeout')
+      };
+      
+      console.error('[History API] Error details:', errorDetails);
+      
       // Check for connection-related errors
       if (
         dbError.message?.includes('connection') || 
         dbError.message?.includes('timeout') || 
-        dbError.code === 'ECONNREFUSED'
+        dbError.code === 'ECONNREFUSED' ||
+        dbError.code === '57P01' || // database connection timeout
+        dbError.code === '08006'    // connection terminated
       ) {
         return NextResponse.json(
           { 
