@@ -483,12 +483,12 @@ function PureSendButton({
     <Button
       type="button"
       size="icon"
-      variant="ghost"
-      className="absolute bottom-2 right-2 size-8 rounded-xl hover:bg-primary/10 hover:text-primary z-20"
+      variant="default"
+      className="absolute bottom-4 right-4 size-12 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 z-30 flex items-center justify-center shadow-lg"
       disabled={!input.trim() && uploadQueue.length === 0}
       onClick={() => submitForm(input)}
     >
-      <ArrowUpIcon />
+      <ArrowUpIcon className="h-6 w-6" />
     </Button>
   );
 }
