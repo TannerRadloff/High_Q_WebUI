@@ -88,6 +88,9 @@ export function Chat({
   // Add new state for chat creation
   const [hasMadeInitialChatRequest, setHasMadeInitialChatRequest] = useState(false);
   
+  // State for agent mode
+  const [isAgentMode, setIsAgentMode] = useState<boolean>(false);
+  
   // Handle network status and display
   useEffect(() => {
     const handleOnline = () => {
@@ -634,6 +637,17 @@ export function Chat({
       
       // Stop loading state on error
       stop();
+    }
+  };
+
+  // Simplify agent mode toggle handler
+  const handleAgentModeToggle = () => {
+    setIsAgentMode(!isAgentMode);
+    
+    // Reset agent panel state when disabling agent mode
+    if (isAgentMode) {
+      setIsAgentPanelOpen(false);
+      setActiveAgents([]);
     }
   };
 

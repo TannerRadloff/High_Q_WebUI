@@ -37,6 +37,14 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Check if OpenAI API key is configured
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: 'OpenAI API key is not configured. Please add it to your .env.local file.' },
+        { status: 500 }
+      );
+    }
+    
     // Initialize the OpenAI Agents SDK
     initializeAgentSDK(process.env.OPENAI_API_KEY);
     

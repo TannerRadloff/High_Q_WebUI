@@ -408,36 +408,38 @@ export default function AgentBuilder() {
 
   return (
     <div className="container mx-auto p-4 h-screen max-h-screen flex flex-col">
-      {/* Workflow header */}
-      <div className="mb-6 flex justify-between items-center">
-        <div>
-          <div className="flex items-baseline gap-4">
-            <h1 className="text-2xl font-bold">Agent Builder</h1>
-            <div className="flex-1">
-              <input
-                type="text"
-                value={workflowName}
-                onChange={(e) => setWorkflowName(e.target.value)}
-                className="px-2 py-1 border-b border-slate-300 dark:border-slate-700 bg-transparent focus:border-blue-500 dark:focus:border-blue-400 outline-none text-lg font-medium"
-                placeholder="Workflow Name"
-              />
-            </div>
+      {/* Top bar with workflow name and save button */}
+      <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800">
+        <div className="flex items-center space-x-4">
+          <div>
+            <input
+              type="text"
+              value={workflowName}
+              onChange={(e) => setWorkflowName(e.target.value)}
+              className="font-bold text-xl bg-transparent border-0 focus:ring-0 focus:border-b focus:border-blue-500 dark:text-white"
+              placeholder="Workflow Name"
+            />
+            <input
+              type="text"
+              value={workflowDescription}
+              onChange={(e) => setWorkflowDescription(e.target.value)}
+              className="text-sm text-gray-500 dark:text-gray-400 bg-transparent border-0 focus:ring-0 focus:border-b focus:border-blue-500 w-72"
+              placeholder="Workflow Description"
+            />
           </div>
-          <input
-            type="text"
-            value={workflowDescription}
-            onChange={(e) => setWorkflowDescription(e.target.value)}
-            className="mt-1 px-2 py-1 border-b border-slate-200 dark:border-slate-800 bg-transparent focus:border-blue-500 dark:focus:border-blue-400 outline-none w-full text-slate-600 dark:text-slate-400"
-            placeholder="Workflow Description"
-          />
         </div>
-        <button
-          onClick={handleSaveWorkflow}
-          disabled={isSaving || isLoading}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white rounded-md"
-        >
-          {isSaving ? 'Saving...' : 'Save Workflow'}
-        </button>
+        
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={handleSaveWorkflow}
+            disabled={isSaving || agents.length === 0}
+            className={`px-4 py-2 bg-blue-600 text-white rounded-md ${
+              isSaving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'
+            } ${agents.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {isSaving ? 'Saving...' : 'Save Workflow'}
+          </button>
+        </div>
       </div>
 
       {/* Connection creation notification */}
