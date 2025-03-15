@@ -44,6 +44,7 @@ function PureMultimodalInput({
   append,
   handleSubmit,
   className,
+  selectedWorkflowId,
 }: {
   chatId: string;
   input: string;
@@ -65,6 +66,7 @@ function PureMultimodalInput({
     chatRequestOptions?: ChatRequestOptions,
   ) => void;
   className?: string;
+  selectedWorkflowId?: string | null;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
@@ -280,6 +282,14 @@ function PureMultimodalInput({
     }
   }, [input, attachments, handleAgentSubmit, setAttachments, resetTextarea]);
 
+  // Update the placeholder text based on workflow selection
+  const getPlaceholderText = () => {
+    if (selectedWorkflowId) {
+      return "Send a message to your custom workflow...";
+    }
+    return "Send a message to Mimir...";
+  };
+
   return (
     <div
       className={cn(
@@ -321,10 +331,7 @@ function PureMultimodalInput({
                 ref={textareaRef}
                 tabIndex={0}
                 name="message"
-                placeholder={selectedAgentId === 'default' ? 
-                  "Message..." : 
-                  `Ask the ${agentTypeConfig.find((a) => a.id === selectedAgentId)?.name || 'selected'} agent...`
-                }
+                placeholder={getPlaceholderText()}
                 className={cn(
                   'max-h-64 min-h-[98px] grow whitespace-break-spaces text-secondary-foreground resize-none',
                   'bg-transparent p-0 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0',
@@ -423,6 +430,7 @@ export const MultimodalInput = memo(
     // Only re-render when these key props change
     if (prevProps.input !== nextProps.input) return false;
     if (prevProps.isLoading !== nextProps.isLoading) return false;
+    if (prevProps.selectedWorkflowId !== nextProps.selectedWorkflowId) return false;
     if (!equal(prevProps.attachments, nextProps.attachments)) return false;
     if (prevProps.chatId !== nextProps.chatId) return false;
     
