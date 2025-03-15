@@ -1,7 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
+import { createBrowserClient, createServerClient, createMiddlewareClient } from '@/utils/supabase';
 
-// Create a single supabase client for interacting with your database
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-) 
+// Export the client functions for use in different contexts
+export {
+  createBrowserClient,
+  createServerClient,
+  createMiddlewareClient
+}; 
