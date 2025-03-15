@@ -110,6 +110,20 @@ export interface Database {
           created_at?: string
         }
       }
+      notes: {
+        Row: {
+          id: number
+          title: string
+        }
+        Insert: {
+          id?: never
+          title: string
+        }
+        Update: {
+          id?: never
+          title?: string
+        }
+      }
     }
     Views: {
       // Views are not being used in this application

@@ -11,6 +11,7 @@ import { createServerComponentClient, createServerActionClient } from '@supabase
 import { createServerClient as createSSRServerClient } from '@supabase/ssr'
 import { Database } from '@/types/supabase'
 import { SupabaseClient } from '@supabase/supabase-js'
+import { type CookieOptions } from '@supabase/ssr'
 
 // Memory store for fallback when cookies are unavailable
 const memoryStore = new Map<string, string>();
@@ -41,12 +42,34 @@ export async function createServerClient(): Promise<SupabaseClient> {
     if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.trim() === '') {
       throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable');
     }
+
+    const { cookies } = await import('next/headers');
     
-    // Use a simpler approach to create the client
     const client = createSSRServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       {
+        cookies: {
+          get: (name: string) => {
+            return cookies().get(name)?.value
+          },
+          set: (name: string, value: string, options: CookieOptions) => {
+            try {
+              cookies().set(name, value, options)
+            } catch (error) {
+              // This can happen when cookies are set in middleware
+              console.error(`[Supabase Server] Error setting cookie ${name}:`, error);
+            }
+          },
+          remove: (name: string, options: CookieOptions) => {
+            try {
+              cookies().set(name, '', { ...options, maxAge: 0 })
+            } catch (error) {
+              // This can happen when cookies are removed in middleware
+              console.error(`[Supabase Server] Error removing cookie ${name}:`, error);
+            }
+          }
+        },
         auth: {
           autoRefreshToken: true,
           persistSession: true,
@@ -78,14 +101,6 @@ export async function createServerClient(): Promise<SupabaseClient> {
         }
       }
     );
-
-    // Setup cookie handling after client creation
-    try {
-      const { cookies } = await import('next/headers');
-      await client.auth.getSession();
-    } catch (error) {
-      console.error('[Supabase Server] Error setting up session:', error);
-    }
 
     return client;
   } catch (error) {

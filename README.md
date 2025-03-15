@@ -347,3 +347,97 @@ await runner.run_streamed("Explain quantum computing", callbacks);
 ## Installation
 
 ...existing content...
+
+# Next.js with Supabase Integration
+
+This project demonstrates how to integrate Supabase with a Next.js application, using TypeScript, Tailwind CSS, and server-side rendering.
+
+## Features
+
+- Supabase authentication
+- Data fetching with Supabase client
+- TypeScript integration
+- Tailwind CSS styling
+- Server-side rendering
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+ installed
+- A Supabase account and project
+
+### Setup
+
+1. Clone the repository:
+
+```bash
+git clone <repository-url>
+cd nextjs-ai-chatbot
+```
+
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Set up environment variables:
+
+Create a `.env.local` file in the root directory with your Supabase credentials:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+4. Start the development server:
+
+```bash
+npm run dev
+```
+
+Visit http://localhost:3000/notes to see your notes retrieved from Supabase.
+
+## Supabase Database Setup
+
+1. Create a `notes` table with the following SQL:
+
+```sql
+-- Create the notes table
+create table notes (
+  id bigint primary key generated always as identity,
+  title text not null
+);
+
+-- Insert some sample data into the table
+insert into notes (title)
+values
+  ('Today I created a Supabase project.'),
+  ('I added some data and queried it from Next.js.'),
+  ('It was awesome!');
+
+-- Enable row level security
+alter table notes enable row level security;
+
+-- Create policy to make notes readable by anyone
+create policy "public can read notes"
+on public.notes
+for select to anon
+using (true);
+```
+
+2. This will create a publicly readable `notes` table with some sample data.
+
+## How It Works
+
+- `utils/supabase/server.ts` - Server-side Supabase client
+- `utils/supabase/supabase-client.ts` - Client-side Supabase client
+- `app/notes/page.tsx` - Server component that fetches and displays notes
+- `types/supabase.ts` - TypeScript types for Supabase tables
+
+## Learn More
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Supabase Documentation](https://supabase.io/docs)
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
