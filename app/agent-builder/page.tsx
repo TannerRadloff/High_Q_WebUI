@@ -188,6 +188,42 @@ export default function AgentBuilder() {
     );
   };
 
+  // Handle connection point click
+  const handleConnectionPointClick = (agentId: string, isSource: boolean) => {
+    if (isCreatingConnection) {
+      // If we're already creating a connection and this is a target point
+      if (!isSource && connectionSource) {
+        // Create a new connection
+        const newConnection: Connection = {
+          id: uuidv4(),
+          sourceAgentId: connectionSource,
+          targetAgentId: agentId,
+          label: 'Handoff'
+        };
+        
+        // Add the connection
+        setConnections(prevConnections => [...prevConnections, newConnection]);
+        
+        // Reset connection creation state
+        setIsCreatingConnection(false);
+        setConnectionSource(null);
+      }
+    } else if (isSource) {
+      // Start creating a connection from this source point
+      setIsCreatingConnection(true);
+      setConnectionSource(agentId);
+    }
+  };
+
+  // Handle agent position change when dragged
+  const handleAgentPositionChange = (agentId: string, position: { x: number; y: number }) => {
+    setAgents(prevAgents => 
+      prevAgents.map(agent => 
+        agent.id === agentId ? { ...agent, position } : agent
+      )
+    );
+  };
+
   // Save the workflow
   const handleSaveWorkflow = async () => {
     try {
@@ -337,101 +373,105 @@ export default function AgentBuilder() {
         </div>
       )}
 
-      {/* Main content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Agent palette */}
-        <div className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 overflow-y-auto">
-          <h2 className="text-lg font-medium mb-4">Agent Types</h2>
-          <div className="space-y-3">
-            {Object.values(AgentType).map((type) => (
-              <DndContext key={type} onDragEnd={handleDragEnd}>
+      {/* Main content with a single DndContext wrapping both palette and canvas */}
+      <DndContext onDragEnd={handleDragEnd}>
+        <div className="flex flex-1 overflow-hidden">
+          {/* Agent palette */}
+          <div className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 overflow-y-auto">
+            <h2 className="text-lg font-medium mb-4">Agent Types</h2>
+            <div className="space-y-3">
+              {Object.values(AgentType).map((type) => (
                 <AgentItem
+                  key={type}
                   id={type}
                   name={AGENT_TEMPLATES[type].config!.name}
                   description={`${type.charAt(0).toUpperCase() + type.slice(1)} agent for specialized tasks`}
                 />
-              </DndContext>
-            ))}
-          </div>
-          
-          <div className="mt-8">
-            <h2 className="text-lg font-medium mb-4">Instructions</h2>
-            <ol className="list-decimal list-inside text-sm space-y-2 text-slate-600 dark:text-slate-400">
-              <li>Drag agent types from the palette to the canvas</li>
-              <li>Click on an agent to edit its properties</li>
-              <li>Use the "Create Connection" button to connect agents</li>
-              <li>Configure each agent's name, instructions, and tools</li>
-              <li>Save your workflow when finished</li>
-            </ol>
-          </div>
-        </div>
-
-        {/* Canvas area */}
-        <div className="flex-1 p-4 bg-slate-50 dark:bg-slate-900 overflow-auto">
-          <div className="mb-4 flex justify-between items-center">
-            <h2 className="text-lg font-medium">Canvas</h2>
-            <div className="space-x-2">
-              {selectedAgentId && !isCreatingConnection && (
-                <button
-                  onClick={() => handleStartConnection(selectedAgentId)}
-                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm"
-                >
-                  Create Connection
-                </button>
-              )}
-              {selectedAgentId && (
-                <button
-                  onClick={() => handleAgentDelete(selectedAgentId)}
-                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm"
-                >
-                  Delete Agent
-                </button>
-              )}
+              ))}
+            </div>
+            
+            <div className="mt-8">
+              <h2 className="text-lg font-medium mb-4">Instructions</h2>
+              <ol className="list-decimal list-inside text-sm space-y-2 text-slate-600 dark:text-slate-400">
+                <li>Drag agent types from the palette to the canvas</li>
+                <li>Click on an agent to edit its properties</li>
+                <li>Use the "Create Connection" button to connect agents</li>
+                <li>Configure each agent's name, instructions, and tools</li>
+                <li>Save your workflow when finished</li>
+              </ol>
             </div>
           </div>
-          
-          <DndContext onDragEnd={handleDragEnd}>
+
+          {/* Canvas area */}
+          <div className="flex-1 p-4 bg-slate-50 dark:bg-slate-900 overflow-auto">
+            <div className="mb-4 flex justify-between items-center">
+              <h2 className="text-lg font-medium">Canvas</h2>
+              <div className="space-x-2">
+                {selectedAgentId && !isCreatingConnection && (
+                  <button
+                    onClick={() => handleStartConnection(selectedAgentId)}
+                    className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm"
+                  >
+                    Create Connection
+                  </button>
+                )}
+                {selectedAgentId && (
+                  <button
+                    onClick={() => handleAgentDelete(selectedAgentId)}
+                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm"
+                  >
+                    Delete Agent
+                  </button>
+                )}
+              </div>
+            </div>
+            
             <Canvas
               agents={agents}
+              connections={connections}
               onAgentSelect={handleAgentSelect}
               selectedAgentId={selectedAgentId}
+              isCreatingConnection={isCreatingConnection}
+              onConnectionPointClick={handleConnectionPointClick}
+              connectionSource={connectionSource}
+              onAgentPositionChange={handleAgentPositionChange}
             />
-          </DndContext>
-          
-          {/* Connections list */}
-          {connections.length > 0 && (
-            <div className="mt-4 p-3 border border-slate-200 dark:border-slate-800 rounded-md bg-white dark:bg-slate-950">
-              <h3 className="text-md font-medium mb-2">Connections</h3>
-              <ul className="space-y-2">
-                {connections.map(connection => {
-                  const sourceAgent = agents.find(a => a.id === connection.sourceAgentId);
-                  const targetAgent = agents.find(a => a.id === connection.targetAgentId);
-                  
-                  return (
-                    <li key={connection.id} className="flex justify-between items-center text-sm">
-                      <span>
-                        {sourceAgent?.config.name} → {targetAgent?.config.name}
-                      </span>
-                      <button
-                        onClick={() => handleDeleteConnection(connection.id)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        Delete
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-        </div>
+            
+            {/* Connections list */}
+            {connections.length > 0 && (
+              <div className="mt-4 p-3 border border-slate-200 dark:border-slate-800 rounded-md bg-white dark:bg-slate-950">
+                <h3 className="text-md font-medium mb-2">Connections</h3>
+                <ul className="space-y-2">
+                  {connections.map(connection => {
+                    const sourceAgent = agents.find(a => a.id === connection.sourceAgentId);
+                    const targetAgent = agents.find(a => a.id === connection.targetAgentId);
+                    
+                    return (
+                      <li key={connection.id} className="flex justify-between items-center text-sm">
+                        <span>
+                          {sourceAgent?.config.name} → {targetAgent?.config.name}
+                        </span>
+                        <button
+                          onClick={() => handleDeleteConnection(connection.id)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          Delete
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </div>
 
-        {/* Properties panel */}
-        <PropertiesPanel
-          selectedAgent={selectedAgent}
-          onAgentUpdate={handleAgentUpdate}
-        />
-      </div>
+          {/* Properties panel */}
+          <PropertiesPanel
+            selectedAgent={selectedAgent}
+            onAgentUpdate={handleAgentUpdate}
+          />
+        </div>
+      </DndContext>
     </div>
   );
 } 
