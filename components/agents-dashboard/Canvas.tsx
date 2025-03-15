@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import AgentNode from './AgentNode';
 import { Agent, Connection } from './types';
@@ -32,8 +32,59 @@ const Canvas: React.FC<CanvasProps> = ({
     id: 'canvas',
   });
 
+  // State for tracking mouse position during connection creation
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
   // Grid size for snapping
   const gridSize = 20; // 20px grid
+
+  // Add state for potential connection target
+  const [potentialTarget, setPotentialTarget] = useState<string | null>(null);
+
+  // Track mouse movement when creating a connection
+  useEffect(() => {
+    if (isCreatingConnection && connectionSource) {
+      const handleMouseMove = (e: MouseEvent) => {
+        const canvas = document.querySelector('[data-droppable-id="canvas"]');
+        if (!canvas) return;
+        
+        const rect = canvas.getBoundingClientRect();
+        setMousePosition({
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top
+        });
+        
+        // Check if mouse is over a potential connection target
+        const agentNodes = document.querySelectorAll('[data-agent-id]');
+        let foundTarget = null;
+        
+        agentNodes.forEach((node) => {
+          const agentId = node.getAttribute('data-agent-id');
+          if (agentId && agentId !== connectionSource) {
+            const nodeRect = node.getBoundingClientRect();
+            
+            // Check if mouse is over this agent
+            if (
+              e.clientX >= nodeRect.left && 
+              e.clientX <= nodeRect.right && 
+              e.clientY >= nodeRect.top && 
+              e.clientY <= nodeRect.bottom
+            ) {
+              foundTarget = agentId;
+            }
+          }
+        });
+        
+        setPotentialTarget(foundTarget);
+      };
+      
+      document.addEventListener('mousemove', handleMouseMove);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        setPotentialTarget(null);
+      };
+    }
+  }, [isCreatingConnection, connectionSource, agents]);
 
   // Handle agent position update
   const handleAgentDragEnd = (agentId: string, position: { x: number; y: number }) => {
@@ -116,11 +167,25 @@ const Canvas: React.FC<CanvasProps> = ({
     const sourceAgent = agents.find(a => a.id === connectionSource);
     if (!sourceAgent) return null;
     
-    // Get mouse position (using mousemove event in a useEffect would be more precise)
-    // For now, we'll just extend a line to the right
+    // Get start point from the source agent
     const startX = sourceAgent.position.x + 192; // End of the agent box
     const startY = sourceAgent.position.y + 28; // Mid-height
-    const endX = startX + 100; // 100px to the right
+    
+    // Use the current mouse position for the end point
+    let endX = mousePosition.x;
+    let endY = mousePosition.y;
+    
+    // If we have a potential target, use its position instead
+    if (potentialTarget) {
+      const targetAgent = agents.find(a => a.id === potentialTarget);
+      if (targetAgent) {
+        endX = targetAgent.position.x;
+        endY = targetAgent.position.y + 28; // Mid-height
+      }
+    }
+    
+    // Create a curved path that follows the mouse
+    const path = `M${startX},${startY} C${startX + 50},${startY} ${endX - 50},${endY} ${endX},${endY}`;
     
     return (
       <svg 
@@ -128,12 +193,19 @@ const Canvas: React.FC<CanvasProps> = ({
         className="overflow-visible"
       >
         <path
-          d={`M${startX},${startY} L${endX},${startY}`}
+          d={path}
           fill="none"
           stroke="currentColor"
           strokeWidth="2"
-          strokeDasharray="5,5"
-          className="text-green-500 dark:text-green-400"
+          strokeDasharray={potentialTarget ? "0" : "5,5"}
+          className={potentialTarget ? "text-blue-500 dark:text-blue-400" : "text-green-500 dark:text-green-400"}
+        />
+        {/* Add a small circle at the end to indicate where the connection will end */}
+        <circle
+          cx={endX}
+          cy={endY}
+          r={4}
+          className={potentialTarget ? "fill-blue-500 dark:fill-blue-400" : "fill-green-500 dark:fill-green-400"}
         />
       </svg>
     );
@@ -177,6 +249,7 @@ const Canvas: React.FC<CanvasProps> = ({
   return (
     <div
       ref={setNodeRef}
+      data-droppable-id="canvas"
       className={`w-full h-full border-2 border-dashed 
                  ${isOver 
                    ? 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-950/30' 
@@ -210,6 +283,7 @@ const Canvas: React.FC<CanvasProps> = ({
           onConnectionPointClick={onConnectionPointClick}
           onDragEnd={handleAgentDragEnd}
           gridSize={gridSize}
+          isPotentialTarget={potentialTarget === agent.id}
         />
       ))}
     </div>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { CSSProperties } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { AgentType, AGENT_ICONS } from './types';
 
@@ -22,22 +22,33 @@ const AgentItem: React.FC<AgentItemProps> = ({
   isCustom = false,
   specialization
 }) => {
-  // Set up draggable behavior
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  // Set up draggable behavior with DragOverlay support
+  const { attributes, listeners, setNodeRef, isDragging, transform } = useDraggable({
     id,
   });
 
   // Get icon, defaulting to type-based icon or 🤖 if not available
   const displayIcon = icon || AGENT_ICONS[id as AgentType] || '🤖';
   
+  // Create a style object for the drag transform
+  const style: CSSProperties | undefined = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    zIndex: 1000,
+    position: 'relative' as const,
+    width: isDragging ? 'fit-content' : 'auto',
+    opacity: isDragging ? 0.8 : 1,
+    boxShadow: isDragging ? '0 5px 15px rgba(0,0,0,0.2)' : 'none',
+  } : undefined;
+  
   return (
     <div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      style={style}
       className={`p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 
                 rounded-lg shadow-sm cursor-grab transition-all
-                ${isDragging ? 'opacity-50 scale-95' : 'opacity-100'}
+                ${isDragging ? 'scale-105' : 'opacity-100'}
                 ${isCustom ? 'border-l-4 border-l-blue-500' : ''}
                 hover:shadow-md`}
     >

@@ -1,16 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { DndContext, DragEndEvent, DragOverEvent } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { createPortal } from 'react-dom';
 
 // Import existing components
 import Canvas from '@/components/agents-dashboard/Canvas';
 import AgentItem from '@/components/agents-dashboard/AgentItem';
 import PropertiesPanel from '@/components/agents-dashboard/PropertiesPanel';
-import { Agent, AgentType, AGENT_TEMPLATES, Connection, ModelType, SavedAgentConfig, BASE_AGENT_TEMPLATE } from '@/components/agents-dashboard/types';
+import { Agent, AgentType, AGENT_TEMPLATES, Connection, ModelType, SavedAgentConfig, BASE_AGENT_TEMPLATE, AGENT_ICONS } from '@/components/agents-dashboard/types';
 
 // Import workflow API functions
 import { createWorkflow, updateWorkflow, fetchWorkflow } from '@/lib/agent-workflow';
@@ -39,11 +40,24 @@ export default function AgentBuilder() {
   const [savedAgentConfigs, setSavedAgentConfigs] = useState<SavedAgentConfig[]>([]);
   const [isLoadingConfigs, setIsLoadingConfigs] = useState(false);
 
+  // Add state for active drag item and position
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
+  
   const router = useRouter();
   const searchParams = useSearchParams();
   
   // Get the selected agent
   const selectedAgent = agents.find(agent => agent.id === selectedAgentId) || null;
+
+  // Configure sensors for better drag detection
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px movement before drag starts
+      },
+    })
+  );
 
   // Load workflow if workflow ID is provided in URL
   useEffect(() => {
@@ -177,6 +191,26 @@ export default function AgentBuilder() {
       setIsLoading(false);
     }
   };
+
+  // Handle drag start event
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    setActiveDragId(active.id as string);
+  };
+
+  // Track mouse position during drag
+  useEffect(() => {
+    if (activeDragId) {
+      const handleMouseMove = (e: MouseEvent) => {
+        setDragPosition({ x: e.clientX, y: e.clientY });
+      };
+      
+      window.addEventListener('mousemove', handleMouseMove);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+      };
+    }
+  }, [activeDragId]);
 
   // Handle drag end event (when an agent is dropped on the canvas)
   const handleDragEnd = (event: DragEndEvent) => {
@@ -406,6 +440,61 @@ export default function AgentBuilder() {
     }
   };
 
+  // Get the active drag item for the overlay
+  const getActiveDragItem = () => {
+    if (!activeDragId) return null;
+    
+    // Check if it's a saved agent config
+    if (activeDragId.startsWith('saved-')) {
+      const configId = activeDragId.replace('saved-', '');
+      const savedConfig = savedAgentConfigs.find(config => config.id === configId);
+      
+      if (savedConfig) {
+        return (
+          <div className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 
+                        rounded-lg shadow-lg border-l-4 border-l-blue-500 w-64">
+            <div className="flex items-start space-x-3">
+              <div className="text-2xl" role="img">
+                {savedConfig.icon || '🤖'}
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium text-slate-900 dark:text-slate-100">{savedConfig.name}</h3>
+                {savedConfig.specialization && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                    {savedConfig.specialization}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+    }
+    
+    // Regular agent type
+    const agentType = activeDragId as AgentType;
+    const template = AGENT_TEMPLATES[agentType];
+    
+    if (!template || !template.config) return null;
+    
+    return (
+      <div className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 
+                    rounded-lg shadow-lg w-64">
+        <div className="flex items-start space-x-3">
+          <div className="text-2xl" role="img">
+            {AGENT_ICONS[agentType] || '🤖'}
+          </div>
+          <div className="flex-1">
+            <h3 className="font-medium text-slate-900 dark:text-slate-100">{template.config.name}</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              {agentType} Agent
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="container mx-auto p-4 h-screen max-h-screen flex flex-col">
       {/* Top bar with workflow name and save button */}
@@ -458,7 +547,11 @@ export default function AgentBuilder() {
       )}
 
       {/* Main content with a single DndContext wrapping both palette and canvas */}
-      <DndContext onDragEnd={handleDragEnd}>
+      <DndContext 
+        onDragEnd={handleDragEnd}
+        onDragStart={handleDragStart}
+        sensors={sensors}
+      >
         <div className="flex flex-1 overflow-hidden">
           {/* Agent palette */}
           <div className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 overflow-y-auto">
@@ -612,6 +705,24 @@ export default function AgentBuilder() {
             )}
           </div>
         </div>
+        
+        {/* Drag overlay */}
+        {typeof window !== 'undefined' && activeDragId && createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              pointerEvents: 'none',
+              zIndex: 1000,
+              left: dragPosition.x,
+              top: dragPosition.y,
+              transform: 'translate(-50%, -50%)',
+            }}
+            className="drag-overlay"
+          >
+            {getActiveDragItem()}
+          </div>,
+          document.body
+        )}
       </DndContext>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Agent, AgentType } from './types';
 
 interface AgentNodeProps {
@@ -9,6 +9,7 @@ interface AgentNodeProps {
   isCreatingConnection?: boolean;
   onDragEnd?: (agentId: string, position: { x: number; y: number }) => void;
   gridSize?: number;
+  isPotentialTarget?: boolean;
 }
 
 /**
@@ -21,10 +22,18 @@ const AgentNode: React.FC<AgentNodeProps> = ({
   onConnectionPointClick,
   isCreatingConnection = false,
   onDragEnd,
-  gridSize = 20
+  gridSize = 20,
+  isPotentialTarget = false
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [position, setPosition] = useState({ x: agent.position.x, y: agent.position.y });
+  const nodeRef = useRef<HTMLDivElement>(null);
+  
+  // Update local position when agent position changes from props
+  useEffect(() => {
+    setPosition({ x: agent.position.x, y: agent.position.y });
+  }, [agent.position.x, agent.position.y]);
 
   // Different color schemes based on agent type
   const getAgentStyles = () => {
@@ -60,7 +69,9 @@ const AgentNode: React.FC<AgentNodeProps> = ({
     if (e.button !== 0) return;
     
     // Calculate offset from the top-left corner of the element
-    const rect = e.currentTarget.getBoundingClientRect();
+    const rect = nodeRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
     const offsetX = e.clientX - rect.left;
     const offsetY = e.clientY - rect.top;
     
@@ -98,10 +109,8 @@ const AgentNode: React.FC<AgentNodeProps> = ({
     newX = Math.max(0, Math.min(newX, canvasRect.width - 192)); // 48px width * 4
     newY = Math.max(0, Math.min(newY, canvasRect.height - 56)); // Approximate height
     
-    // Update the element's position
-    const element = e.target as HTMLElement;
-    element.style.left = `${newX}px`;
-    element.style.top = `${newY}px`;
+    // Update the local position state for smooth movement
+    setPosition({ x: newX, y: newY });
   };
 
   // End dragging
@@ -114,32 +123,32 @@ const AgentNode: React.FC<AgentNodeProps> = ({
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
     
-    // Get the new position
-    const element = e.target as HTMLElement;
-    const newX = parseInt(element.style.left, 10) || agent.position.x;
-    const newY = parseInt(element.style.top, 10) || agent.position.y;
-    
-    // Snap to grid and call onDragEnd with the new position
+    // Call onDragEnd with the final position
     if (onDragEnd) {
       onDragEnd(agent.id, { 
-        x: Math.round(newX / gridSize) * gridSize, 
-        y: Math.round(newY / gridSize) * gridSize 
+        x: position.x, 
+        y: position.y 
       });
     }
   };
 
   return (
     <div
+      ref={nodeRef}
+      data-agent-id={agent.id}
       style={{
         position: 'absolute',
-        left: agent.position.x,
-        top: agent.position.y,
+        left: position.x,
+        top: position.y,
         cursor: isDragging ? 'grabbing' : isCreatingConnection ? 'pointer' : 'grab',
-        zIndex: isDragging || isSelected ? 10 : 1
+        zIndex: isDragging || isSelected ? 10 : 1,
+        transition: isDragging ? 'none' : 'box-shadow 0.2s, transform 0.1s',
+        transform: isDragging ? 'scale(1.02)' : isPotentialTarget ? 'scale(1.05)' : 'scale(1)',
       }}
       className={`p-4 w-48 rounded-lg shadow-md border ${getAgentStyles()} 
                 ${isSelected ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''}
-                transition-all ${isDragging ? 'opacity-80' : 'opacity-100'}`}
+                ${isDragging ? 'shadow-xl' : ''}
+                ${isPotentialTarget ? 'ring-2 ring-green-500 dark:ring-green-400 shadow-lg' : ''}`}
       onClick={(e) => {
         if (!isDragging) onClick();
       }}
