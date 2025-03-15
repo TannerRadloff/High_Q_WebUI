@@ -92,26 +92,91 @@ export async function saveChat({
 }
 
 export async function getChatsByUserId({ id }: { id: string }) {
+  const traceId = generateTraceId();
   try {
-    console.log(`[Supabase] Fetching chats for user: ${id}`);
+    console.log(`[Supabase][${traceId}] Fetching chats for user: ${id.substring(0, 5)}...`);
+    
+    // Performance tracking
+    const startTime = performance.now();
     
     const supabase = await getSupabaseClient();
+    console.log(`[Supabase][${traceId}] Client initialized successfully for getChatsByUserId`);
+    
+    // Log database connection attempt
+    console.log(`[Supabase][${traceId}] Sending query to database...`);
+    
+    // Add query timeout and diagnostics
+    let queryTimedOut = false;
+    const timeoutId = setTimeout(() => {
+      queryTimedOut = true;
+      console.error(`[Supabase][${traceId}] Query timeout warning: getChatsByUserId has been running for 4s`);
+    }, 4000);
+    
     const { data, error } = await supabase
       .from('chat')
       .select('*')
       .eq('user_id', id)
       .order('created_at', { ascending: false });
     
+    // Clear the timeout since the query has completed
+    clearTimeout(timeoutId);
+    
+    // Performance logging
+    const duration = performance.now() - startTime;
+    console.log(`[Supabase][${traceId}] Query execution time: ${duration.toFixed(2)}ms`);
+    
     if (error) {
-      console.error('[Supabase] Error fetching user chats:', error);
+      console.error(`[Supabase][${traceId}] Error fetching user chats:`, {
+        error,
+        errorCode: error.code,
+        errorMessage: error.message,
+        errorDetails: error.details,
+        queryTimedOut,
+        userId: id.substring(0, 5),
+        timestamp: new Date().toISOString()
+      });
       throw error;
+    }
+    
+    // Log the result summary
+    console.log(`[Supabase][${traceId}] Successfully fetched ${data?.length || 0} chats for user ${id.substring(0, 5)}`);
+    
+    if (data) {
+      // Perform basic data validation
+      const validData = data.every(chat => 
+        typeof chat.id === 'string' && 
+        typeof chat.title === 'string' && 
+        typeof chat.user_id === 'string'
+      );
+      
+      if (!validData) {
+        console.warn(`[Supabase][${traceId}] Data validation warning: Some chat records have unexpected format`);
+      }
+      
+      // Check for empty data
+      if (data.length === 0) {
+        console.log(`[Supabase][${traceId}] Note: No chat records found for user ${id.substring(0, 5)}`);
+      }
     }
     
     return data || [];
   } catch (error) {
-    console.error('[Supabase] Failed to get chats by user ID:', error);
+    console.error(`[Supabase][${traceId}] Failed to get chats by user ID:`, {
+      error: error instanceof Error ? {
+        name: error.name,
+        message: error.message,
+        stack: error.stack?.split('\n')[0]
+      } : String(error),
+      userId: id.substring(0, 5),
+      timestamp: new Date().toISOString()
+    });
     throw error;
   }
+}
+
+// Helper function to generate a trace ID for correlating logs
+function generateTraceId() {
+  return Math.random().toString(36).substring(2, 10);
 }
 
 // Message operations
