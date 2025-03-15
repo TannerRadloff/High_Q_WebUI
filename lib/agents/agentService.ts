@@ -1,7 +1,19 @@
-import { Agent, Runner, set_default_openai_key, set_tracing_export_api_key, set_tracing_disabled } from 'openai-agents';
+import { Agent, Runner, set_default_openai_key, set_tracing_export_api_key, set_tracing_disabled } from './openai-agents';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-import { AgentStatus } from '@/components/features/AgentStatusPanel';
+
+// Define the AgentStatus interface directly
+export interface AgentStatus {
+  id: string;
+  name: string;
+  type: string;
+  task?: string;
+  status: 'idle' | 'working' | 'completed' | 'error';
+  progress: number;
+  startTime: Date;
+  endTime?: Date;
+  result?: string;
+}
 
 // Define specialized agent types that extend the base Agent
 interface AgentDefinition {
