@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createClient } from '@/utils/supabase/middleware'
+import { createMiddlewareClient } from '@/lib/supabase/middleware'
 
 // Define public routes that don't require authentication
 const PUBLIC_PATHS = [
@@ -34,7 +34,7 @@ const DEV_MODE = process.env.NODE_ENV === 'development'
 export async function middleware(request: NextRequest) {
   try {
     // Create a Supabase client configured to use cookies
-    const { supabase, response } = createClient(request)
+    const { supabase, response } = createMiddlewareClient(request)
 
     // Refresh session if expired - required for Server Components
     // https://supabase.com/docs/guides/auth/auth-helpers/nextjs#managing-session-with-middleware

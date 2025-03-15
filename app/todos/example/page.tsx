@@ -1,4 +1,4 @@
-import { createClient } from "@/utils/supabase/server";
+import { createSSRServerClient } from "@/lib/supabase/index";
 import TodoList from "@/app/components/TodoList";
 
 type Todo = {
@@ -9,7 +9,7 @@ type Todo = {
 };
 
 export default async function ExamplePage() {
-  const supabase = await createClient();
+  const supabase = await createSSRServerClient();
   
   const { data: todos, error } = await supabase
     .from("todos")

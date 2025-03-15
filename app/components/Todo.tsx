@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { createBrowserClient } from '@/lib/supabase/index';
 
 type TodoProps = {
   id: string;
@@ -16,7 +16,7 @@ export default function Todo({ id, title, is_complete, onToggle, onDelete }: Tod
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   
-  const supabase = createClient();
+  const supabase = createBrowserClient();
   
   const handleToggle = async () => {
     try {

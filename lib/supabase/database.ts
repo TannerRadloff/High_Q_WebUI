@@ -1,4 +1,4 @@
-import { createClient } from '@/utils/supabase/server';
+import { createSSRServerClient } from './index';
 import type { Database } from '@/types/supabase';
 import { SupabaseClient } from '@supabase/supabase-js';
 
@@ -93,8 +93,8 @@ export async function getSupabaseClient() {
     metrics.connectionCreated = true;
     connectionPool.totalConnections++;
     
-    // Create a new client
-    const supabase = await createClient();
+    // Create a new client using our consolidated implementation
+    const supabase = await createSSRServerClient();
     
     // Simple health check to verify connection
     metrics.healthCheckPerformed = true;
@@ -120,7 +120,7 @@ export async function getSupabaseClient() {
           consecutiveErrors: connectionPool.consecutiveErrors,
           totalConnAttempts: connectionPool.totalConnections,
           successConnections: connectionPool.successfulConnections,
-          errorRate: (connectionPool.totalConnections - connectionPool.successfulConnections) / connectionPool.totalConnections
+          errorRate: ((connectionPool.totalConnections - connectionPool.successfulConnections) / connectionPool.totalConnections).toFixed(2)
         });
         
         // Track connection retries

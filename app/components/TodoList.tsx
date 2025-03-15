@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { createBrowserClient } from '@/lib/supabase/index';
 import Todo from './Todo';
 import TodoForm from './TodoForm';
 
@@ -16,7 +16,7 @@ export default function TodoList({ initialTodos = [] }: { initialTodos: Todo[] }
   const [todos, setTodos] = useState<Todo[]>(initialTodos);
   const [isLoading, setIsLoading] = useState(false);
   
-  const supabase = createClient();
+  const supabase = createBrowserClient();
   
   useEffect(() => {
     // Set up a real-time subscription to todos
