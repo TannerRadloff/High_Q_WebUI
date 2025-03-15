@@ -22,6 +22,11 @@ function isChatPage(pathname: string | null) {
   return pathname.startsWith('/chat') || pathname === '/';
 }
 
+function isAgentBuilderPage(pathname: string | null) {
+  if (!pathname) return false;
+  return pathname.startsWith('/agent-builder');
+}
+
 // Initialize global error handlers
 function initGlobalErrorHandlers() {
   // Error handling for fetch requests
@@ -67,6 +72,7 @@ export default function ClientLayout({
   // Derived state - not hooks
   const isAuth = isAuthPage(pathname);
   const isChat = isChatPage(pathname);
+  const isAgentBuilder = isAgentBuilderPage(pathname);
 
   // Initialize on mount
   useEffect(() => {
@@ -104,7 +110,7 @@ export default function ClientLayout({
       <div className={cn(
         "w-full h-full", 
         isAuth && "flex-center min-h-[calc(100vh-3.5rem)]",
-        isChat && "h-full" // Chat pages (including home) don't need extra height adjustment
+        (isChat || isAgentBuilder) && "h-full" // Chat pages and agent builder pages don't need extra height adjustment
       )}>
         {children}
       </div>

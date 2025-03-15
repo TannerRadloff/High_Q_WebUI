@@ -5,7 +5,7 @@ import type { User } from '@supabase/supabase-js';
 import { useRouter, usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
-import { PlusIcon, BoxIcon, InfoIcon, MenuIcon } from '@/components/icons';
+import { PlusIcon, BoxIcon, InfoIcon, MenuIcon, RouteIcon } from '@/components/icons';
 import { SidebarHistory } from '@/src/components/layout/sidebar-history';
 import { SidebarUserNav } from '@/src/components/layout/sidebar-user-nav';
 import { Button } from '@/src/components/ui/button';
@@ -159,6 +159,23 @@ export function AppSidebar({ user }: { user: User | undefined }) {
             >
               <span className="truncate">New Chat</span>
             </Button>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => {
+                    router.push('/agent-builder');
+                    setOpenMobile(false);
+                  }}
+                >
+                  <RouteIcon size={14} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Agent Builder</TooltipContent>
+            </Tooltip>
             
             <Tooltip>
               <TooltipTrigger asChild>
