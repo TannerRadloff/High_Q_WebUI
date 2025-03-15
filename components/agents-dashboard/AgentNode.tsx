@@ -8,6 +8,7 @@ interface AgentNodeProps {
   onConnectionPointClick?: (agentId: string, isSource: boolean) => void;
   isCreatingConnection?: boolean;
   onDragEnd?: (agentId: string, position: { x: number; y: number }) => void;
+  gridSize?: number;
 }
 
 /**
@@ -19,7 +20,8 @@ const AgentNode: React.FC<AgentNodeProps> = ({
   onClick, 
   onConnectionPointClick,
   isCreatingConnection = false,
-  onDragEnd
+  onDragEnd,
+  gridSize = 20
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -88,6 +90,10 @@ const AgentNode: React.FC<AgentNodeProps> = ({
     let newX = e.clientX - canvasRect.left - dragOffset.x;
     let newY = e.clientY - canvasRect.top - dragOffset.y;
     
+    // Snap to grid while dragging for visual feedback
+    newX = Math.round(newX / gridSize) * gridSize;
+    newY = Math.round(newY / gridSize) * gridSize;
+    
     // Clamp to canvas bounds
     newX = Math.max(0, Math.min(newX, canvasRect.width - 192)); // 48px width * 4
     newY = Math.max(0, Math.min(newY, canvasRect.height - 56)); // Approximate height
@@ -113,9 +119,12 @@ const AgentNode: React.FC<AgentNodeProps> = ({
     const newX = parseInt(element.style.left, 10) || agent.position.x;
     const newY = parseInt(element.style.top, 10) || agent.position.y;
     
-    // Call onDragEnd with the new position
+    // Snap to grid and call onDragEnd with the new position
     if (onDragEnd) {
-      onDragEnd(agent.id, { x: newX, y: newY });
+      onDragEnd(agent.id, { 
+        x: Math.round(newX / gridSize) * gridSize, 
+        y: Math.round(newY / gridSize) * gridSize 
+      });
     }
   };
 

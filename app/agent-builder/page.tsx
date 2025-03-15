@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import Canvas from '@/components/agents-dashboard/Canvas';
 import AgentItem from '@/components/agents-dashboard/AgentItem';
 import PropertiesPanel from '@/components/agents-dashboard/PropertiesPanel';
-import { Agent, AgentType, AGENT_TEMPLATES, Connection } from '@/components/agents-dashboard/types';
+import { Agent, AgentType, AGENT_TEMPLATES, Connection, ModelType } from '@/components/agents-dashboard/types';
 
 // Import workflow API functions
 import { createWorkflow, updateWorkflow, fetchWorkflow } from '@/lib/agent-workflow';
@@ -23,8 +23,8 @@ export default function AgentBuilder() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  const [workflowName, setWorkflowName] = useState('New Workflow');
-  const [workflowDescription, setWorkflowDescription] = useState('');
+  const [workflowName, setWorkflowName] = useState('Research Workflow');
+  const [workflowDescription, setWorkflowDescription] = useState('An example workflow for delegating research tasks');
   
   // State for connection creation
   const [isCreatingConnection, setIsCreatingConnection] = useState(false);
@@ -46,8 +46,78 @@ export default function AgentBuilder() {
     const workflowId = searchParams?.get('workflow');
     if (workflowId) {
       loadWorkflow(workflowId);
+    } else {
+      // Create example agents workflow
+      createExampleWorkflow();
     }
   }, [searchParams]);
+
+  // Create an example workflow with delegation, research, and report writing agents
+  const createExampleWorkflow = () => {
+    // Create IDs for the agents
+    const delegatorId = uuidv4();
+    const researcherId = uuidv4();
+    const reportWriterId = uuidv4();
+    
+    // Create the agents
+    const delegator: Agent = {
+      id: delegatorId,
+      type: AgentType.JUDGE,
+      position: { x: 100, y: 100 },
+      config: {
+        name: 'Delegation Agent',
+        instructions: 'You are the primary delegation agent responsible for receiving user queries and directing them to the appropriate specialist agents. For research tasks, first understand what the user is asking for, then delegate to the Research Agent. Monitor the workflow and ensure tasks are properly handed off between agents.',
+        model: ModelType.GPT_4O,
+        tools: []
+      }
+    };
+    
+    const researcher: Agent = {
+      id: researcherId,
+      type: AgentType.RESEARCH,
+      position: { x: 400, y: 60 },
+      config: {
+        name: 'Research Agent',
+        instructions: 'As a specialized research agent, your role is to collect comprehensive information on topics delegated to you. Utilize search tools to find accurate, up-to-date information from reliable sources. Format your findings clearly, including citations and references. When research is complete, hand off your findings to the Report Writer Agent.',
+        model: ModelType.GPT_4O,
+        tools: []
+      }
+    };
+    
+    const reportWriter: Agent = {
+      id: reportWriterId,
+      type: AgentType.REPORT,
+      position: { x: 700, y: 100 },
+      config: {
+        name: 'Report Writer Agent',
+        instructions: 'You are a specialized report writing agent. Your role is to take research data handed to you by the Research Agent and transform it into well-structured, professional reports. Organize information logically, highlight key findings, and ensure the report is easy to understand. Present the final report back to the user in a clear, readable format.',
+        model: ModelType.GPT_4O,
+        tools: []
+      }
+    };
+    
+    // Create connections between agents
+    const delegatorToResearcher: Connection = {
+      id: uuidv4(),
+      sourceAgentId: delegatorId,
+      targetAgentId: researcherId,
+      label: 'Research Request'
+    };
+    
+    const researcherToReportWriter: Connection = {
+      id: uuidv4(),
+      sourceAgentId: researcherId,
+      targetAgentId: reportWriterId,
+      label: 'Research Data'
+    };
+    
+    // Update state
+    setAgents([delegator, researcher, reportWriter]);
+    setConnections([delegatorToResearcher, researcherToReportWriter]);
+    
+    // Set default selected agent
+    setSelectedAgentId(delegatorId);
+  };
 
   // Load a workflow from the server
   const loadWorkflow = async (workflowId: string) => {
@@ -93,8 +163,8 @@ export default function AgentBuilder() {
         id: uuidv4(),
         type: agentType,
         position: {
-          x: Math.random() * 400 + 50, // Random position within the canvas
-          y: Math.random() * 300 + 50,
+          x: Math.round((Math.random() * 400 + 50) / 20) * 20, // Random position within the canvas, snapped to grid
+          y: Math.round((Math.random() * 300 + 50) / 20) * 20,
         },
         config: {
           ...AGENT_TEMPLATES[agentType].config!
@@ -224,20 +294,20 @@ export default function AgentBuilder() {
     );
   };
 
-  // Save the workflow
+  // Handle saving the workflow
   const handleSaveWorkflow = async () => {
     try {
-      if (!workflowName.trim()) {
-        toast.error('Please enter a workflow name');
-        return;
-      }
-
       setIsSaving(true);
       
-      // Determine the entry point agent (first agent for now)
-      const entryPointAgentId = agents.length > 0 ? agents[0].id : '';
+      // Create the workflow object with all necessary fields
+      const workflow = {
+        name: workflowName,
+        description: workflowDescription,
+        agents,
+        connections,
+        entryPointAgentId: agents.length > 0 ? agents[0].id : ''
+      };
       
-      // Either update an existing workflow or create a new one
       if (currentWorkflowId) {
         await updateWorkflow(
           currentWorkflowId,
@@ -245,23 +315,22 @@ export default function AgentBuilder() {
           workflowDescription,
           agents,
           connections,
-          entryPointAgentId
+          agents.length > 0 ? agents[0].id : ''
         );
         toast.success('Workflow updated successfully');
       } else {
-        const { workflowId } = await createWorkflow(
+        const result = await createWorkflow(
           workflowName,
           workflowDescription,
           agents,
           connections,
-          entryPointAgentId
+          agents.length > 0 ? agents[0].id : ''
         );
-        setCurrentWorkflowId(workflowId);
-        toast.success('Workflow saved successfully');
+        setCurrentWorkflowId(result.workflowId);
+        toast.success('Workflow created successfully');
         
-        // Update URL to include the new workflow ID without a full page reload
-        const newUrl = `/agent-builder?workflow=${workflowId}`;
-        window.history.pushState({ path: newUrl }, '', newUrl);
+        // Update the URL with the new workflow ID
+        router.push(`?workflow=${result.workflowId}`);
       }
     } catch (error) {
       console.error('Error saving workflow:', error);
@@ -271,94 +340,41 @@ export default function AgentBuilder() {
     }
   };
 
-  // Reset to a new workflow
-  const handleNewWorkflow = () => {
-    if (agents.length > 0 && !confirm('Are you sure you want to create a new workflow? Unsaved changes will be lost.')) {
-      return;
-    }
-    
-    setAgents([]);
-    setConnections([]);
-    setSelectedAgentId(null);
-    setWorkflowName('New Workflow');
-    setWorkflowDescription('');
-    setCurrentWorkflowId(null);
-    
-    // Remove workflow ID from URL
-    router.push('/agent-builder');
-  };
-
-  // Navigate to workflows page
-  const handleViewWorkflows = () => {
-    router.push('/agent-builder/workflows');
-  };
-
   return (
-    <div className="flex flex-col h-screen">
-      {/* Header */}
-      <header className="p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold">Agent Workflow Builder</h1>
-            <p className="text-slate-500 dark:text-slate-400">
-              Build agent workflows using the OpenAI Agents SDK
-            </p>
-          </div>
-          <div className="flex space-x-4 items-center">
-            <input
-              type="text"
-              value={workflowName}
-              onChange={(e) => setWorkflowName(e.target.value)}
-              className="px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900"
-              placeholder="Workflow Name"
-            />
-            <input
-              type="text"
-              value={workflowDescription}
-              onChange={(e) => setWorkflowDescription(e.target.value)}
-              className="px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 w-48 md:w-auto"
-              placeholder="Description (optional)"
-            />
-            <div className="flex space-x-2">
-              <button
-                onClick={handleNewWorkflow}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white rounded-md"
-              >
-                New
-              </button>
-              <button
-                onClick={handleViewWorkflows}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white rounded-md"
-              >
-                My Workflows
-              </button>
-              <button
-                onClick={handleSaveWorkflow}
-                disabled={isSaving || isLoading}
-                className={`px-4 py-2 rounded-md ${
-                  isSaving || isLoading
-                    ? 'bg-blue-400 dark:bg-blue-800 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700'
-                } text-white`}
-              >
-                {isSaving ? 'Saving...' : currentWorkflowId ? 'Update' : 'Save'}
-              </button>
+    <div className="container mx-auto p-4 h-screen max-h-screen flex flex-col">
+      {/* Workflow header */}
+      <div className="mb-6 flex justify-between items-center">
+        <div>
+          <div className="flex items-baseline gap-4">
+            <h1 className="text-2xl font-bold">Agent Builder</h1>
+            <div className="flex-1">
+              <input
+                type="text"
+                value={workflowName}
+                onChange={(e) => setWorkflowName(e.target.value)}
+                className="px-2 py-1 border-b border-slate-300 dark:border-slate-700 bg-transparent focus:border-blue-500 dark:focus:border-blue-400 outline-none text-lg font-medium"
+                placeholder="Workflow Name"
+              />
             </div>
           </div>
+          <input
+            type="text"
+            value={workflowDescription}
+            onChange={(e) => setWorkflowDescription(e.target.value)}
+            className="mt-1 px-2 py-1 border-b border-slate-200 dark:border-slate-800 bg-transparent focus:border-blue-500 dark:focus:border-blue-400 outline-none w-full text-slate-600 dark:text-slate-400"
+            placeholder="Workflow Description"
+          />
         </div>
-      </header>
+        <button
+          onClick={handleSaveWorkflow}
+          disabled={isSaving || isLoading}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white rounded-md"
+        >
+          {isSaving ? 'Saving...' : 'Save Workflow'}
+        </button>
+      </div>
 
-      {/* Loading overlay */}
-      {isLoading && (
-        <div className="absolute inset-0 bg-slate-800/30 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-lg shadow-lg flex flex-col items-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent mb-4" />
-            <p>Loading workflow...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Connection creation mode indicator */}
+      {/* Connection creation notification */}
       {isCreatingConnection && (
         <div className="bg-amber-100 dark:bg-amber-900 p-2 text-center">
           <p className="text-amber-800 dark:text-amber-200">
@@ -396,80 +412,97 @@ export default function AgentBuilder() {
                 <li>Drag agent types from the palette to the canvas</li>
                 <li>Click on an agent to edit its properties</li>
                 <li>Use the "Create Connection" button to connect agents</li>
+                <li>Alternatively, click on connection nodes to create connections directly</li>
+                <li>Agents can be positioned along the grid</li>
                 <li>Configure each agent's name, instructions, and tools</li>
                 <li>Save your workflow when finished</li>
               </ol>
             </div>
           </div>
 
-          {/* Canvas area */}
-          <div className="flex-1 p-4 bg-slate-50 dark:bg-slate-900 overflow-auto">
-            <div className="mb-4 flex justify-between items-center">
-              <h2 className="text-lg font-medium">Canvas</h2>
-              <div className="space-x-2">
-                {selectedAgentId && !isCreatingConnection && (
-                  <button
-                    onClick={() => handleStartConnection(selectedAgentId)}
-                    className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm"
-                  >
-                    Create Connection
-                  </button>
-                )}
-                {selectedAgentId && (
-                  <button
-                    onClick={() => handleAgentDelete(selectedAgentId)}
-                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm"
-                  >
-                    Delete Agent
-                  </button>
-                )}
+          {/* Canvas and properties panel */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Canvas toolbar */}
+            <div className="flex-grow p-4 flex flex-col">
+              <div className="mb-4 flex justify-between items-center">
+                <h2 className="text-lg font-medium">Canvas</h2>
+                <div className="space-x-2">
+                  {selectedAgentId && !isCreatingConnection && (
+                    <button
+                      onClick={() => handleStartConnection(selectedAgentId)}
+                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm"
+                    >
+                      Create Connection
+                    </button>
+                  )}
+                  {selectedAgentId && (
+                    <button
+                      onClick={() => handleAgentDelete(selectedAgentId)}
+                      className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm"
+                    >
+                      Delete Agent
+                    </button>
+                  )}
+                </div>
               </div>
+              
+              <Canvas
+                agents={agents}
+                connections={connections}
+                onAgentSelect={handleAgentSelect}
+                selectedAgentId={selectedAgentId}
+                isCreatingConnection={isCreatingConnection}
+                onConnectionPointClick={handleConnectionPointClick}
+                connectionSource={connectionSource}
+                onAgentPositionChange={handleAgentPositionChange}
+              />
             </div>
             
-            <Canvas
-              agents={agents}
-              connections={connections}
-              onAgentSelect={handleAgentSelect}
-              selectedAgentId={selectedAgentId}
-              isCreatingConnection={isCreatingConnection}
-              onConnectionPointClick={handleConnectionPointClick}
-              connectionSource={connectionSource}
-              onAgentPositionChange={handleAgentPositionChange}
-            />
+            {/* Properties panel */}
+            {selectedAgent && (
+              <div className="h-1/3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 overflow-y-auto">
+                <PropertiesPanel 
+                  selectedAgent={selectedAgent} 
+                  onAgentUpdate={handleAgentUpdate} 
+                />
+              </div>
+            )}
             
             {/* Connections list */}
-            {connections.length > 0 && (
-              <div className="mt-4 p-3 border border-slate-200 dark:border-slate-800 rounded-md bg-white dark:bg-slate-950">
-                <h3 className="text-md font-medium mb-2">Connections</h3>
-                <ul className="space-y-2">
+            {!selectedAgent && connections.length > 0 && (
+              <div className="h-1/3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 overflow-y-auto">
+                <h2 className="text-lg font-medium mb-4">Connections</h2>
+                <div className="space-y-2">
                   {connections.map(connection => {
                     const sourceAgent = agents.find(a => a.id === connection.sourceAgentId);
                     const targetAgent = agents.find(a => a.id === connection.targetAgentId);
                     
+                    if (!sourceAgent || !targetAgent) return null;
+                    
                     return (
-                      <li key={connection.id} className="flex justify-between items-center text-sm">
-                        <span>
-                          {sourceAgent?.config.name} → {targetAgent?.config.name}
-                        </span>
+                      <div 
+                        key={connection.id} 
+                        className="p-2 border border-slate-200 dark:border-slate-800 rounded-md flex justify-between items-center"
+                      >
+                        <div>
+                          <span className="font-medium">{sourceAgent.config.name}</span>
+                          <span className="mx-2">→</span>
+                          <span className="font-medium">{targetAgent.config.name}</span>
+                          <span className="ml-2 text-sm text-slate-500">({connection.label})</span>
+                        </div>
                         <button
                           onClick={() => handleDeleteConnection(connection.id)}
                           className="text-red-500 hover:text-red-700"
                         >
                           Delete
                         </button>
-                      </li>
+                      </div>
                     );
                   })}
-                </ul>
+                </div>
               </div>
             )}
           </div>
-
-          {/* Properties panel */}
-          <PropertiesPanel
-            selectedAgent={selectedAgent}
-            onAgentUpdate={handleAgentUpdate}
-          />
         </div>
       </DndContext>
     </div>

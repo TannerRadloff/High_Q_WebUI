@@ -32,10 +32,19 @@ const Canvas: React.FC<CanvasProps> = ({
     id: 'canvas',
   });
 
+  // Grid size for snapping
+  const gridSize = 20; // 20px grid
+
   // Handle agent position update
   const handleAgentDragEnd = (agentId: string, position: { x: number; y: number }) => {
+    // Snap to grid
+    const snappedPosition = {
+      x: Math.round(position.x / gridSize) * gridSize,
+      y: Math.round(position.y / gridSize) * gridSize
+    };
+    
     if (onAgentPositionChange) {
-      onAgentPositionChange(agentId, position);
+      onAgentPositionChange(agentId, snappedPosition);
     }
   };
 
@@ -70,6 +79,15 @@ const Canvas: React.FC<CanvasProps> = ({
             className="text-blue-500 dark:text-blue-400"
             markerEnd="url(#arrowhead)"
           />
+          {/* Add connection label */}
+          <text
+            x={(startX + endX) / 2}
+            y={((startY + endY) / 2) - 10}
+            textAnchor="middle"
+            className="text-xs fill-slate-500 dark:fill-slate-400 select-none"
+          >
+            {connection.label || 'Handoff'}
+          </text>
           {/* SVG definition for arrowhead */}
           <defs>
             <marker
@@ -121,6 +139,41 @@ const Canvas: React.FC<CanvasProps> = ({
     );
   };
 
+  // Render the grid pattern
+  const renderGrid = () => {
+    return (
+      <svg 
+        style={{ 
+          position: 'absolute', 
+          top: 0, 
+          left: 0, 
+          width: '100%', 
+          height: '100%', 
+          pointerEvents: 'none',
+          zIndex: 0
+        }}
+      >
+        <defs>
+          <pattern 
+            id="grid" 
+            width={gridSize} 
+            height={gridSize} 
+            patternUnits="userSpaceOnUse"
+          >
+            <path 
+              d={`M ${gridSize} 0 L 0 0 0 ${gridSize}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="0.5"
+              className="text-slate-200 dark:text-slate-800"
+            />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid)" />
+      </svg>
+    );
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -130,6 +183,9 @@ const Canvas: React.FC<CanvasProps> = ({
                    : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900'} 
                  rounded-lg overflow-hidden relative transition-colors`}
     >
+      {/* Render grid pattern */}
+      {renderGrid()}
+      
       {/* Display a helper message if no agents are added */}
       {agents.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center text-slate-400 dark:text-slate-600">
@@ -153,6 +209,7 @@ const Canvas: React.FC<CanvasProps> = ({
           isCreatingConnection={isCreatingConnection}
           onConnectionPointClick={onConnectionPointClick}
           onDragEnd={handleAgentDragEnd}
+          gridSize={gridSize}
         />
       ))}
     </div>
