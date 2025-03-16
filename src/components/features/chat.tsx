@@ -47,7 +47,6 @@ import { configureTracing, trace } from '@/agents/tracing';
 declare global {
   interface Window {
     generateRandomStars?: () => HTMLElement;
-    initializeAgentTracing?: () => void;
   }
 }
 
@@ -93,6 +92,9 @@ export function Chat({
   const [activeAgent, setActiveAgent] = useState<string>('MimirAgent');
   const [delegationReason, setDelegationReason] = useState<string>('');
   
+  // Add state to track if agent trace service has been initialized
+  const [isAgentTraceServiceInitialized, setIsAgentTraceServiceInitialized] = useState(false);
+  
   // Optimize scroll behavior to bottom of messages
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     if (messagesEndRef.current) {
@@ -118,18 +120,9 @@ export function Chat({
   const [currentTraceId, setCurrentTraceId] = useState<string | null>(null);
   const [isTraceViewerVisible, setIsTraceViewerVisible] = useState(false);
   
-  // Effect to sync trace visibility with local storage preference
-  useEffect(() => {
-    if (currentTrace) {
-      setIsTraceVisible(isAgentTraceVisible);
-    }
-  }, [currentTrace, isAgentTraceVisible]);
-  
-  // Initialize agent trace service
-  useEffect(() => {
-    // Only initialize the agent trace service when explicitly needed
-    // Don't initialize automatically on component mount
-    const initializeTracing = () => {
+  // Function to initialize agent trace service when needed
+  const initializeAgentTraceServiceIfNeeded = useCallback(() => {
+    if (!isAgentTraceServiceInitialized) {
       // Initialize the agent trace service
       initializeAgentTraceService();
       
@@ -141,18 +134,20 @@ export function Chat({
         const supabaseTraceProcessor = new SupabaseTraceProcessor(supabaseUrl, supabaseKey);
         configureTracing();
       }
-    };
-
-    // We'll expose this function to be called only when needed
-    // instead of running it automatically
-    window.initializeAgentTracing = initializeTracing;
-    
-    return () => {
-      // Clean up the global function when component unmounts
-      delete window.initializeAgentTracing;
-    };
-  }, []);
+      
+      // Update the initialization flag
+      setIsAgentTraceServiceInitialized(true);
+      console.log('Agent trace service initialized on demand');
+    }
+  }, [isAgentTraceServiceInitialized]);
   
+  // Effect to sync trace visibility with local storage preference
+  useEffect(() => {
+    if (currentTrace) {
+      setIsTraceVisible(isAgentTraceVisible);
+    }
+  }, [currentTrace, isAgentTraceVisible]);
+
   // Handle network status and display
   useEffect(() => {
     const handleOnline = () => {
@@ -512,11 +507,7 @@ export function Chat({
       
       if (existingAgentIndex === -1) {
         // Initialize agent tracing if needed
-        if (window.initializeAgentTracing) {
-          window.initializeAgentTracing();
-          // After initialization, remove the reference to avoid duplicate initializations
-          delete window.initializeAgentTracing;
-        }
+        initializeAgentTraceServiceIfNeeded();
         
         // Add new generating agent status
         const generatingAgent: AgentStatus = {
@@ -584,7 +575,7 @@ export function Chat({
         }, 3000);
       }
     }
-  }, [isLoading, activeAgents, isAgentPanelOpen, selectedChatModel, chatId]);
+  }, [isLoading, activeAgents, isAgentPanelOpen, selectedChatModel, chatId, initializeAgentTraceServiceIfNeeded]);
 
   // Customize the stop function to update agent status
   const customStop = useCallback(() => {
@@ -638,11 +629,7 @@ export function Chat({
   ) => {
     try {
       // Initialize agent tracing if needed
-      if (window.initializeAgentTracing) {
-        window.initializeAgentTracing();
-        // After initialization, remove the reference to avoid duplicate initializations
-        delete window.initializeAgentTracing;
-      }
+      initializeAgentTraceServiceIfNeeded();
       
       // Create a new agent status entry
       const agentId = targetAgentId || 'delegation-agent';
@@ -974,11 +961,7 @@ export function Chat({
       
       try {
         // Initialize agent tracing if needed
-        if (window.initializeAgentTracing) {
-          window.initializeAgentTracing();
-          // After initialization, remove the reference to avoid duplicate initializations
-          delete window.initializeAgentTracing;
-        }
+        initializeAgentTraceServiceIfNeeded();
         
         // Add user message to UI
         const userMessage = {
@@ -1049,7 +1032,8 @@ export function Chat({
       customStop, 
       selectedWorkflowId, 
       messages,
-      processMessageWithAgents
+      processMessageWithAgents,
+      initializeAgentTraceServiceIfNeeded
     ]
   );
 
