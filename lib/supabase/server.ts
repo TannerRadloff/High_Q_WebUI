@@ -43,33 +43,77 @@ export async function createServerClient(): Promise<SupabaseClient> {
       throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable');
     }
 
-    const { cookies } = await import('next/headers');
+    let cookieHandler;
+    
+    try {
+      // Try to import next/headers, may fail during static build
+      const cookiesModule = await import('next/headers');
+      
+      // Create a wrapper for the cookies API to handle the type issues
+      const getCookieStore = () => {
+        try {
+          return cookiesModule.cookies();
+        } catch (error) {
+          console.warn('[Supabase] Error accessing cookies API, using memory fallback:', error);
+          return null;
+        }
+      };
+      
+      // Create standard cookie handlers with fallback to memory store
+      cookieHandler = {
+        get: (name: string) => {
+          try {
+            const cookieStore = getCookieStore();
+            if (!cookieStore) {
+              return memoryStore.get(name);
+            }
+            return cookieStore.get(name)?.value || memoryStore.get(name);
+          } catch (error) {
+            console.warn(`[Supabase] Error getting cookie ${name}, using memory store:`, error);
+            return memoryStore.get(name);
+          }
+        },
+        set: (name: string, value: string, options: CookieOptions) => {
+          try {
+            const cookieStore = getCookieStore();
+            if (cookieStore) {
+              cookieStore.set({ name, value, ...options });
+            }
+            // Always store in memory as fallback
+            memoryStore.set(name, value);
+          } catch (error) {
+            console.warn(`[Supabase] Error setting cookie ${name}, using memory store:`, error);
+            memoryStore.set(name, value);
+          }
+        },
+        remove: (name: string, options: CookieOptions) => {
+          try {
+            const cookieStore = getCookieStore();
+            if (cookieStore) {
+              cookieStore.set({ name, value: '', ...options, maxAge: 0 });
+            }
+            memoryStore.delete(name);
+          } catch (error) {
+            console.warn(`[Supabase] Error removing cookie ${name}, using memory store:`, error);
+            memoryStore.delete(name);
+          }
+        }
+      };
+    } catch (error) {
+      console.warn('[Supabase] Using memory store fallback for cookies during static build');
+      // Fallback to memory store if cookies() is not available (static build)
+      cookieHandler = {
+        get: (name: string) => memoryStore.get(name),
+        set: (name: string, value: string) => { memoryStore.set(name, value); },
+        remove: (name: string) => { memoryStore.delete(name); }
+      };
+    }
     
     const client = createSSRServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       {
-        cookies: {
-          get: (name: string) => {
-            return cookies().get(name)?.value
-          },
-          set: (name: string, value: string, options: CookieOptions) => {
-            try {
-              cookies().set(name, value, options)
-            } catch (error) {
-              // This can happen when cookies are set in middleware
-              console.error(`[Supabase Server] Error setting cookie ${name}:`, error);
-            }
-          },
-          remove: (name: string, options: CookieOptions) => {
-            try {
-              cookies().set(name, '', { ...options, maxAge: 0 })
-            } catch (error) {
-              // This can happen when cookies are removed in middleware
-              console.error(`[Supabase Server] Error removing cookie ${name}:`, error);
-            }
-          }
-        },
+        cookies: cookieHandler,
         auth: {
           autoRefreshToken: true,
           persistSession: true,

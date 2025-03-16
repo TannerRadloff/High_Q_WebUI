@@ -1,5 +1,8 @@
 import { createSSRServerClient } from '@/lib/supabase/index';
 
+// Force dynamic rendering for this route to handle cookies
+export const dynamic = 'force-dynamic';
+
 export default async function Notes() {
   const supabase = await createSSRServerClient();
   const { data: notes } = await supabase.from("notes").select();

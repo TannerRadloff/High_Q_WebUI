@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@/lib/supabase/server'
 import { getSupabaseClient } from '@/lib/supabase/database'
 
+// Force dynamic rendering for this route to handle cookies
+export const dynamic = 'force-dynamic';
+
 // Define a Chat type for TypeScript
 type Chat = {
   id: string;

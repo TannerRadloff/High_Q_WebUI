@@ -8,6 +8,9 @@ import { convertToUIMessages } from '@/lib/utils';
 import { DataStreamHandler } from '@/src/components/data-stream-handler';
 import { DEFAULT_CHAT_MODEL, chatModels } from '@/lib/ai/models';
 
+// Force dynamic rendering for this route to handle cookies
+export const dynamic = 'force-dynamic';
+
 export default async function Page(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const { id } = params;

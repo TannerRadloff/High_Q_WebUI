@@ -1,6 +1,9 @@
 import { createSSRServerClient } from "@/lib/supabase/index";
 import TodoList from "./components/TodoList";
 
+// Force dynamic rendering for this route to handle cookies
+export const dynamic = 'force-dynamic';
+
 type Todo = {
   id: string;
   title: string;

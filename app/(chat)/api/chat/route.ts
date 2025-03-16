@@ -22,6 +22,9 @@ import { generateTitleFromUserMessage } from '../../actions';
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
+// Force dynamic rendering for this route to handle cookies
+export const dynamic = 'force-dynamic';
+
 export const maxDuration = 60;
 
 // Initialize OpenAI client
