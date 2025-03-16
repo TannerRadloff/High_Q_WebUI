@@ -1,6 +1,10 @@
 {
+  "version": 2,
   "buildCommand": "npm run build",
-  "installCommand": "npm install",
+  "installCommand": "npm install --ignore-scripts",
   "framework": "nextjs",
-  "outputDirectory": ".next"
+  "outputDirectory": ".next",
+  "env": {
+    "VERCEL": "1"
+  }
 } 
