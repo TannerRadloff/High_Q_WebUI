@@ -47,6 +47,7 @@ import { configureTracing, trace } from '@/agents/tracing';
 declare global {
   interface Window {
     generateRandomStars?: () => HTMLElement;
+    initializeAgentTracing?: () => void;
   }
 }
 
@@ -126,17 +127,30 @@ export function Chat({
   
   // Initialize agent trace service
   useEffect(() => {
-    // Initialize the agent trace service
-    initializeAgentTraceService();
+    // Only initialize the agent trace service when explicitly needed
+    // Don't initialize automatically on component mount
+    const initializeTracing = () => {
+      // Initialize the agent trace service
+      initializeAgentTraceService();
+      
+      // Configure tracing with Supabase processor
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      
+      if (supabaseUrl && supabaseKey) {
+        const supabaseTraceProcessor = new SupabaseTraceProcessor(supabaseUrl, supabaseKey);
+        configureTracing();
+      }
+    };
+
+    // We'll expose this function to be called only when needed
+    // instead of running it automatically
+    window.initializeAgentTracing = initializeTracing;
     
-    // Configure tracing with Supabase processor
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    
-    if (supabaseUrl && supabaseKey) {
-      const supabaseTraceProcessor = new SupabaseTraceProcessor(supabaseUrl, supabaseKey);
-      configureTracing();
-    }
+    return () => {
+      // Clean up the global function when component unmounts
+      delete window.initializeAgentTracing;
+    };
   }, []);
   
   // Handle network status and display
@@ -497,6 +511,13 @@ export function Chat({
       const existingAgentIndex = activeAgents.findIndex(agent => agent.id === generatingAgentId);
       
       if (existingAgentIndex === -1) {
+        // Initialize agent tracing if needed
+        if (window.initializeAgentTracing) {
+          window.initializeAgentTracing();
+          // After initialization, remove the reference to avoid duplicate initializations
+          delete window.initializeAgentTracing;
+        }
+        
         // Add new generating agent status
         const generatingAgent: AgentStatus = {
           id: generatingAgentId,
@@ -616,6 +637,13 @@ export function Chat({
     useWorkflow: boolean = false
   ) => {
     try {
+      // Initialize agent tracing if needed
+      if (window.initializeAgentTracing) {
+        window.initializeAgentTracing();
+        // After initialization, remove the reference to avoid duplicate initializations
+        delete window.initializeAgentTracing;
+      }
+      
       // Create a new agent status entry
       const agentId = targetAgentId || 'delegation-agent';
       const agentName = targetAgentId ? currentAgent?.name || 'Specialized Agent' : useWorkflow ? 'Workflow Agent' : 'Delegation Agent';
@@ -945,6 +973,13 @@ export function Chat({
       }
       
       try {
+        // Initialize agent tracing if needed
+        if (window.initializeAgentTracing) {
+          window.initializeAgentTracing();
+          // After initialization, remove the reference to avoid duplicate initializations
+          delete window.initializeAgentTracing;
+        }
+        
         // Add user message to UI
         const userMessage = {
           id: uuidv4(),
