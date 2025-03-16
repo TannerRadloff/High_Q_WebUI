@@ -1282,7 +1282,45 @@ a {
 /* Ensure input container z-index is high enough */
 .enhanced-input {
   position: relative;
-  z-index: 20 !important; /* Higher z-index to ensure it's above other elements */
+  z-index: 20;
+}
+
+.enhanced-input textarea,
+.enhanced-input button {
+  pointer-events: auto;
+}
+
+/* Remove disabled state styling to ensure input is always usable */
+.enhanced-input textarea:disabled {
+  opacity: 1 !important;
+  cursor: text !important;
+  background-color: transparent !important;
+}
+
+/* Reset messaging container pointer events */
+.messages-container {
+  pointer-events: auto;
+}
+
+/* Remove any pointer-events: none that might be affecting inputs */
+form, input, textarea, button, select {
+  pointer-events: auto !important;
+}
+
+/* Ensure our buttons are visible and not hidden */
+.enhanced-input button {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: flex !important;
+}
+
+/* Fix positioning issues in absolute positioned elements */
+.enhanced-input .absolute {
+  pointer-events: auto;
+}
+
+/* Make the root document body permit events */
+body {
   pointer-events: auto !important;
 }
 

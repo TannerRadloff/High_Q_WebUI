@@ -10,6 +10,10 @@ import { LayoutContent } from './layout-content';
 import './globals.css';
 import './modern-ui.css';
 
+// Add chat cleanup component for fixing input issues
+import { ChatCleanup } from './features/chat/chat-cleanup';
+import { ThemeProvider } from 'next-themes';
+
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
@@ -70,9 +74,13 @@ export default function RootLayout({
           inter.className
         )}
       >
-        <LayoutContent>{children}</LayoutContent>
-        <Analytics />
-        <SpeedInsights />
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+          {/* Add ChatCleanup component to fix input issues */}
+          <ChatCleanup />
+          <LayoutContent>{children}</LayoutContent>
+          <Analytics />
+          <SpeedInsights />
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -14,12 +14,9 @@ import {
   useCallback,
   type Dispatch,
   type SetStateAction,
-  type ChangeEvent,
-  memo,
 } from 'react';
 import { toast } from 'sonner';
-import { useLocalStorage, useWindowSize } from 'usehooks-ts';
-import equal from 'fast-deep-equal';
+import { useLocalStorage } from 'usehooks-ts';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { cn } from '@/utils/formatting';
@@ -28,7 +25,6 @@ import { ArrowUpIcon, PaperclipIcon, StopIcon, CrossIcon } from '@/src/component
 import { Button } from '@/src/components/ui/button';
 import { Textarea } from '@/src/components/ui/textarea';
 import { sanitizeUIMessages } from '@/utils/messages';
-import { agentTypeConfig } from '@/src/config/agent-types';
 import { useFileUpload } from './hooks/useFileUpload';
 import { InputProvider, useInputContext } from './context/InputContext';
 
@@ -70,11 +66,31 @@ export function MultimodalInput({
   className?: string;
   selectedWorkflowId?: string | null;
 }) {
+  // Create a local state to override isLoading if it's stuck
+  const [forceNotLoading, setForceNotLoading] = useState(false);
+  
+  // Force reset loading state after component mount
+  useEffect(() => {
+    // Short delay to ensure component is mounted before resetting
+    const timer = setTimeout(() => {
+      if (isLoading) {
+        console.log('[MultimodalInput] Force resetting initial loading state');
+        setForceNotLoading(true);
+        // Optional: You could call stop() here if needed
+      }
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []); // Only run once on mount
+  
+  // Create modified context with the loading state fixed
+  const effectiveIsLoading = forceNotLoading ? false : isLoading;
+  
   const contextValue = {
     chatId,
     input,
     setInput,
-    isLoading,
+    isLoading: effectiveIsLoading,
     stop,
     attachments,
     setAttachments,
@@ -94,45 +110,18 @@ export function MultimodalInput({
 
 // Main component that uses the context
 function InputContainer({ className }: { className?: string }) {
-  // Add a way to enable/disable debugging with a key combination
-  const [showDebug, setShowDebug] = useState(false);
-  
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Toggle debug overlay with Alt+D
-      if (e.altKey && e.key === 'd') {
-        setShowDebug(prev => !prev);
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-  
   return (
-    <>
-      <div
-        className={cn(
-          'p-1.5 mt-auto z-10 bg-background/60 backdrop-blur-md backdrop-saturate-150 rounded-xl border sm:border border-border',
-          'relative lg:py-3 lg:px-3.5 w-full',
-          'shadow-lg hover:shadow-xl transition-all duration-200',
-          'enhanced-input',
-          className
-        )}
-        style={{ 
-          pointerEvents: 'auto',
-          isolation: 'isolate' // Creates a new stacking context
-        }}
-        onClick={(e) => {
-          // This helps with debugging click issues
-          console.log("[MultimodalInput] InputContainer clicked", e.target);
-        }}
-      >
-        <MessageForm />
-      </div>
-      
-      {showDebug && <DebugOverlay />}
-    </>
+    <div
+      className={cn(
+        'p-1.5 mt-auto bg-background/60 backdrop-blur-md backdrop-saturate-150 rounded-xl border sm:border border-border',
+        'relative lg:py-3 lg:px-3.5 w-full',
+        'shadow-lg hover:shadow-xl transition-all duration-200',
+        'enhanced-input',
+        className
+      )}
+    >
+      <MessageForm />
+    </div>
   );
 }
 
@@ -147,6 +136,9 @@ function MessageForm() {
     stop
   } = useInputContext();
   
+  // Local state to track actual button visibility
+  const [showStopButton, setShowStopButton] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { uploadQueue, handleFileChange } = useFileUpload(
     (newAttachments) => setAttachments(newAttachments)
@@ -154,88 +146,69 @@ function MessageForm() {
   
   const submitMessage = useSubmitMessage();
   
-  // Track if the component has mounted to ensure we show the send button initially
-  const [hasMounted, setHasMounted] = useState(false);
-  
-  // Add a local state to track button state manually if needed
-  const [forceButtonState, setForceButtonState] = useState<'send' | 'stop' | null>(null);
-  
-  // Set hasMounted to true after first render to ensure correct initial button state
+  // Update button visibility based on loading state
   useEffect(() => {
-    setHasMounted(true);
-  }, []);
-
-  // Debug logging for isLoading state
-  useEffect(() => {
-    console.log("[MultimodalInput] isLoading state changed:", isLoading);
+    console.log('[MultimodalInput] Current isLoading state:', isLoading);
+    setShowStopButton(isLoading);
   }, [isLoading]);
   
-  // Force reset isLoading state after a timeout
+  // Auto-reset button state after timeout to prevent stuck state
   useEffect(() => {
     let resetTimer: NodeJS.Timeout;
     
-    if (isLoading) {
-      // If loading takes longer than 30 seconds, assume it's stuck and force reset
+    if (showStopButton) {
+      // If stop button is showing for more than 30 seconds, reset it
       resetTimer = setTimeout(() => {
-        console.log("[MultimodalInput] Force resetting isLoading state after timeout");
-        stop(); // Call stop function to reset loading state
-        setForceButtonState('send'); // Force the send button to appear
-      }, 30000); // 30 seconds timeout
+        console.log('[MultimodalInput] Force resetting button state after timeout');
+        setShowStopButton(false);
+      }, 30000);
     }
     
     return () => {
       if (resetTimer) clearTimeout(resetTimer);
     };
-  }, [isLoading, stop]);
-  
-  // Determine which button to show based on isLoading state and forceButtonState
-  const showStopButton = forceButtonState === 'stop' || (isLoading && forceButtonState !== 'send');
-  const showSendButton = forceButtonState === 'send' || (!isLoading && forceButtonState !== 'stop');
+  }, [showStopButton]);
 
   return (
     <form
       onSubmit={(e) => submitMessage(e)}
       className="flex flex-1 flex-col items-start gap-2 relative"
-      style={{ pointerEvents: 'auto' }}
     >
       <div className="flex w-full flex-row items-end gap-2">
-        <div className="relative flex-1" style={{ pointerEvents: 'auto' }}>
+        <div className="relative flex-1">
           <TextareaInput />
           
-          {/* Both buttons are always visible, but one is visually hidden */}
-          <div className="absolute bottom-2 right-2 z-20">
-            {/* Only use AnimatePresence after component has mounted */}
-            {hasMounted ? (
-              <AnimatePresence mode="wait">
-                {showStopButton ? (
-                  <motion.div
-                    key="stop"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.15 }}
-                  >
-                    <StopButton onFallbackComplete={() => setForceButtonState('send')} />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="send"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    transition={{ duration: 0.15 }}
-                  >
-                    <SendButton 
-                      uploadQueue={uploadQueue} 
-                      onBeforeSubmit={() => setForceButtonState('stop')}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            ) : (
-              /* Always show send button before mount */
-              <SendButton uploadQueue={uploadQueue} />
-            )}
+          {/* Button container */}
+          <div className="absolute bottom-2 right-2">
+            {/* Show both buttons, but only one is visible at a time */}
+            <div className="relative">
+              {/* Send button */}
+              <div style={{ 
+                opacity: showStopButton ? 0 : 1,
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                transition: 'opacity 0.2s ease-in-out',
+                pointerEvents: showStopButton ? 'none' : 'auto'
+              }}>
+                <SendButton 
+                  uploadQueue={uploadQueue} 
+                  onSend={() => setShowStopButton(true)}
+                />
+              </div>
+              
+              {/* Stop button */}
+              <div style={{ 
+                opacity: showStopButton ? 1 : 0,
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                transition: 'opacity 0.2s ease-in-out',
+                pointerEvents: showStopButton ? 'auto' : 'none'
+              }}>
+                <StopButton onStop={() => setShowStopButton(false)} />
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -297,6 +270,7 @@ function TextareaInput() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const handleKeyDown = useKeyboardSubmit();
   
+  // Local storage for draft messages
   const [savedValue, setSavedValue] = useLocalStorage<string>(
     'multimodal-input-draft',
     ''
@@ -325,6 +299,14 @@ function TextareaInput() {
     }
   }, [savedValue, input, setInput]);
   
+  // Force remove disabled attribute to ensure textarea is always clickable
+  useEffect(() => {
+    if (textareaRef.current && textareaRef.current.hasAttribute('disabled')) {
+      console.log('[TextareaInput] Removing disabled attribute from textarea');
+      textareaRef.current.removeAttribute('disabled');
+    }
+  });
+  
   const handleInput = useCallback(
     (e: React.FormEvent<HTMLTextAreaElement>) => {
       const target = e.target as HTMLTextAreaElement;
@@ -345,34 +327,6 @@ function TextareaInput() {
     return "Message Mimir (attach files or type / for commands)...";
   }, [selectedWorkflowId]);
 
-  // Debug click handling
-  useEffect(() => {
-    if (textareaRef.current) {
-      console.log("[MultimodalInput] TextareaInput mounted");
-      
-      // Check if there's anything above the textarea that might be blocking clicks
-      const checkForBlockingElements = () => {
-        if (!textareaRef.current) return;
-        
-        const rect = textareaRef.current.getBoundingClientRect();
-        const x = rect.left + rect.width / 2;
-        const y = rect.top + rect.height / 2;
-        
-        const elementsAtPoint = document.elementsFromPoint(x, y);
-        console.log("[MultimodalInput] Elements at textarea center:", elementsAtPoint);
-        
-        // Check if our textarea is actually in the list
-        const textareaInList = elementsAtPoint.some(el => el === textareaRef.current);
-        if (!textareaInList) {
-          console.warn("[MultimodalInput] Textarea is being obscured by other elements!");
-        }
-      };
-      
-      // Run this check after the component is fully rendered
-      setTimeout(checkForBlockingElements, 1000);
-    }
-  }, []);
-
   return (
     <div
       className={cn(
@@ -382,14 +336,6 @@ function TextareaInput() {
         'hover:border-primary/50 hover:shadow-sm',
         isFocused && 'ring-2 ring-primary/30 border-primary shadow-[0_0_10px_rgba(0,120,255,0.15)]',
       )}
-      style={{ 
-        pointerEvents: 'auto',
-        position: 'relative',
-        isolation: 'isolate' // Creates a new stacking context
-      }}
-      onClick={(e) => {
-        console.log("[MultimodalInput] TextareaInput container clicked", e.target);
-      }}
     >
       <Textarea
         ref={textareaRef}
@@ -399,7 +345,7 @@ function TextareaInput() {
         className={cn(
           'max-h-64 min-h-[60px] grow whitespace-break-spaces text-secondary-foreground resize-none',
           'bg-transparent p-0 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0',
-          'relative z-0 h-full border-none outline-none placeholder:text-muted-foreground/70',
+          'border-none outline-none placeholder:text-muted-foreground/70',
           'transition-colors duration-300 pr-12', // Add padding for the send button
         )}
         onInput={handleInput}
@@ -409,36 +355,27 @@ function TextareaInput() {
         spellCheck={false}
         rows={1}
         onKeyDown={handleKeyDown}
-        disabled={isLoading}
-        style={{ 
-          pointerEvents: 'auto',
-          outline: '1px dashed rgba(0, 200, 0, 0.2)' // Visual indicator for debugging
-        }}
-        onClick={(e) => {
-          e.stopPropagation();
-          console.log("[MultimodalInput] Textarea clicked", e.target);
-        }}
+        // Remove disabled to ensure it's always interactive
+        // disabled={isLoading}
       />
     </div>
   );
 }
 
-// Send button component with before submit handler
+// Send button component with callback
 function SendButton({ 
   uploadQueue,
-  onBeforeSubmit
+  onSend
 }: { 
-  uploadQueue: string[],
-  onBeforeSubmit?: () => void
+  uploadQueue: string[];
+  onSend?: () => void;
 }) {
   const { input } = useInputContext();
   const handleAgentSubmit = useAgentSubmit();
   const isDisabled = !input.trim() && uploadQueue.length === 0;
   
-  const handleSubmit = () => {
-    if (onBeforeSubmit) {
-      onBeforeSubmit();
-    }
+  const handleClick = () => {
+    if (onSend) onSend();
     handleAgentSubmit(input);
   };
   
@@ -453,7 +390,7 @@ function SendButton({
         isDisabled && "opacity-70"
       )}
       disabled={isDisabled}
-      onClick={handleSubmit}
+      onClick={handleClick}
       aria-label="Send message"
     >
       <motion.div
@@ -466,22 +403,14 @@ function SendButton({
   );
 }
 
-// Stop button component with fallback complete handler
-function StopButton({ 
-  onFallbackComplete 
-}: { 
-  onFallbackComplete?: () => void 
-}) {
+// Stop button component with callback
+function StopButton({ onStop }: { onStop?: () => void }) {
   const { stop, setMessages } = useInputContext();
   
-  const handleStop = () => {
+  const handleClick = () => {
     stop();
     setMessages((messages) => sanitizeUIMessages(messages));
-    
-    // Call the fallback handler after a short delay to ensure loading state is reset
-    if (onFallbackComplete) {
-      setTimeout(onFallbackComplete, 300);
-    }
+    if (onStop) onStop();
   };
   
   return (
@@ -490,7 +419,7 @@ function StopButton({
       size="icon"
       variant="ghost"
       className="size-8 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-all duration-200 hover:shadow-[0_0_8px_rgba(255,50,50,0.3)]"
-      onClick={handleStop}
+      onClick={handleClick}
       aria-label="Stop generation"
     >
       <motion.div
@@ -655,18 +584,4 @@ function useAgentSubmit() {
       handleSubmit();
     }
   }, [handleSubmit, selectedWorkflowId]);
-}
-
-// Add a debugging component at the bottom of the file
-function DebugOverlay() {
-  const { isLoading } = useInputContext();
-  
-  return (
-    <div
-      className="fixed bottom-2 right-2 bg-black/50 text-white p-2 text-xs rounded-md z-50"
-      style={{ pointerEvents: 'none' }}
-    >
-      <div>isLoading: {isLoading ? 'true' : 'false'}</div>
-    </div>
-  );
 }
