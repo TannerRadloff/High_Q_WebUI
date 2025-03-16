@@ -79,6 +79,8 @@ export function MultimodalInput({
   
   // Add direct chat mode toggle
   const [isDirectChatMode, setIsDirectChatMode] = useState<boolean>(false);
+  // Track whether this is an initial load or a user action
+  const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
   
   // Store the mode preference in local storage
   useEffect(() => {
@@ -87,12 +89,32 @@ export function MultimodalInput({
     if (savedMode) {
       setIsDirectChatMode(savedMode === 'true');
     }
+    // After initial load, mark initialization as complete
+    setIsInitialLoad(false);
   }, []);
   
   // Save the preference when it changes
   useEffect(() => {
     localStorage.setItem('direct-chat-mode', isDirectChatMode.toString());
-  }, [isDirectChatMode]);
+    
+    // Only show toast notification if this is not the initial load
+    if (!isInitialLoad) {
+      // Check if we've already shown this notification recently (within 2 seconds)
+      const lastToastTime = parseInt(sessionStorage.getItem('last-chat-mode-toast') || '0', 10);
+      const now = Date.now();
+      
+      if (now - lastToastTime > 2000) {
+        // Update the last toast time
+        sessionStorage.setItem('last-chat-mode-toast', now.toString());
+        
+        toast.info(
+          isDirectChatMode 
+            ? "Direct chat mode enabled: Chatting directly with the model" 
+            : "Delegation agent mode enabled: Agent will help route your requests"
+        );
+      }
+    }
+  }, [isDirectChatMode, isInitialLoad]);
   
   // Force reset loading state after component mount
   useEffect(() => {
@@ -206,12 +228,8 @@ function MessageForm() {
   // Toggle between delegation agent and direct chat modes
   const handleToggleMode = () => {
     if (setIsDirectChatMode) {
+      // Toggle the mode - the useEffect for this state change will handle showing the toast
       setIsDirectChatMode(!isDirectChatMode);
-      toast.info(
-        !isDirectChatMode 
-          ? "Direct chat mode enabled: Chatting directly with the model" 
-          : "Delegation agent mode enabled: Agent will help route your requests"
-      );
     }
   };
   
