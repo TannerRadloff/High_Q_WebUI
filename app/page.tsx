@@ -56,6 +56,8 @@ export default function Home() {
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false)
   const [showAgentBanner, setShowAgentBanner] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
+  // Add state to track the last redirect time to prevent loops
+  const [lastRedirectTime, setLastRedirectTime] = useState<number>(0)
 
   // Run client-side only code after mount
   useEffect(() => {
@@ -67,8 +69,14 @@ export default function Home() {
       if (agentBannerDismissed !== 'true') {
         setShowAgentBanner(true)
       }
+      
+      // Recover last redirect time from sessionStorage
+      const storedTime = sessionStorage.getItem('home_last_redirect')
+      if (storedTime) {
+        setLastRedirectTime(parseInt(storedTime, 10))
+      }
     } catch (e) {
-      console.error('LocalStorage error:', e)
+      console.error('LocalStorage/SessionStorage error:', e)
       // Default to showing banner if localStorage fails
       setShowAgentBanner(true)
     }
@@ -99,54 +107,65 @@ export default function Home() {
       if (!user) {
         console.log('[HomePage] User not authenticated, redirecting to login')
         
-        // Check if we're in a potential redirect loop
-        let redirectCount = 0
-        try {
-          const storedCount = sessionStorage.getItem('homeRedirectCount')
-          redirectCount = storedCount ? parseInt(storedCount, 10) : 0
-        } catch (e) {
-          console.error('SessionStorage error:', e)
-        }
+        // Apply a cooldown to prevent redirect loops
+        const now = Date.now()
+        const cooldownPeriod = 2000 // 2 seconds
         
-        // Only redirect if we're actually on the home page to prevent loops
-        // and only if we're not already redirecting and haven't redirected too many times
-        if (window.location.pathname === '/' && !isRedirecting && redirectCount < 3) {
-          setIsRedirecting(true)
-          
-          // Increment redirect count
+        if (now - lastRedirectTime > cooldownPeriod) {
+          // Check if we're in a potential redirect loop
+          let redirectCount = 0
           try {
-            sessionStorage.setItem('homeRedirectCount', (redirectCount + 1).toString())
+            const storedCount = sessionStorage.getItem('homeRedirectCount')
+            redirectCount = storedCount ? parseInt(storedCount, 10) : 0
           } catch (e) {
-            console.error('SessionStorage error during redirect:', e)
+            console.error('SessionStorage error:', e)
           }
           
-          console.log(`[HomePage] Redirecting to login (attempt ${redirectCount + 1})`)
-          
-          // Add a small delay to prevent rapid redirects
-          setTimeout(() => {
-            // Add a query param to help with loop detection
-            router.push('/login?from=home')
-          }, 300)
-        } else if (redirectCount >= 3) {
-          console.log('[HomePage] Too many redirects, stopping redirect loop')
-          // Reset counter and show an error state instead
-          try {
-            sessionStorage.removeItem('homeRedirectCount')
-          } catch (e) {
-            console.error('SessionStorage error during redirect count reset:', e)
+          // Only redirect if we're actually on the home page to prevent loops
+          // and only if we're not already redirecting and haven't redirected too many times
+          if (window.location.pathname === '/' && !isRedirecting && redirectCount < 3) {
+            setIsRedirecting(true)
+            setLastRedirectTime(now)
+            
+            // Store redirect time in sessionStorage
+            try {
+              sessionStorage.setItem('home_last_redirect', now.toString())
+              sessionStorage.setItem('homeRedirectCount', (redirectCount + 1).toString())
+            } catch (e) {
+              console.error('SessionStorage error during redirect:', e)
+            }
+            
+            console.log(`[HomePage] Redirecting to login (attempt ${redirectCount + 1})`)
+            
+            // Add a small delay to prevent rapid redirects
+            setTimeout(() => {
+              // Add a query param to help with loop detection
+              router.replace('/login?from=home')
+            }, 300)
+          } else if (redirectCount >= 3) {
+            console.log('[HomePage] Too many redirects, stopping redirect loop')
+            // Reset counter and show an error state instead
+            try {
+              sessionStorage.removeItem('homeRedirectCount')
+            } catch (e) {
+              console.error('SessionStorage error during redirect count reset:', e)
+            }
           }
+        } else {
+          console.log('[HomePage] Redirect prevented by cooldown period')
         }
       } else {
         console.log('[HomePage] User authenticated, staying on home page')
         // Reset redirect counter when authentication succeeds
         try {
           sessionStorage.removeItem('homeRedirectCount')
+          sessionStorage.removeItem('home_last_redirect')
         } catch (e) {
           console.error('SessionStorage error during counter reset:', e)
         }
       }
     }
-  }, [user, isLoading, router, session, hasCheckedAuth, isRedirecting, isMounted])
+  }, [user, isLoading, router, session, hasCheckedAuth, isRedirecting, isMounted, lastRedirectTime])
 
   // Show a simple loading state until client-side code can run
   if (!isMounted) {

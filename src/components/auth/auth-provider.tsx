@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js'
 import { useRouter, usePathname } from 'next/navigation'
 import { toast } from 'sonner'
@@ -28,80 +28,6 @@ function isAuthPage(pathname: string | null): boolean {
          pathname.includes('/reset-password');
 }
 
-// Helper to safely redirect to avoid loops
-function safeRedirect(path: string, forceReload = false) {
-  // Get the current location
-  const currentPath = window.location.pathname;
-  
-  // Check if we're already on the target path to avoid unnecessary redirects
-  if (currentPath === path) {
-    console.log('Already on target path, skipping redirect');
-    return;
-  }
-  
-  // Implement a rate limit for redirects to prevent loops
-  // With localStorage availability check
-  try {
-    const redirectKey = 'auth_redirect_timestamp';
-    let shouldRedirect = true;
-    
-    // Only use localStorage if available
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
-      try {
-        const lastRedirect = localStorage.getItem(redirectKey);
-        const now = Date.now();
-        
-        // Only allow redirects if we haven't redirected in the last 5 seconds
-        shouldRedirect = !lastRedirect || (now - parseInt(lastRedirect)) > 5000;
-        
-        if (shouldRedirect) {
-          localStorage.setItem(redirectKey, now.toString());
-        } else {
-          console.log('Redirect throttled to prevent loops');
-        }
-      } catch (e) {
-        // localStorage might throw in private browsing or if quota is exceeded
-        console.warn('localStorage error, proceeding with redirect:', e);
-        shouldRedirect = true;
-      }
-    }
-    
-    // Proceed with redirect if allowed
-    if (shouldRedirect) {
-      // Track redirect attempts to detect loops
-      const redirectCountKey = 'auth_redirect_count';
-      const redirectCount = parseInt(localStorage.getItem(redirectCountKey) || '0', 10);
-      
-      // If we've redirected too many times in a short period, stop to prevent loops
-      if (redirectCount > 5) {
-        console.warn('Too many redirects detected, stopping to prevent loop');
-        localStorage.removeItem(redirectCountKey);
-        return;
-      }
-      
-      // Increment redirect count
-      localStorage.setItem(redirectCountKey, (redirectCount + 1).toString());
-      
-      // Clear the count after 10 seconds to reset the counter if no loops occur
-      setTimeout(() => {
-        localStorage.removeItem(redirectCountKey);
-      }, 10000);
-      
-      // Use direct location change for more reliable cross-domain redirects
-      if (forceReload) {
-        window.location.href = path;
-      } else {
-        // For safer in-app redirects
-        window.location.assign(path);
-      }
-    }
-  } catch (e) {
-    // Fallback if any error occurs in redirection
-    console.error('Redirect error:', e);
-    window.location.href = path;
-  }
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -113,6 +39,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
   // Track if we've already initialized
   const [hasInitialized, setHasInitialized] = useState(false)
+  // Track last redirect time to prevent redirect loops
+  const [lastRedirectTime, setLastRedirectTime] = useState<number>(0)
+  
+  // Safe redirect function with cooldown to prevent loops
+  const safeRedirectWithCooldown = useCallback((path: string, replace: boolean = false) => {
+    const now = Date.now()
+    const cooldownPeriod = 2000 // 2 seconds cooldown
+    
+    // Only redirect if we haven't redirected recently
+    if (now - lastRedirectTime > cooldownPeriod) {
+      setLastRedirectTime(now)
+      
+      // Store the last redirect in sessionStorage
+      try {
+        sessionStorage.setItem('last_auth_redirect', now.toString())
+        sessionStorage.setItem('last_auth_redirect_path', path)
+      } catch (e) {
+        console.error('SessionStorage error during redirect tracking:', e)
+      }
+      
+      // Perform the actual redirect
+      console.log(`[AuthProvider] Safe redirecting to: ${path}`)
+      if (replace) {
+        router.replace(path)
+      } else {
+        router.push(path)
+      }
+    } else {
+      console.log(`[AuthProvider] Redirect prevented - cooldown period (path: ${path})`)
+    }
+  }, [router, lastRedirectTime])
   
   // Initial session check
   useEffect(() => {
@@ -126,6 +83,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false)
       setHasInitialized(true)
       return
+    }
+    
+    // Try to recover last redirect time from sessionStorage
+    try {
+      const storedTime = sessionStorage.getItem('last_auth_redirect')
+      if (storedTime) {
+        setLastRedirectTime(parseInt(storedTime, 10))
+      }
+    } catch (e) {
+      console.error('SessionStorage error during redirect time recovery:', e)
     }
     
     const setupUser = async () => {
@@ -149,8 +116,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (!hasInitialized && isAuthPage(pathname)) {
             // Add a small delay to ensure state is updated
             setTimeout(() => {
-              safeRedirect('/', false);
-            }, 300);
+              safeRedirectWithCooldown('/', true)
+            }, 300)
           }
         }
       } catch (e) {
@@ -164,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, currentSession: Session | null) => {
-        console.log(`[AuthProvider] Auth state change: ${event}`);
+        console.log(`[AuthProvider] Auth state change: ${event}`)
         
         // Update the state with the new session
         setSession(currentSession)
@@ -177,8 +144,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (isAuthPage(pathname)) {
               // Add a small delay to ensure state is updated
               setTimeout(() => {
-                safeRedirect('/', false);
-              }, 300);
+                safeRedirectWithCooldown('/', true)
+              }, 300)
             }
             break
             
@@ -187,8 +154,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (!isAuthPage(pathname)) {
               // Add a small delay to ensure state is updated
               setTimeout(() => {
-                safeRedirect('/login', false);
-              }, 300);
+                safeRedirectWithCooldown('/login', true)
+              }, 300)
             }
             break
             
@@ -204,8 +171,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (currentSession && isAuthPage(pathname)) {
               // Add a small delay to ensure state is updated
               setTimeout(() => {
-                safeRedirect('/', false);
-              }, 300);
+                safeRedirectWithCooldown('/', true)
+              }, 300)
             }
             break
         }
@@ -219,13 +186,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription?.unsubscribe()
     }
-  }, [router, pathname, supabase, hasInitialized])
+  }, [router, pathname, supabase, hasInitialized, safeRedirectWithCooldown])
   
   /**
-   * Sign in with email and password
+   * Sign in a user with email/password
    */
   const signIn = async (email: string, password: string) => {
     try {
+      // Clear any previous errors
+      
+      if (!email || !password) {
+        throw new Error('Email and password are required')
+      }
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -233,22 +206,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (error) {
         console.error('Sign in error:', error)
-        
-        // Provide more user-friendly error messages
-        if (error.message.includes('Invalid login')) {
-          throw new Error('Invalid email or password. Please try again.')
-        } else {
-          throw error
-        }
+        throw error
       }
       
-      // Update state with new session information
-      toast.success('Signed in successfully')
+      setSession(data.session)
+      setUser(data.session.user)
       
-      // Let the auth state change event handle the redirect
-      // Don't manually redirect here to avoid conflicts with the auth state listener
+      // Success message
+      toast.success('Sign in successful')
+      
+      // Redirect to home after login
+      safeRedirectWithCooldown('/')
     } catch (error: any) {
-      toast.error(error.message || 'Failed to sign in')
+      console.error('Failed to sign in:', error)
       throw error
     }
   }
@@ -258,20 +228,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut()
+      await supabase.auth.signOut()
       
-      if (error) {
-        console.error('Sign out error:', error)
-        throw error
-      }
+      // Clear user state
+      setUser(null)
+      setSession(null)
       
-      // Auth state change will handle redirection
+      // Success message
       toast.success('Signed out successfully')
       
-      // Ensure redirect happens
-      safeRedirect('/login');
+      // Redirect to login
+      safeRedirectWithCooldown('/login')
     } catch (error: any) {
-      toast.error(error.message || 'Failed to sign out')
+      console.error('Failed to sign out:', error)
+      toast.error(`Sign out failed: ${error.message}`)
       throw error
     }
   }
