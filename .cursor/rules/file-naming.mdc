@@ -1,0 +1,9 @@
+---
+description: Naming Files
+globs: 
+alwaysApply: false
+---
+
+Use kebab-case for file names (e.g., some-component.tsx)
+Use PascalCase for component names (e.g., SomeComponent)
+Use camelCase for utility functions, hooks, and variables

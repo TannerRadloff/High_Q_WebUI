@@ -1,0 +1,17 @@
+---
+description: Creating or updating Typescript files
+globs: 
+alwaysApply: false
+---
+
+# Your rule content
+
+3.1 Type Definitions
+Create shared types in the types/ directory
+Use interfaces for object shapes and component props
+Use type aliases for unions, intersections, and simple types
+Use enums for fixed sets of related values
+3.2 Type Safety
+Avoid using any type - use unknown when necessary
+Use proper TypeScript utility types like Partial<T>, Pick<T>, etc.
+Enable strict type checking in tsconfig.json

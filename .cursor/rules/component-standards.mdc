@@ -1,0 +1,18 @@
+---
+description: creating or editing components
+globs: 
+alwaysApply: false
+---
+
+# Your rule content
+
+Follow the established structure from README_COMPONENT_STRUCTURE.md:
+UI components in components/ui/
+Layout components in components/layout/
+Feature components in components/features/
+Common components in components/common/
+2.2 Component Implementation
+Each component should have a clear, single responsibility
+Use TypeScript interfaces to define component props
+Default exports for components
+Include JSDoc comments for complex components

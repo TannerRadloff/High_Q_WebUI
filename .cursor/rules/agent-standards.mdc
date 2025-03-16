@@ -1,0 +1,15 @@
+---
+description: building or editing agents or agent functionality
+globs: 
+alwaysApply: false
+---
+
+5.1 Agent Architecture
+Follow the architecture outlined in ARCHITECTURE.md
+Use the OpenAI Agents SDK for agent implementation
+Implement proper tracing and span management
+Follow the SDK's handoff patterns for agent delegation
+5.2 Agent Integration
+Initialize the SDK before using any agent functionality
+Use the agent service for processing user messages
+Implement proper error handling for agent operations

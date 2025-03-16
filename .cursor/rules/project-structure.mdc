@@ -1,0 +1,26 @@
+---
+description: understanding project structure 
+globs: 
+alwaysApply: false
+---
+
+# Your rule content
+
+1.1 Directory Organization
+app/: Contains Next.js App Router pages and layouts
+Route-specific components should be in their respective route folders
+API routes should be placed in app/api/
+components/: UI components organized by purpose:
+ui/: Basic UI components (buttons, inputs, etc.)
+common/: Reusable components used across the application
+layout/: Components defining structure and positioning
+icons/: Icon components
+auth/: Authentication-related components
+lib/: Core functionality and utilities
+agents/: Agent-related functionality
+db/: Database connections and models
+utils/: Utility functions
+hooks/: Custom React hooks
+tracing/: Tracing and monitoring logic
+public/: Static assets
+types/: TypeScript type definitions

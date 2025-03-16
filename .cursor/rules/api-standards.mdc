@@ -1,0 +1,17 @@
+---
+description: creating or editing API 
+globs: 
+alwaysApply: false
+---
+
+# Your rule content
+
+6.1 API Routes
+Place API routes in the app/api/ directory
+Use proper HTTP methods for different operations
+Implement proper error handling and status codes
+Return consistent JSON response formats
+6.2 API Request/Response
+Use Zod for request validation
+Include appropriate HTTP status codes
+Handle errors gracefully with proper error messages

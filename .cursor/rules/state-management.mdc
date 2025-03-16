@@ -1,0 +1,14 @@
+---
+description: state managment
+globs: 
+alwaysApply: false
+---
+
+# Your rule content
+7.1 React Hooks
+Use React hooks for component-level state management
+Create custom hooks in hooks/ directory for reusable logic
+7.2 Global State
+Use Zustand for global state management
+Organize store files in a logical manner
+8. Authentication

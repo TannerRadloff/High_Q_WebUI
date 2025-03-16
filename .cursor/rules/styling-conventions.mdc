@@ -1,0 +1,11 @@
+---
+description: Updating or creating styling or visual elements
+globs: 
+alwaysApply: false
+---
+
+# Your rule content
+4.1 Tailwind CSS
+Use Tailwind CSS for styling components
+For complex components, consider using the cn() utility to combine classes
+Follow the project's existing color palette and design system

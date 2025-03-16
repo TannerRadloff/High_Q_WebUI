@@ -1,0 +1,14 @@
+---
+description: working with database related logic or files
+globs: 
+alwaysApply: false
+---
+
+# Your rule content
+
+Use supabase for database operations
+Define schema in appropriate files
+Use migrations for schema changes
+9.2 Data Fetching
+Use React Server Components for initial data loading when possible
+Use SWR for client-side data fetching with proper caching strategies

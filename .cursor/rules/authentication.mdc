@@ -1,0 +1,10 @@
+---
+description: working on Auth or authentication related files
+globs: 
+alwaysApply: false
+---
+
+8.1 Authentication Flow
+Use Supabase for authentication
+Follow the authentication patterns established in lib/auth.ts
+Properly protect routes that require authentication
