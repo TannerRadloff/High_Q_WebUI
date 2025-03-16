@@ -13,15 +13,30 @@ import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
 
-interface AuthContextType {
-  user: User | null
-  session: Session | null
-  isLoading: boolean
-  signIn: (email: string, password: string) => Promise<void>
-  signOut: () => Promise<void>
-  refreshSession: () => Promise<void>
+// Define the User type
+interface User {
+  id: string;
+  email: string;
+  name?: string;
 }
 
+// Define the Session type
+interface Session {
+  user: User;
+  expires: string;
+}
+
+// Define the AuthContextType
+interface AuthContextType {
+  user: User | null;
+  session: Session | null;
+  isLoading: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  refreshSession: () => Promise<void>;
+}
+
+// Create the AuthContext
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 // Helper function to check if we're on an auth page
@@ -89,14 +104,25 @@ function safeRedirect(path: string, forceReload = false) {
   }
 }
 
+// Create the AuthProvider component
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [hasEnvError, setHasEnvError] = useState(false)
-  const router = useRouter()
-  const pathname = usePathname()
-  const supabase = createClient()
+  const [user, setUser] = useState<User | null>({
+    id: '1',
+    email: 'demo@example.com',
+    name: 'Demo User'
+  });
+  const [session, setSession] = useState<Session | null>({
+    user: {
+      id: '1',
+      email: 'demo@example.com',
+      name: 'Demo User'
+    },
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const supabase = createClient();
   
   // Track if we've already initialized
   const [hasInitialized, setHasInitialized] = useState(false)
@@ -109,8 +135,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Check if API keys are available
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       console.error('Missing Supabase environment variables')
-      setHasEnvError(true)
       setIsLoading(false)
+      setHasInitialized(true)
       return
     }
     
@@ -122,6 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error('Failed to get session:', error)
           setIsLoading(false)
+          setHasInitialized(true)
           return
         }
         
@@ -191,86 +218,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [router, pathname, supabase, hasInitialized])
   
-  /**
-   * Sign in with email and password
-   */
+  // Mock sign in function
   const signIn = async (email: string, password: string) => {
+    setIsLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const mockUser = {
+        id: '1',
         email,
-        password,
-      })
+        name: 'Demo User'
+      };
       
-      if (error) {
-        console.error('Sign in error:', error)
-        
-        // Provide more user-friendly error messages
-        if (error.message.includes('Invalid login')) {
-          throw new Error('Invalid email or password. Please try again.')
-        } else {
-          throw error
-        }
-      }
+      setUser(mockUser);
+      setSession({
+        user: mockUser,
+        expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      });
       
-      // Update state with new session information
-      toast.success('Signed in successfully')
-      
-      // Manually redirect to ensure it happens
-      // Add a small delay to ensure state is updated before redirect
-      setTimeout(() => {
-        safeRedirect('/', true);
-      }, 300);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to sign in')
-      throw error
+      router.push('/');
+    } catch (error) {
+      console.error('Sign in error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
-  }
-  
-  /**
-   * Sign out the current user
-   */
+  };
+
+  // Mock sign out function
   const signOut = async () => {
+    setIsLoading(true);
     try {
-      const { error } = await supabase.auth.signOut()
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      if (error) {
-        console.error('Sign out error:', error)
-        throw error
-      }
+      setUser(null);
+      setSession(null);
       
-      // Auth state change will handle redirection
-      toast.success('Signed out successfully')
-      
-      // Ensure redirect happens
-      safeRedirect('/login');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to sign out')
-      throw error
+      router.push('/login');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
-  }
-  
-  /**
-   * Refresh the current session
-   */
+  };
+
+  // Mock refresh session function
   const refreshSession = async () => {
+    setIsLoading(true);
     try {
-      const { data, error } = await supabase.auth.refreshSession()
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      if (error) {
-        console.error('Session refresh error:', error)
-        throw error
+      if (user) {
+        setSession({
+          user,
+          expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        });
       }
-      
-      if (data.session) {
-        setSession(data.session)
-        setUser(data.session.user)
-      }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to refresh session')
-      throw error
+    } catch (error) {
+      console.error('Refresh session error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
-  }
-  
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -279,27 +294,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         signIn,
         signOut,
-        refreshSession,
+        refreshSession
       }}
     >
-      {hasEnvError ? (
-        <div className="p-4 bg-red-100 text-red-700 rounded-md">
-          <h2 className="text-lg font-bold">Environment Error</h2>
-          <p>Missing Supabase environment variables. Please check your .env file.</p>
-        </div>
-      ) : (
-        children
-      )}
+      {children}
     </AuthContext.Provider>
-  )
+  );
 }
 
+// Create the useAuth hook
 export const useAuth = () => {
-  const context = useContext(AuthContext)
-  
+  const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
+    throw new Error('useAuth must be used within an AuthProvider');
   }
-  
-  return context
-} 
+  return context;
+}; 

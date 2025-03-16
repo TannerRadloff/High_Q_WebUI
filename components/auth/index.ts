@@ -5,4 +5,4 @@
  * These components handle user authentication and authorization
  */
 
-export * from './auth-provider'; 
+export { AuthProvider, useAuth } from './auth-provider'; 

@@ -1,0 +1,9 @@
+---
+description: new files
+globs: 
+alwaysApply: false
+---
+
+# Your rule content
+
+Before creating a new file, search the codebase and make sure that file or a logically equivalent file doesn't already exist. 
