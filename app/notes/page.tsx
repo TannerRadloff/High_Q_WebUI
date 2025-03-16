@@ -1,7 +1,7 @@
-import { createClient } from '@/utils/supabase/server';
+import { createSSRServerClient } from '@/lib/supabase/index';
 
 export default async function Notes() {
-  const supabase = await createClient();
+  const supabase = await createSSRServerClient();
   const { data: notes } = await supabase.from("notes").select();
 
   return (

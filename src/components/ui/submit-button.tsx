@@ -2,7 +2,7 @@
 
 import { useFormStatus } from 'react-dom';
 
-import { LoaderIcon } from '@/components/icons';
+import { LoaderIcon } from '@/src/components/common/icons';
 
 import { Button } from '@/src/components/ui/button';
 
