@@ -73,6 +73,20 @@ const nextConfig = {
   },
   // Move serverComponentsExternalPackages to the root level as serverExternalPackages
   serverExternalPackages: ['sharp'],
+  
+  // Environment variables that were previously set in fix-build.js
+  env: {
+    NEXT_PUBLIC_APP_URL: process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+  },
+  
+  // Custom function to run before the build starts
+  async rewrites() {
+    return [
+      // Add any necessary rewrites here
+    ];
+  },
 };
 
 module.exports = nextConfig; 

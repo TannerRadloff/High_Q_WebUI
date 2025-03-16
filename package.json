@@ -5,8 +5,10 @@
   "scripts": {
     "dev": "next dev --turbo",
     "dev:clean": "rimraf .next && next dev --turbo",
-    "build": "node scripts/fix-build.js && next build && node scripts/post-build.js",
-    "build:with-migrate": "tsx lib/db/migrate && node scripts/fix-build.js && next build && node scripts/post-build.js",
+    "build": "node scripts/simplified-build.js",
+    "build:legacy": "node scripts/fix-build.js && next build && node scripts/post-build.js",
+    "build:simple": "node scripts/simplified-build.js",
+    "build:with-migrate": "tsx lib/db/migrate && node scripts/simplified-build.js",
     "start": "next start",
     "lint": "biome lint ./app ./lib ./components ./utils",
     "lint:fix": "biome lint --apply ./app ./lib ./components ./utils",
