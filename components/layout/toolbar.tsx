@@ -29,7 +29,6 @@ import { sanitizeUIMessages } from '@/utils/messages';
 
 import {
   ArrowUpIcon,
-  StopIcon,
   SummarizeIcon,
 } from '@/src/components/common/icons';
 import { artifactDefinitions } from '@/src/components/features/artifact';
@@ -433,19 +432,7 @@ const PureToolbar = ({
         ref={toolbarRef}
       >
         {isLoading ? (
-          <motion.div
-            key="stop-icon"
-            initial={{ scale: 1 }}
-            animate={{ scale: 1.4 }}
-            exit={{ scale: 1 }}
-            className="p-3"
-            onClick={() => {
-              stop();
-              setMessages((messages) => sanitizeUIMessages(messages));
-            }}
-          >
-            <StopIcon />
-          </motion.div>
+          null
         ) : selectedTool === 'adjust-reading-level' ? (
           <ReadingLevelSelector
             key="reading-level-selector"

@@ -26,7 +26,7 @@ import {
 
 import { cn } from '@/utils/formatting';
 import { showUniqueErrorToast } from '@/lib/api-error-handler';
-import { ArrowUpIcon, PaperclipIcon, StopIcon, CrossIcon } from '@/src/components/common/icons';
+import { ArrowUpIcon, PaperclipIcon, CrossIcon } from '@/src/components/common/icons';
 import { Button } from '@/src/components/ui/button';
 import { Textarea } from '@/src/components/ui/textarea';
 import { Switch } from '@/src/components/ui/switch';
@@ -388,33 +388,21 @@ function SendButton({
   const { input, attachments } = useInputContext();
   const hasContent = input.trim().length > 0 || attachments.length > 0;
   
-  // Handle click based on state
-  const handleClick = () => {
-    if (isLoading) {
-      onStopGeneration();
-    }
-  };
-  
   return (
-    <ButtonTooltip content={isLoading ? "Stop generating" : "Send message"}>
+    <ButtonTooltip content="Send message">
       <Button
         size="icon"
-        type={isLoading ? "button" : "submit"}
-        onClick={isLoading ? handleClick : undefined}
-        disabled={!isLoading && !hasContent}
-        variant={isLoading ? "destructive" : "default"}
+        type="submit"
+        disabled={isLoading || !hasContent}
+        variant="default"
         className={cn(
           "rounded-full w-8 h-8 shrink-0",
-          isLoading ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90",
+          "bg-primary hover:bg-primary/90",
           "transition-all duration-200",
           uploadQueue.length > 0 && "animate-pulse"
         )}
       >
-        {isLoading ? (
-          <StopIcon size={12} />
-        ) : (
-          <ArrowUpIcon size={12} className="h-3 w-3" />
-        )}
+        <ArrowUpIcon size={12} className="h-3 w-3" />
       </Button>
     </ButtonTooltip>
   );
