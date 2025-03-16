@@ -12,7 +12,7 @@ export * from './messages';
 export { Artifact } from './artifact';
 // Note: ArtifactKind and UIArtifact are now defined in @/types/artifact
 export * from './visibility-selector';
-export * from './multimodal-input';
+// Multimodal input is now imported from @/components/common/multimodal-input
 export * from './message-actions';
 export * from './message-editor';
 export * from './message-reasoning';

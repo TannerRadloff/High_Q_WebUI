@@ -17,9 +17,9 @@ import useSWR, { useSWRConfig } from 'swr';
 import { useDebounceCallback, useWindowSize } from 'usehooks-ts';
 import type { Document, Vote } from '@/lib/db/schema';
 import { fetcher } from '@/lib/utils';
-import { MultimodalInput } from './multimodal-input';
+import { MultimodalInput } from '@/components/common/multimodal-input';
 import { Toolbar } from '@/src/components/features/toolbar';
-import { VersionFooter } from './version-footer';
+import { VersionFooter } from '@/src/components/features/version-footer';
 import { ArtifactActions } from '@/src/components/features/artifact-actions';
 import { ArtifactCloseButton } from '@/src/components/features/artifact-close-button';
 import { ArtifactMessages } from '@/src/components/features/artifact-messages';
@@ -39,7 +39,7 @@ export const artifactDefinitions = [
   sheetArtifact,
 ];
 
-import type { UIArtifact, ArtifactKind } from '../../types/artifact';
+import type { UIArtifact, ArtifactKind } from '@/types/artifact';
 
 function PureArtifact({
   chatId,
@@ -426,84 +426,4 @@ function PureArtifact({
                         {
                           addSuffix: true,
                         },
-                      )}`}
-                    </div>
-                  ) : (
-                    <div className="w-32 h-3 mt-2 bg-muted-foreground/20 rounded-md animate-pulse" />
-                  )}
-                </div>
-              </div>
-
-              <ArtifactActions
-                artifact={artifact}
-                currentVersionIndex={currentVersionIndex}
-                handleVersionChange={handleVersionChange}
-                isCurrentVersion={isCurrentVersion}
-                mode={mode}
-                metadata={metadata}
-                setMetadata={setMetadata}
-              />
-            </div>
-
-            <div className="dark:bg-muted bg-background h-full overflow-y-scroll !max-w-full items-center">
-              <artifactDefinition.content
-                title={artifact.title}
-                content={
-                  isCurrentVersion
-                    ? artifact.content
-                    : getDocumentContentById(currentVersionIndex)
-                }
-                mode={mode}
-                status={artifact.status}
-                currentVersionIndex={currentVersionIndex}
-                suggestions={[]}
-                onSaveContent={saveContent}
-                isInline={false}
-                isCurrentVersion={isCurrentVersion}
-                getDocumentContentById={getDocumentContentById}
-                isLoading={isDocumentsFetching && !artifact.content}
-                metadata={metadata}
-                setMetadata={setMetadata}
-              />
-
-              <AnimatePresence>
-                {isCurrentVersion && (
-                  <Toolbar
-                    isToolbarVisible={isToolbarVisible}
-                    setIsToolbarVisible={setIsToolbarVisible}
-                    append={append}
-                    isLoading={isLoading}
-                    stop={stop}
-                    setMessages={setMessages}
-                    artifactKind={artifact.kind}
-                  >
-                    <div></div>
-                  </Toolbar>
-                )}
-              </AnimatePresence>
-            </div>
-
-            <AnimatePresence>
-              {!isCurrentVersion && (
-                <VersionFooter
-                  currentVersionIndex={currentVersionIndex}
-                  documents={documents}
-                  handleVersionChange={handleVersionChange}
-                />
-              )}
-            </AnimatePresence>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-}
-
-export const Artifact = memo(PureArtifact, (prevProps, nextProps) => {
-  if (prevProps.isLoading !== nextProps.isLoading) return false;
-  if (!equal(prevProps.votes, nextProps.votes)) return false;
-  if (prevProps.input !== nextProps.input) return false;
-  if (!equal(prevProps.messages, nextProps.messages.length)) return false;
-
-  return true;
-});
+                      )}`
