@@ -5,7 +5,6 @@ import type {
   CreateMessage,
   Message,
 } from 'ai';
-import type { ExtendedAttachment } from '@/types';
 import type React from 'react';
 import {
   useRef,
@@ -18,6 +17,12 @@ import {
 import { toast } from 'sonner';
 import { useLocalStorage } from 'usehooks-ts';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 import { cn } from '@/utils/formatting';
 import { showUniqueErrorToast } from '@/lib/api-error-handler';
@@ -27,6 +32,7 @@ import { Textarea } from '@/src/components/ui/textarea';
 import { sanitizeUIMessages } from '@/utils/messages';
 import { useFileUpload } from './hooks/useFileUpload';
 import { InputProvider, useInputContext } from './context/InputContext';
+import { ExtendedAttachment } from '@/types';
 
 // Main exported component that uses the context provider
 export function MultimodalInput({
@@ -125,117 +131,127 @@ function InputContainer({ className }: { className?: string }) {
   );
 }
 
-// Form component
+// MessageForm component
 function MessageForm() {
   const { 
-    input, 
-    setInput, 
-    attachments, 
-    setAttachments,
+    input,
     isLoading,
-    stop
+    attachments, 
+    setAttachments
   } = useInputContext();
   
-  // Local state to track actual button visibility
+  // Local state to track button visibility
   const [showStopButton, setShowStopButton] = useState(false);
-  
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const submitMessage = useSubmitMessage();
+  
+  // Setup file upload handling
   const { uploadQueue, handleFileChange } = useFileUpload(
     (newAttachments) => setAttachments(newAttachments)
   );
   
-  const submitMessage = useSubmitMessage();
+  // Function to handle attachment actions
+  const handleAttachment = (action: 'remove', index: number) => {
+    if (action === 'remove') {
+      setAttachments(attachments.filter((_, i) => i !== index));
+    }
+  };
   
   // Update button visibility based on loading state
   useEffect(() => {
-    console.log('[MultimodalInput] Current isLoading state:', isLoading);
-    setShowStopButton(isLoading);
+    if (isLoading) {
+      setShowStopButton(true);
+    } else {
+      // Small delay to ensure smooth transition
+      const timer = setTimeout(() => {
+        setShowStopButton(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
   }, [isLoading]);
   
-  // Auto-reset button state after timeout to prevent stuck state
-  useEffect(() => {
-    let resetTimer: NodeJS.Timeout;
-    
-    if (showStopButton) {
-      // If stop button is showing for more than 30 seconds, reset it
-      resetTimer = setTimeout(() => {
-        console.log('[MultimodalInput] Force resetting button state after timeout');
-        setShowStopButton(false);
-      }, 30000);
-    }
-    
-    return () => {
-      if (resetTimer) clearTimeout(resetTimer);
-    };
-  }, [showStopButton]);
-
+  // Handle form submission
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    submitMessage(e);
+  };
+  
   return (
     <form
-      onSubmit={(e) => submitMessage(e)}
-      className="flex flex-1 flex-col items-start gap-2 relative"
+      onSubmit={handleSubmit}
+      className="relative flex w-full flex-col gap-2"
     >
-      <div className="flex w-full flex-row items-end gap-2">
-        <div className="relative flex-1">
+      {/* TextareaInput container */}
+      <div className="relative">
+        {/* Attach button */}
+        <AttachButton
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isLoading}
+        />
+        
+        {/* Textarea component */}
+        <motion.div
+          initial={false}
+          animate={{ opacity: input.length > 0 ? 1 : 0.8 }}
+          transition={{ duration: 0.2 }}
+          className={cn(
+            "relative rounded-lg border bg-muted/30 before:pointer-events-none",
+            // Enhanced focus-within effect
+            "before:absolute before:inset-0 before:rounded-lg before:transition-all before:duration-300",
+            "focus-within:before:shadow-[0_0_0_1px_rgba(var(--primary-rgb),0.3),0_0_0_4px_rgba(var(--primary-rgb),0.1)]",
+            // Enhanced hover effect
+            "hover:before:shadow-[0_0_0_1px_rgba(var(--primary-rgb),0.2)]"
+          )}
+        >
           <TextareaInput />
           
-          {/* Button container */}
-          <div className="absolute bottom-2 right-2">
-            {/* Show both buttons, but only one is visible at a time */}
-            <div className="relative">
-              {/* Send button */}
-              <div style={{ 
-                opacity: showStopButton ? 0 : 1,
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                transition: 'opacity 0.2s ease-in-out',
-                pointerEvents: showStopButton ? 'none' : 'auto'
-              }}>
-                <SendButton 
-                  uploadQueue={uploadQueue} 
-                  onSend={() => setShowStopButton(true)}
-                />
-              </div>
-              
-              {/* Stop button */}
-              <div style={{ 
-                opacity: showStopButton ? 1 : 0,
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                transition: 'opacity 0.2s ease-in-out',
-                pointerEvents: showStopButton ? 'auto' : 'none'
-              }}>
-                <StopButton onStop={() => setShowStopButton(false)} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex justify-between items-center w-full">
-        <div className="flex gap-1.5">
-          <AttachmentsButton
-            fileInputRef={fileInputRef}
-          />
-
-          <AnimatePresence>
-            {attachments.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 8 }}
-                className="flex flex-wrap gap-1.5"
-              >
-                {attachments.map((attachment, index) => (
-                  <AttachmentItem 
-                    key={index} 
-                    attachment={attachment} 
-                    index={index} 
-                  />
-                ))}
-              </motion.div>
+          {/* Send/Stop button container */}
+          <div 
+            className={cn(
+              "absolute bottom-1 right-1.5",
+              "transition-all duration-300 ease-in-out",
+              "z-10",
+              "send-button-container"
             )}
+          >
+            <AnimatePresence mode="wait">
+              {showStopButton ? (
+                <motion.div
+                  key="stop"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute bottom-0 right-0"
+                >
+                  <StopButton />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="send"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute bottom-0 right-0"
+                >
+                  <SendButton uploadQueue={uploadQueue} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </motion.div>
+
+        {/* File attachment previews */}
+        <div className="mt-2 flex flex-wrap gap-2">
+          <AnimatePresence>
+            {attachments.map((attachment, index) => (
+              <AttachmentItem 
+                key={`attachment-${index}`}
+                attachment={attachment}
+                onRemove={() => handleAttachment('remove', index)}
+              />
+            ))}
           </AnimatePresence>
 
           {uploadQueue.length > 0 && (
@@ -328,35 +344,34 @@ function TextareaInput() {
   }, [selectedWorkflowId]);
 
   return (
-    <div
-      className={cn(
-        'flex relative w-full font-sans group/input border rounded-md overflow-hidden',
-        'border-input bg-background px-3 py-2 text-sm',
-        'transition-all ease-in-out duration-200',
-        'hover:border-primary/50 hover:shadow-sm',
-        isFocused && 'ring-2 ring-primary/30 border-primary shadow-[0_0_10px_rgba(0,120,255,0.15)]',
-      )}
-    >
+    <div className="relative">
       <Textarea
         ref={textareaRef}
         tabIndex={0}
         name="message"
         placeholder={getPlaceholderText()}
         className={cn(
-          'max-h-64 min-h-[60px] grow whitespace-break-spaces text-secondary-foreground resize-none',
-          'bg-transparent p-0 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0',
-          'border-none outline-none placeholder:text-muted-foreground/70',
-          'transition-colors duration-300 pr-12', // Add padding for the send button
+          "min-h-12 h-auto resize-none border-0 p-3",
+          // Add left padding for the attach button
+          "pl-12", 
+          // Increased right padding to accommodate larger button
+          "pr-14 lg:pr-16", 
+          // Smooth transitions for focus
+          "transition-all duration-200 ease-in-out",
+          // Better visual feedback when typing
+          "placeholder:text-muted-foreground/70 focus:placeholder:text-muted-foreground/50",
+          // Subtle animation when typing
+          "focus:shadow-none",
+          !isFocused && "bg-transparent",
+          !input && "text-muted-foreground"
         )}
-        onInput={handleInput}
+        value={input}
+        rows={1}
+        // disabled={isLoading}
+        onChange={handleInput}
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
-        value={input}
-        spellCheck={false}
-        rows={1}
-        onKeyDown={handleKeyDown}
-        // Remove disabled to ensure it's always interactive
-        // disabled={isLoading}
+        aria-label="Type a message"
       />
     </div>
   );
@@ -364,139 +379,164 @@ function TextareaInput() {
 
 // Send button component with callback
 function SendButton({ 
-  uploadQueue,
-  onSend
+  uploadQueue
 }: { 
   uploadQueue: string[];
-  onSend?: () => void;
 }) {
   const { input } = useInputContext();
   const handleAgentSubmit = useAgentSubmit();
   const isDisabled = !input.trim() && uploadQueue.length === 0;
+  const hasContent = !!input.trim() || uploadQueue.length > 0;
   
   const handleClick = () => {
-    if (onSend) onSend();
     handleAgentSubmit(input);
   };
   
   return (
-    <Button
-      type="button"
-      size="icon"
-      variant="default"
-      className={cn(
-        "size-8 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center",
-        "transition-all duration-200 hover:shadow-[0_0_8px_rgba(0,120,255,0.5)]",
-        isDisabled && "opacity-70"
-      )}
-      disabled={isDisabled}
-      onClick={handleClick}
-      aria-label="Send message"
-    >
-      <motion.div
-        whileTap={{ scale: 0.9 }}
-        transition={{ duration: 0.1 }}
+    <ButtonTooltip content="Send message" side="top">
+      <Button
+        type="button"
+        size="icon"
+        variant="default"
+        className={cn(
+          // Increase size from size-8 to size-10
+          "size-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center",
+          // Enhanced hover effects with stronger glow and color change
+          "transition-all duration-300 ease-in-out",
+          "hover:bg-primary-600 hover:scale-105", 
+          "hover:shadow-[0_0_15px_rgba(0,130,255,0.7)]",
+          "active:scale-95 active:shadow-[0_0_10px_rgba(0,130,255,0.8)]",
+          // Stronger resting state with subtle glow
+          "shadow-[0_0_5px_rgba(0,120,255,0.3)]",
+          // Add pulsing animation when there's content to send
+          hasContent && "send-button-pulse",
+          isDisabled && "opacity-70 hover:scale-100 hover:shadow-none"
+        )}
+        disabled={isDisabled}
+        onClick={handleClick}
+        aria-label="Send message"
       >
-        <ArrowUpIcon size={16} />
-      </motion.div>
-    </Button>
+        <motion.div
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          transition={{ duration: 0.15 }}
+          className="flex items-center justify-center"
+        >
+          <ArrowUpIcon size={18} />
+        </motion.div>
+      </Button>
+    </ButtonTooltip>
   );
 }
 
 // Stop button component with callback
-function StopButton({ onStop }: { onStop?: () => void }) {
+function StopButton() {
   const { stop, setMessages } = useInputContext();
   
   const handleClick = () => {
     stop();
     setMessages((messages) => sanitizeUIMessages(messages));
-    if (onStop) onStop();
   };
   
   return (
-    <Button
-      type="button"
-      size="icon"
-      variant="ghost"
-      className="size-8 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-all duration-200 hover:shadow-[0_0_8px_rgba(255,50,50,0.3)]"
-      onClick={handleClick}
-      aria-label="Stop generation"
-    >
-      <motion.div
-        whileTap={{ scale: 0.9 }}
-        transition={{ duration: 0.1 }}
+    <ButtonTooltip content="Stop generation" side="top">
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className={cn(
+          // Match size with SendButton for consistency
+          "size-10 rounded-lg flex items-center justify-center",
+          // Enhanced hover effects with destructive color theme
+          "transition-all duration-300 ease-in-out",
+          "text-destructive-foreground hover:bg-destructive/20",
+          "hover:text-destructive hover:scale-105", 
+          "hover:shadow-[0_0_15px_rgba(255,50,50,0.5)]",
+          "active:scale-95 active:shadow-[0_0_10px_rgba(255,50,50,0.6)]",
+          // Subtle glow in resting state
+          "shadow-[0_0_5px_rgba(255,50,50,0.2)]"
+        )}
+        onClick={handleClick}
+        aria-label="Stop generation"
       >
-        <StopIcon size={16} />
-      </motion.div>
-    </Button>
+        <motion.div
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          transition={{ duration: 0.15 }}
+          className="flex items-center justify-center"
+        >
+          <StopIcon size={18} /> {/* Match icon size with SendButton */}
+        </motion.div>
+      </Button>
+    </ButtonTooltip>
   );
 }
 
-// Attachment button component
-function AttachmentsButton({
-  fileInputRef,
+// Attach button component
+function AttachButton({
+  onClick,
+  disabled = false
 }: {
-  fileInputRef: React.MutableRefObject<HTMLInputElement | null>;
+  onClick: () => void;
+  disabled?: boolean;
 }) {
-  const { isLoading } = useInputContext();
-  
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="icon"
-      className={cn(
-        "size-10 shrink-0 rounded-xl border-border/40 bg-background/50",
-        "hover:bg-primary/10 hover:text-primary hover:border-primary/50 hover:shadow-[0_0_10px_rgba(0,150,255,0.3)]",
-        "transition-all duration-200"
-      )}
-      onClick={() => fileInputRef.current?.click()}
-      disabled={isLoading}
-      aria-label="Attach files"
-    >
-      <motion.div
-        whileHover={{ rotate: 15, scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        transition={{ duration: 0.2 }}
+    <ButtonTooltip content="Attach files" side="top">
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        onClick={onClick}
+        disabled={disabled}
+        className={cn(
+          "absolute left-2 top-2.5 size-8 rounded-lg",
+          "flex items-center justify-center",
+          "transition-all duration-300 ease-in-out",
+          "text-muted-foreground hover:text-primary",
+          "hover:bg-primary/10 hover:scale-105",
+          "hover:shadow-[0_0_8px_rgba(0,120,255,0.3)]",
+          "active:scale-95",
+          disabled && "opacity-50 pointer-events-none"
+        )}
+        aria-label="Attach files"
       >
-        <PaperclipIcon size={20} />
-      </motion.div>
-    </Button>
+        <motion.div
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          transition={{ duration: 0.15 }}
+        >
+          <PaperclipIcon size={18} />
+        </motion.div>
+      </Button>
+    </ButtonTooltip>
   );
 }
 
 // Attachment item component
 function AttachmentItem({ 
   attachment, 
-  index 
+  onRemove
 }: { 
   attachment: ExtendedAttachment; 
-  index: number;
+  onRemove: () => void;
 }) {
-  const { attachments, setAttachments } = useInputContext();
-  
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.9 }}
       transition={{ duration: 0.2 }}
-      key={index}
       className="flex h-8 items-center gap-1.5 rounded-md border bg-muted pr-2 text-muted-foreground hover:shadow-sm transition-all duration-200"
     >
       <div className="flex h-full items-center rounded-l-md border-r bg-muted px-2 py-0.5 text-xs text-muted-foreground">
         {attachment.contentType?.split('/')[0] || 'file'}
       </div>
       <div className="max-w-28 truncate text-xs">
-        {attachment.name?.split('/').pop() || 'attachment'}
+        {attachment.name?.split('/').pop() || 'Attachment'}
       </div>
       <button
         type="button"
-        onClick={() => {
-          setAttachments(
-            attachments.filter((_, i) => i !== index),
-          );
-        }}
+        onClick={onRemove}
         className="flex h-4 w-4 items-center justify-center rounded-sm text-muted-foreground/50 transition-colors hover:bg-muted-foreground/20 hover:text-muted-foreground"
         aria-label={`Remove ${attachment.name?.split('/').pop() || 'attachment'}`}
       >
@@ -584,4 +624,28 @@ function useAgentSubmit() {
       handleSubmit();
     }
   }, [handleSubmit, selectedWorkflowId]);
+}
+
+// Create a reusable tooltip component for our buttons
+function ButtonTooltip({
+  children,
+  content,
+  side = "top"
+}: {
+  children: React.ReactNode;
+  content: string;
+  side?: "top" | "right" | "bottom" | "left";
+}) {
+  return (
+    <TooltipProvider>
+      <Tooltip delayDuration={300}>
+        <TooltipTrigger asChild>
+          {children}
+        </TooltipTrigger>
+        <TooltipContent side={side} className="text-xs font-medium">
+          {content}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }

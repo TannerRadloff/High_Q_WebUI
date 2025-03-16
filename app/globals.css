@@ -20,6 +20,7 @@
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
     --background-rgb: 255, 255, 255;
+    --primary-rgb: 0, 120, 255;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -31,6 +32,7 @@
         --background: 240 10% 3.9%;
         --foreground: 0 0% 98%;
         --background-rgb: 10, 10, 14;
+        --primary-rgb: 60, 140, 255;
     }
 }
 
@@ -1344,4 +1346,45 @@ textarea[name="message"] {
 /* Apply this class to body during debugging */
 .debug-mode .enhanced-input * {
   pointer-events: auto !important;
+}
+
+/* Enhanced Chat Input Styling */
+@layer components {
+    /* Input focus effects */
+    textarea:focus {
+        box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    /* Make sure inputs are always clickable even when visually disabled */
+    textarea[disabled] {
+        opacity: 0.7;
+        pointer-events: auto !important;
+        cursor: text !important;
+    }
+    
+    /* Button animation effects */
+    .send-button-container button {
+        transform-origin: center;
+        transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+    }
+    
+    .send-button-container button:hover {
+        transform: scale(1.05);
+    }
+    
+    .send-button-container button:active {
+        transform: scale(0.95);
+    }
+    
+    /* Pulsing effect for the send button when active */
+    @keyframes subtle-pulse {
+        0% { box-shadow: 0 0 5px rgba(var(--primary-rgb), 0.3); }
+        50% { box-shadow: 0 0 15px rgba(var(--primary-rgb), 0.5); }
+        100% { box-shadow: 0 0 5px rgba(var(--primary-rgb), 0.3); }
+    }
+    
+    .send-button-pulse {
+        animation: subtle-pulse 2s infinite ease-in-out;
+    }
 }
