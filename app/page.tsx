@@ -9,9 +9,8 @@ import { BrainIcon } from '@/app/features/icons/icons'
 import { Button } from '@/components/ui/button'
 import { CrossIcon } from '@/app/features/icons/icons'
 
-// Add export for client-side only rendering
+// Force client-side rendering to ensure authentication works correctly
 export const dynamic = 'force-dynamic';
-export const runtime = 'edge';
 
 // Agent Welcome Banner Component
 const AgentWelcomeBanner = ({ onClose }: { onClose: () => void }) => {

@@ -52,8 +52,6 @@ const nextConfig = {
       bodySizeLimit: '2mb',
       allowedOrigins: ['localhost:3000', process.env.NEXT_PUBLIC_APP_URL],
     },
-    // Skip server-side rendering for authenticated pages to avoid SSR issues
-    isrMemoryCacheSize: 0,
   },
   env: {
     APP_URL: process.env.NEXT_PUBLIC_APP_URL,
@@ -116,27 +114,6 @@ const nextConfig = {
       },
     ];
   },
-  
-  // Skip pre-rendering for authenticated pages
-  // This prevents issues with auth state on pages that require auth
-  async exportPathMap(defaultPathMap, { dev, dir, outDir, distDir, buildId }) {
-    // In development, we don't need to customize the export path map
-    if (dev) {
-      return defaultPathMap;
-    }
-    
-    // Remove paths that require authentication from static export
-    // This ensures they'll be rendered on-demand with access to auth state
-    const filteredPaths = { ...defaultPathMap };
-    
-    // Remove authenticated pages from static generation
-    delete filteredPaths['/'];  // Homepage requires auth
-    delete filteredPaths['/chat']; // Chat pages require auth
-    delete filteredPaths['/settings']; // Settings requires auth
-    delete filteredPaths['/profile']; // Profile requires auth
-    
-    return filteredPaths;
-  }
 };
 
 module.exports = nextConfig; 
