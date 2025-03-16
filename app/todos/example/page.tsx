@@ -1,5 +1,5 @@
 import { createSSRServerClient } from "@/lib/supabase/index";
-import TodoList from "@/app/components/TodoList";
+import TodoList from "@/components/features/todos/TodoList";
 
 type Todo = {
   id: string;
