@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/index';
 import { getServerSession } from '@/lib/auth';
-import { agentTrace, agentTraceStep } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 /**
@@ -27,20 +26,20 @@ export async function GET(req: NextRequest) {
     if (chatId) {
       // Get traces for a specific chat
       traces = await db.query.agentTrace.findMany({
-        where: (fields: any) => eq(fields.chatId, chatId),
-        orderBy: (fields: any) => fields.startTime,
+        where: (fields) => chatId ? eq(fields.chatId, chatId) : undefined,
+        orderBy: (fields) => fields.startTime,
         desc: true,
         with: {
           steps: {
-            orderBy: (fields: any) => fields.timestamp,
+            orderBy: (fields) => fields.timestamp,
           },
         },
       });
     } else {
       // Get all traces for the user
       traces = await db.query.agentTrace.findMany({
-        where: (fields: any) => eq(fields.userId, session.user.id),
-        orderBy: (fields: any) => fields.startTime,
+        where: (fields) => eq(fields.userId, session.user.id),
+        orderBy: (fields) => fields.startTime,
         desc: true,
         limit: 20,
       });
@@ -76,9 +75,7 @@ export async function GET_TRACE(req: NextRequest, { params }: { params: { id: st
     const trace = await db.query.agentTrace.findFirst({
       where: (fields) => eq(fields.id, id),
       with: {
-        steps: {
-          orderBy: (fields) => fields.timestamp,
-        },
+        steps: true,
       },
     });
     

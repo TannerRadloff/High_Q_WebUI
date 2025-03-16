@@ -4,11 +4,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { processWithAgents, initializeAgentSDK, processDirectChat } from '@/lib/agents/agentService';
 import { AgentType, determineAgentType } from '@/lib/agents/agentService';
 import { checkAuth } from '@/lib/auth-utils';
-import { PrismaClient } from '@prisma/client';
 import { getAgentById } from '@/lib/agents/agentRegistry';
 import { createAgentTrace, addTraceStep, completeAgentTrace } from '@/lib/agents/agentTraceService';
-
-const prisma = new PrismaClient();
 
 /**
  * POST /api/agent-handoff

@@ -168,6 +168,88 @@ export interface Database {
           created_at?: string
         }
       }
+      agent_trace: {
+        Row: {
+          id: string
+          workflow_name: string
+          trace_id: string
+          group_id?: string
+          session_id?: string
+          user_id?: string
+          chat_id?: string
+          status: 'running' | 'completed' | 'error'
+          started_at: string
+          ended_at?: string
+          metadata?: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          workflow_name: string
+          trace_id: string
+          group_id?: string
+          session_id?: string
+          user_id?: string
+          chat_id?: string
+          status: 'running' | 'completed' | 'error'
+          started_at?: string
+          ended_at?: string
+          metadata?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          workflow_name?: string
+          trace_id?: string
+          group_id?: string
+          session_id?: string
+          user_id?: string
+          chat_id?: string
+          status?: 'running' | 'completed' | 'error'
+          started_at?: string
+          ended_at?: string
+          metadata?: Json
+          created_at?: string
+        }
+      }
+      agent_trace_span: {
+        Row: {
+          id: string
+          span_id: string
+          trace_id: string
+          parent_id?: string
+          name: string
+          span_type: 'agent' | 'generation' | 'function' | 'guardrail' | 'handoff' | 'custom'
+          span_data: Json
+          started_at: string
+          ended_at?: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          span_id: string
+          trace_id: string
+          parent_id?: string
+          name: string
+          span_type: 'agent' | 'generation' | 'function' | 'guardrail' | 'handoff' | 'custom'
+          span_data: Json
+          started_at: string
+          ended_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          span_id?: string
+          trace_id?: string
+          parent_id?: string
+          name?: string
+          span_type?: 'agent' | 'generation' | 'function' | 'guardrail' | 'handoff' | 'custom'
+          span_data?: Json
+          started_at?: string
+          ended_at?: string
+          created_at?: string
+        }
+      }
       notes: {
         Row: {
           id: number

@@ -27,7 +27,9 @@
     "migrate:components": "node scripts/migrate-components.js",
     "migrate:components:dry": "node scripts/migrate-components.js --dry-run",
     "migrate:pages": "node scripts/update-page-imports.js",
-    "test:urls": "node scripts/test-urls.js"
+    "test:urls": "node scripts/test-urls.js",
+    "setup:agent-traces": "node scripts/setup-agent-traces.js",
+    "setup:agent-traces:manual": "node scripts/setup-agent-traces-manual.js"
   },
   "dependencies": {
     "@ai-sdk/fireworks": "^0.1.14",

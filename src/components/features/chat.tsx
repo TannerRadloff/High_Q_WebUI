@@ -38,6 +38,10 @@ import {
   completeAgentTrace,
   addStreamingTraceStep
 } from '@/lib/agents/agentTraceService';
+import { AgentTraceViewer } from '@/components/ui/agent-trace-viewer';
+import { initializeAgentTraceService } from '@/lib/tracing/agentTraceService';
+import { SupabaseTraceProcessor } from '@/lib/tracing/supabaseTraceProcessor';
+import { configureTracing, trace } from '@/agents/tracing';
 
 // Add type declaration for window.generateRandomStars
 declare global {
@@ -109,12 +113,31 @@ export function Chat({
   const [isTraceVisible, setIsTraceVisible] = useState(false);
   const [isAgentTraceVisible, setIsAgentTraceVisible] = useLocalStorage<boolean>('agent-trace-visible', false);
   
+  // Add state for agent trace viewer
+  const [currentTraceId, setCurrentTraceId] = useState<string | null>(null);
+  const [isTraceViewerVisible, setIsTraceViewerVisible] = useState(false);
+  
   // Effect to sync trace visibility with local storage preference
   useEffect(() => {
     if (currentTrace) {
       setIsTraceVisible(isAgentTraceVisible);
     }
   }, [currentTrace, isAgentTraceVisible]);
+  
+  // Initialize agent trace service
+  useEffect(() => {
+    // Initialize the agent trace service
+    initializeAgentTraceService();
+    
+    // Configure tracing with Supabase processor
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (supabaseUrl && supabaseKey) {
+      const supabaseTraceProcessor = new SupabaseTraceProcessor(supabaseUrl, supabaseKey);
+      configureTracing();
+    }
+  }, []);
   
   // Handle network status and display
   useEffect(() => {
@@ -494,6 +517,24 @@ export function Chat({
         if (!isAgentPanelOpen) {
           setIsAgentPanelOpen(true);
         }
+        
+        // Create a new trace for this generation
+        const traceId = `trace_${uuidv4()}`;
+        setCurrentTraceId(traceId);
+        setIsTraceViewerVisible(true);
+        
+        // Start a trace for this generation
+        const traceObj = trace('AI Assistant Generation', {
+          trace_id: traceId,
+          workflow_name: 'Chat Generation',
+          trace_metadata: {
+            model: selectedChatModel,
+            chatId: chatId
+          }
+        });
+        
+        // Start the trace
+        traceObj.start();
       }
     } else {
       // When AI stops generating, update the generating agent's status or remove it
@@ -522,7 +563,7 @@ export function Chat({
         }, 3000);
       }
     }
-  }, [isLoading, activeAgents, isAgentPanelOpen]);
+  }, [isLoading, activeAgents, isAgentPanelOpen, selectedChatModel, chatId]);
 
   // Customize the stop function to update agent status
   const customStop = useCallback(() => {
@@ -1063,6 +1104,11 @@ export function Chat({
     }
   };
 
+  // Add a function to close the trace viewer
+  const closeTraceViewer = useCallback(() => {
+    setIsTraceViewerVisible(false);
+  }, []);
+
   return (
     <div 
       className="relative flex flex-col w-full h-full overflow-hidden"
@@ -1353,6 +1399,15 @@ export function Chat({
         isOpen={isAgentPanelOpen}
         onToggle={toggleAgentPanel}
       />
+      
+      {/* Agent trace viewer */}
+      {currentTraceId && (
+        <AgentTraceViewer
+          traceId={currentTraceId}
+          isVisible={isTraceViewerVisible}
+          onClose={closeTraceViewer}
+        />
+      )}
       
       {/* Add CSS for animations */}
       <style jsx>{`

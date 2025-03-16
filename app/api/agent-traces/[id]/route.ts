@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/index';
 import { getServerSession } from '@/lib/auth';
-import { agentTrace } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 
 /**
@@ -25,10 +24,10 @@ export async function GET(
     const { id } = params;
     
     const trace = await db.query.agentTrace.findFirst({
-      where: (fields: any) => eq(fields.id, id),
+      where: (fields) => eq(fields.id, id),
       with: {
         steps: {
-          orderBy: (fields: any) => fields.timestamp,
+          orderBy: (fields) => fields.timestamp,
         },
       },
     });
