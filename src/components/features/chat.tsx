@@ -22,7 +22,7 @@ import { ErrorMessage } from '@/src/components/ui/error-message';
 import { Artifact } from '@/src/components/features/artifact';
 import { Messages } from './messages';
 // Agent mode functionality is now integrated directly into the MultimodalInput component
-import { MultimodalInput } from '@/src/components/features';
+import { MultimodalInput } from '@/components/common/multimodal-input';
 import type { VisibilityType } from './visibility-selector';
 import { useArtifactSelector } from '@/hooks/use-artifact';
 import dynamic from 'next/dynamic';
