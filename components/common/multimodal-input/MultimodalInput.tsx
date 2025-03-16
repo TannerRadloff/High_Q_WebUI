@@ -77,6 +77,8 @@ export function MultimodalInput({
 }) {
   // Track direct chat mode preference
   const [isDirectChatMode, setIsDirectChatMode] = useLocalStorage<boolean>('direct-chat-mode', false);
+  // Track agent trace visibility preference
+  const [isAgentTraceVisible, setIsAgentTraceVisible] = useLocalStorage<boolean>('agent-trace-visible', false);
   
   // Show toast when changing modes
   useEffect(() => {
@@ -111,6 +113,8 @@ export function MultimodalInput({
           selectedWorkflowId,
           isDirectChatMode,
           setIsDirectChatMode,
+          isAgentTraceVisible,
+          setIsAgentTraceVisible,
         }}
       >
         <InputContainer className="enhanced-input" />
@@ -121,6 +125,74 @@ export function MultimodalInput({
 
 // Main component that uses the context
 function InputContainer({ className }: { className?: string }) {
+  const { isLoading, stop, isDirectChatMode, isAgentTraceVisible, setIsAgentTraceVisible } = useInputContext();
+  
+  // Add state for generation status
+  const [generationStatus, setGenerationStatus] = useState<{
+    isGenerating: boolean;
+    progress: number;
+    statusText: string;
+  }>({
+    isGenerating: false,
+    progress: 0,
+    statusText: ''
+  });
+  
+  // Update generation status when loading state changes
+  useEffect(() => {
+    if (isLoading) {
+      setGenerationStatus({
+        isGenerating: true,
+        progress: 10,
+        statusText: 'Starting AI generation...'
+      });
+      
+      // Simulate progress updates
+      const interval = setInterval(() => {
+        setGenerationStatus(prev => {
+          // Don't update if we've stopped generating
+          if (!prev.isGenerating) return prev;
+          
+          // Calculate new progress, capping at 90% (we'll set to 100% when complete)
+          const newProgress = Math.min(90, prev.progress + Math.random() * 5);
+          
+          // Update status text based on progress
+          let statusText = 'Starting AI generation...';
+          if (newProgress > 20) statusText = 'Processing your request...';
+          if (newProgress > 40) statusText = 'Analyzing context...';
+          if (newProgress > 60) statusText = 'Generating response...';
+          if (newProgress > 80) statusText = 'Finalizing response...';
+          
+          return {
+            ...prev,
+            progress: newProgress,
+            statusText
+          };
+        });
+      }, 800);
+      
+      return () => clearInterval(interval);
+    } else {
+      // When loading completes, show 100% briefly then reset
+      setGenerationStatus(prev => ({
+        ...prev,
+        progress: 100,
+        statusText: 'Response complete'
+      }));
+      
+      // Reset after a short delay
+      const timeout = setTimeout(() => {
+        setGenerationStatus({
+          isGenerating: false,
+          progress: 0,
+          statusText: ''
+        });
+      }, 1000);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [isLoading]);
+  
   return (
     <div
       className={cn(
@@ -131,156 +203,77 @@ function InputContainer({ className }: { className?: string }) {
         className
       )}
     >
-      <MessageForm />
-    </div>
-  );
-}
-
-// MessageForm component
-function MessageForm() {
-  const { 
-    input,
-    isLoading,
-    stop,
-    attachments, 
-    setAttachments,
-    setMessages,
-    isDirectChatMode,
-    setIsDirectChatMode
-  } = useInputContext();
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const submitMessage = useSubmitMessage();
-  
-  // Setup file upload handling
-  const { uploadQueue, handleFileChange } = useFileUpload(setAttachments);
-  
-  // Function to handle attachment actions
-  const handleAttachment = (action: 'remove', index: number) => {
-    if (action === 'remove') {
-      setAttachments(attachments.filter((_, i) => i !== index));
-    }
-  };
-  
-  // Handle form submission
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (isLoading) {
-      // If loading, stop generation when form is submitted
-      handleStopGeneration();
-    } else {
-      // Otherwise submit the message
-      submitMessage(e);
-    }
-  };
-  
-  // Function to handle stopping generation
-  const handleStopGeneration = () => {
-    // Call the stop function to stop generation
-    stop();
-    
-    // Sanitize the UI messages to clean up streaming state
-    setMessages((messages) => sanitizeUIMessages(messages));
-    
-    // Notify that generation was stopped by user
-    notifications.info('Generation stopped by user', { 
-      id: 'generation-stopped',
-      duration: 3000
-    });
-  };
-  
-  // Add keyboard shortcut to stop generation (Escape key)
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (isLoading && event.key === "Escape") {
-        handleStopGeneration();
-      }
-    };
-    
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isLoading, stop, setMessages]);
-  
-  // Toggle between delegation agent and direct chat modes
-  const handleToggleMode = () => {
-    if (setIsDirectChatMode) {
-      // Toggle the mode - the useEffect for this state change will handle showing the toast
-      setIsDirectChatMode(!isDirectChatMode);
-    }
-  };
-  
-  return (
-    <form onSubmit={handleSubmit} className="relative flex flex-col">
-      {/* Attachments area */}
+      {/* Generation Status Indicator */}
       <AnimatePresence>
-        {attachments.length > 0 && (
+        {generationStatus.isGenerating && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="flex flex-wrap gap-2 mb-2 overflow-hidden"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="mb-2 px-2 py-1.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-md"
           >
-            {attachments.map((attachment, i) => (
-              <AttachmentItem 
-                key={`${attachment.name}-${i}`}
-                attachment={attachment} 
-                onRemove={() => handleAttachment('remove', i)}
-              />
-            ))}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-shrink-0 h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-blue-500 items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                    <path d="M22 12c-2.667 4.667-6 7-10 7s-7.333-2.333-10-7c2.667-4.667 6-7 10-7s7.333 2.333 10 7" />
+                  </svg>
+                </span>
+              </div>
+              <div className="flex-1">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs font-medium text-blue-800 dark:text-blue-300">
+                    {generationStatus.statusText}
+                  </span>
+                  <span className="text-xs text-blue-700 dark:text-blue-400">
+                    {Math.round(generationStatus.progress)}%
+                  </span>
+                </div>
+                <div className="h-1.5 w-full bg-blue-200 dark:bg-blue-900/50 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-500 rounded-full transition-all duration-300 ease-in-out"
+                    style={{ width: `${generationStatus.progress}%` }}
+                  ></div>
+                </div>
+              </div>
+              {isLoading && (
+                <button
+                  onClick={stop}
+                  className="flex-shrink-0 p-1 rounded-full bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-800/50 text-blue-700 dark:text-blue-300 transition-colors"
+                  aria-label="Stop generation"
+                >
+                  <StopIcon className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+            
+            {/* Agent trace visibility toggle */}
+            {setIsAgentTraceVisible && (
+              <div className="mt-2 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Switch
+                    id="agent-trace-toggle"
+                    checked={isAgentTraceVisible}
+                    onCheckedChange={setIsAgentTraceVisible}
+                    className="h-3.5 w-7 data-[state=checked]:bg-blue-600"
+                  />
+                  <Label htmlFor="agent-trace-toggle" className="text-xs text-blue-800 dark:text-blue-300 cursor-pointer">
+                    Show agent trace
+                  </Label>
+                </div>
+                <div className="text-xs text-blue-700 dark:text-blue-400">
+                  {isDirectChatMode ? 'Direct chat mode' : 'Agent delegation mode'}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
       
-      {/* Direct chat mode toggle */}
-      {setIsDirectChatMode && (
-        <div className="flex items-center justify-end mb-2 text-xs">
-          <div className="flex items-center space-x-2">
-            <Switch
-              id="direct-chat-mode"
-              checked={isDirectChatMode}
-              onCheckedChange={handleToggleMode}
-              className="data-[state=checked]:bg-sky-600"
-            />
-            <Label htmlFor="direct-chat-mode" className="cursor-pointer">
-              {isDirectChatMode ? 'Direct Chat' : 'Delegation Agent'}
-            </Label>
-          </div>
-        </div>
-      )}
-      
-      {/* Main input area */}
-      <div className="flex items-end w-full gap-2">
-        <div className="flex-1">
-          <TextareaInput />
-        </div>
-        
-        {/* Action buttons */}
-        <div className="flex items-center gap-1 shrink-0">
-          {/* Attachments button */}
-          <AttachButton 
-            onClick={() => fileInputRef.current?.click()} 
-            disabled={isLoading}
-          />
-          
-          {/* Send/Stop button */}
-          <SendButton 
-            uploadQueue={uploadQueue}
-            isLoading={isLoading} 
-            onStopGeneration={stop}
-          />
-          
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            onChange={handleFileChange}
-            className="hidden"
-            disabled={isLoading}
-          />
-        </div>
-      </div>
-    </form>
+      <MessageForm />
+    </div>
   );
 }
 

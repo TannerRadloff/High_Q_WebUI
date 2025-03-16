@@ -131,3 +131,40 @@ export const suggestion = pgTable(
 );
 
 export type Suggestion = InferSelectModel<typeof suggestion>;
+
+// Agent trace tables
+export const agentTrace = pgTable('AgentTrace', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  agentId: varchar('agentId', { length: 64 }).notNull(),
+  agentName: varchar('agentName', { length: 64 }).notNull(),
+  agentIcon: varchar('agentIcon', { length: 16 }).notNull(),
+  query: text('query').notNull(),
+  startTime: timestamp('startTime').notNull(),
+  endTime: timestamp('endTime'),
+  status: varchar('status', { enum: ['running', 'completed', 'error'] }).notNull(),
+  reasoning: text('reasoning'),
+  userId: uuid('userId').references(() => user.id),
+  chatId: uuid('chatId').references(() => chat.id),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+});
+
+export type AgentTrace = InferSelectModel<typeof agentTrace>;
+
+export const agentTraceStep = pgTable('AgentTraceStep', {
+  id: uuid('id').primaryKey().notNull().defaultRandom(),
+  traceId: uuid('traceId')
+    .notNull()
+    .references(() => agentTrace.id),
+  agentId: varchar('agentId', { length: 64 }).notNull(),
+  agentName: varchar('agentName', { length: 64 }).notNull(),
+  timestamp: timestamp('timestamp').notNull(),
+  type: varchar('type', { 
+    enum: ['thought', 'action', 'observation', 'decision', 'handoff', 'error'] 
+  }).notNull(),
+  content: text('content').notNull(),
+  metadata: json('metadata'),
+  status: varchar('status', { enum: ['completed', 'in-progress', 'planned'] }).default('completed'),
+  createdAt: timestamp('createdAt').notNull().defaultNow(),
+});
+
+export type AgentTraceStep = InferSelectModel<typeof agentTraceStep>;

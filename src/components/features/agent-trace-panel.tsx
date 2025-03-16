@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { IconProps } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
+import { subscribeToTraceUpdates } from '@/lib/agents/agentTraceService';
 
 export interface AgentTraceStep {
   id: string;
@@ -143,14 +144,27 @@ const StepItem: React.FC<{ step: AgentTraceStep, isActive: boolean }> = ({ step,
                 {step.type.charAt(0).toUpperCase() + step.type.slice(1)}
               </Badge>
               {step.status === 'in-progress' && (
-                <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                  </span>
                   In Progress
                 </span>
               )}
             </div>
             <span className="text-xs text-muted-foreground">{formatTime(step.timestamp)}</span>
           </div>
-          <p className="text-sm mt-1 whitespace-pre-wrap">{step.content}</p>
+          <p className="text-sm mt-1 whitespace-pre-wrap">
+            {step.status === 'in-progress' ? (
+              <span>
+                {step.content}
+                <span className="inline-block animate-pulse">▌</span>
+              </span>
+            ) : (
+              step.content
+            )}
+          </p>
           
           {step.metadata && Object.keys(step.metadata).length > 0 && (
             <Tooltip>
@@ -192,6 +206,40 @@ const LoadingTraceStep = () => (
 );
 
 const AgentTracePanel: React.FC<AgentTracePanelProps> = ({ trace, isVisible, isLoading, onClose }) => {
+  // State to hold the live trace data
+  const [liveTrace, setLiveTrace] = useState<AgentTrace | null>(trace);
+  const [activeStepId, setActiveStepId] = useState<string | null>(null);
+
+  // Subscribe to trace updates
+  useEffect(() => {
+    if (!trace) {
+      setLiveTrace(null);
+      return;
+    }
+
+    // Set initial trace
+    setLiveTrace(trace);
+    
+    // Subscribe to updates for this trace
+    const unsubscribe = subscribeToTraceUpdates(trace.id, (updatedTrace) => {
+      setLiveTrace(updatedTrace);
+      
+      // Set the active step to the most recent in-progress step
+      const inProgressStep = updatedTrace.steps.findLast(step => step.status === 'in-progress');
+      if (inProgressStep) {
+        setActiveStepId(inProgressStep.id);
+      } else if (updatedTrace.steps.length > 0) {
+        // If no in-progress steps, set the last step as active
+        setActiveStepId(updatedTrace.steps[updatedTrace.steps.length - 1].id);
+      }
+    });
+    
+    // Cleanup subscription on unmount or when trace changes
+    return () => {
+      unsubscribe();
+    };
+  }, [trace]);
+
   if (!isVisible && !isLoading) return null;
 
   return (
@@ -208,18 +256,28 @@ const AgentTracePanel: React.FC<AgentTracePanelProps> = ({ trace, isVisible, isL
           <div className="p-3 border-b border-border bg-muted/30 flex justify-between items-center">
             <div className="flex items-center gap-2">
               <span className="font-medium text-sm">Agent Trace</span>
-              {trace?.agentName && (
+              {liveTrace?.agentName && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm text-muted-foreground">•</span>
                   <div className="flex items-center gap-1">
-                    <span className="text-sm">{trace.agentIcon}</span>
-                    <span className="text-sm">{trace.agentName}</span>
+                    <span className="text-sm">{liveTrace.agentIcon}</span>
+                    <span className="text-sm">{liveTrace.agentName}</span>
                   </div>
                 </div>
               )}
-              {trace?.status === 'running' && (
+              {liveTrace?.status === 'running' && (
                 <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 animate-pulse">
                   Running
+                </Badge>
+              )}
+              {liveTrace?.status === 'completed' && (
+                <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                  Completed
+                </Badge>
+              )}
+              {liveTrace?.status === 'error' && (
+                <Badge variant="outline" className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+                  Error
                 </Badge>
               )}
             </div>
@@ -236,7 +294,7 @@ const AgentTracePanel: React.FC<AgentTracePanelProps> = ({ trace, isVisible, isL
           </div>
           
           <div className="p-3 max-h-[400px] overflow-y-auto">
-            {isLoading && !trace && (
+            {isLoading && !liveTrace && (
               <>
                 <LoadingTraceStep />
                 <LoadingTraceStep />
@@ -244,43 +302,63 @@ const AgentTracePanel: React.FC<AgentTracePanelProps> = ({ trace, isVisible, isL
               </>
             )}
             
-            {trace && (
+            {liveTrace && (
               <>
                 <div className="mb-3">
                   <div className="text-sm font-medium mb-1">Query</div>
-                  <div className="text-sm p-2 bg-muted/30 rounded border border-border">{trace.query}</div>
+                  <div className="p-2 bg-muted/30 rounded-md text-sm">{liveTrace.query}</div>
                 </div>
                 
                 <div className="mb-3">
-                  <div className="text-sm font-medium mb-1">Trace Steps</div>
-                  <AnimatePresence>
-                    {trace.steps.map((step, index) => (
+                  <div className="text-sm font-medium mb-1">Steps</div>
+                  <AnimatePresence initial={false}>
+                    {liveTrace.steps.map((step) => (
                       <StepItem 
                         key={step.id} 
                         step={step} 
-                        isActive={step.status === 'in-progress'} 
+                        isActive={step.id === activeStepId}
                       />
                     ))}
-                    
-                    {trace.status === 'running' && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="flex items-center justify-center p-2"
-                      >
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <div className="animate-spin h-4 w-4 border-2 border-primary/50 border-t-primary rounded-full"></div>
-                          <span>Processing...</span>
-                        </div>
-                      </motion.div>
-                    )}
                   </AnimatePresence>
+                  
+                  {liveTrace.status === 'running' && liveTrace.steps.length === 0 && (
+                    <div className="text-sm text-muted-foreground italic">
+                      Waiting for agent to start processing...
+                    </div>
+                  )}
                 </div>
                 
-                {trace.reasoning && (
-                  <div className="mb-3">
-                    <div className="text-sm font-medium mb-1">Agent Reasoning</div>
-                    <div className="text-sm p-2 bg-muted/30 rounded border border-border whitespace-pre-wrap">{trace.reasoning}</div>
+                {liveTrace.reasoning && (
+                  <div className="mt-4">
+                    <div className="text-sm font-medium mb-1">Reasoning</div>
+                    <div className="p-2 bg-muted/30 rounded-md text-sm whitespace-pre-wrap">
+                      {liveTrace.reasoning}
+                    </div>
+                  </div>
+                )}
+                
+                {liveTrace.status === 'completed' && (
+                  <div className="mt-4 p-2 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 rounded-md">
+                    <div className="text-sm text-green-800 dark:text-green-300 flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                      </svg>
+                      Trace completed successfully
+                    </div>
+                  </div>
+                )}
+                
+                {liveTrace.status === 'error' && (
+                  <div className="mt-4 p-2 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-md">
+                    <div className="text-sm text-red-800 dark:text-red-300 flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      </svg>
+                      Trace completed with errors
+                    </div>
                   </div>
                 )}
               </>

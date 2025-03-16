@@ -35,7 +35,8 @@ import { executeWorkflow } from '@/lib/agents/workflowService';
 import { 
   createAgentTrace, 
   addTraceStep, 
-  completeAgentTrace 
+  completeAgentTrace,
+  addStreamingTraceStep
 } from '@/lib/agents/agentTraceService';
 
 // Add type declaration for window.generateRandomStars
@@ -106,6 +107,14 @@ export function Chat({
   // Add state for trace panel
   const [currentTrace, setCurrentTrace] = useState<AgentTrace | null>(null);
   const [isTraceVisible, setIsTraceVisible] = useState(false);
+  const [isAgentTraceVisible, setIsAgentTraceVisible] = useLocalStorage<boolean>('agent-trace-visible', false);
+  
+  // Effect to sync trace visibility with local storage preference
+  useEffect(() => {
+    if (currentTrace) {
+      setIsTraceVisible(isAgentTraceVisible);
+    }
+  }, [currentTrace, isAgentTraceVisible]);
   
   // Handle network status and display
   useEffect(() => {
@@ -554,7 +563,8 @@ export function Chat({
   // Toggle trace panel visibility
   const toggleTracePanel = useCallback(() => {
     setIsTraceVisible(prev => !prev);
-  }, []);
+    setIsAgentTraceVisible(prev => !prev);
+  }, [setIsAgentTraceVisible]);
 
   // Update the chat with agent processing and track agent progress
   const processMessageWithAgents = async (
@@ -606,55 +616,80 @@ export function Chat({
       if (selectedWorkflowId && useWorkflow) {
         setDelegationStatus('delegating');
         
-        // Add trace step for workflow execution
-        addTraceStep(
+        // Create a streaming action step for workflow execution
+        const { stepId, updateContent, completeStep } = addStreamingTraceStep(
           trace.id,
           'action',
-          `Executing workflow: ${selectedWorkflowId}`,
+          `Executing workflow: ${selectedWorkflowId}...`,
           { workflowId: selectedWorkflowId },
-          'in-progress'
         );
         
-        // Call the workflow execution API
-        const apiResponse = await fetch('/api/agent-workflow-execute', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            workflowId: selectedWorkflowId,
-            message,
-            chatId
-          })
-        });
+        // Update agent status
+        setActiveAgents(prev => 
+          prev.map(agent => 
+            agent.id === agentId 
+              ? { 
+                  ...agent, 
+                  progress: 25, 
+                  currentAction: `Executing workflow: ${selectedWorkflowId}`, 
+                  lastUpdateTime: new Date() 
+                } 
+              : agent
+          )
+        );
         
-        if (!apiResponse.ok) {
-          // Add error trace step
+        try {
+          // Call the workflow execution API
+          const apiResponse = await fetch('/api/agent-workflow-execute', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              workflowId: selectedWorkflowId,
+              message,
+              chatId
+            })
+          });
+          
+          if (!apiResponse.ok) {
+            // Complete the streaming step with error
+            completeStep(`Failed to execute workflow: ${apiResponse.status} ${apiResponse.statusText}`);
+            
+            // Add error trace step
+            addTraceStep(
+              trace.id,
+              'error',
+              `Failed to execute workflow: ${apiResponse.status} ${apiResponse.statusText}`,
+              { status: apiResponse.status }
+            );
+            
+            completeAgentTrace(trace.id, false, 'API request failed');
+            throw new Error('Failed to execute workflow');
+          }
+          
+          // Complete the streaming step
+          completeStep(`Executed workflow: ${selectedWorkflowId} successfully`);
+          
+          response = await apiResponse.json();
+          
+          // Add observation trace step
           addTraceStep(
             trace.id,
-            'error',
-            `Failed to execute workflow: ${apiResponse.status} ${apiResponse.statusText}`,
-            { status: apiResponse.status }
+            'observation',
+            `Workflow execution completed successfully`,
+            { workflowResult: response.success }
           );
           
-          completeAgentTrace(trace.id, false, 'API request failed');
-          throw new Error('Failed to execute workflow');
+          // Update delegation status
+          setDelegationStatus('delegated');
+          setActiveAgent('Workflow Agent');
+          setDelegationReason(`Using workflow: ${selectedWorkflowId}`);
+        } catch (error) {
+          // Complete the streaming step with error if not already completed
+          completeStep(`Error executing workflow: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          throw error;
         }
-        
-        response = await apiResponse.json();
-        
-        // Add observation trace step
-        addTraceStep(
-          trace.id,
-          'observation',
-          `Workflow execution completed successfully`,
-          { workflowResult: response.success }
-        );
-        
-        // Update delegation status
-        setDelegationStatus('delegated');
-        setActiveAgent('Workflow Agent');
-        setDelegationReason(`Using workflow: ${selectedWorkflowId}`);
       } else {
         // Add decision step about using standard agent handoff
         addTraceStep(
@@ -666,58 +701,124 @@ export function Chat({
           { sourceAgentId, targetAgentId, messageLength: message.length }
         );
         
-        // Use the standard agent handoff
-        const apiResponse = await fetch('/api/agent-handoff', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            message,
-            sourceAgentId,
-            targetAgentId,
-            chatId,
-            previousMessages
-          })
-        });
+        // Create a streaming action step for agent processing
+        const { stepId, updateContent, completeStep } = addStreamingTraceStep(
+          trace.id,
+          'action',
+          `Processing with ${targetAgentId || 'delegation agent'}...`,
+          { sourceAgentId, targetAgentId }
+        );
         
-        if (!apiResponse.ok) {
-          // Add error trace step
-          addTraceStep(
-            trace.id,
-            'error',
-            `Agent handoff failed: ${apiResponse.status} ${apiResponse.statusText}`,
-            { status: apiResponse.status }
+        // Update agent status
+        setActiveAgents(prev => 
+          prev.map(agent => 
+            agent.id === agentId 
+              ? { 
+                  ...agent, 
+                  progress: 30, 
+                  currentAction: `Processing request`, 
+                  lastUpdateTime: new Date() 
+                } 
+              : agent
+          )
+        );
+        
+        try {
+          // Use the standard agent handoff
+          const apiResponse = await fetch('/api/agent-handoff', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              message,
+              sourceAgentId,
+              targetAgentId,
+              chatId,
+              previousMessages
+            })
+          });
+          
+          if (!apiResponse.ok) {
+            // Complete the streaming step with error
+            completeStep(`Agent handoff failed: ${apiResponse.status} ${apiResponse.statusText}`);
+            
+            // Add error trace step
+            addTraceStep(
+              trace.id,
+              'error',
+              `Agent handoff failed: ${apiResponse.status} ${apiResponse.statusText}`,
+              { status: apiResponse.status }
+            );
+            
+            completeAgentTrace(trace.id, false, 'API request failed');
+            throw new Error('Failed to process message with agent');
+          }
+          
+          // Complete the streaming step
+          completeStep(`Processing completed successfully`);
+          
+          response = await apiResponse.json();
+          
+          // Update agent status
+          setActiveAgents(prev => 
+            prev.map(agent => 
+              agent.id === agentId 
+                ? { 
+                    ...agent, 
+                    progress: 70, 
+                    currentAction: `Generating response`, 
+                    lastUpdateTime: new Date() 
+                  } 
+                : agent
+            )
           );
           
-          completeAgentTrace(trace.id, false, 'API request failed');
-          throw new Error('Failed to process message with agent');
-        }
-        
-        response = await apiResponse.json();
-        
-        // If response contains an agent handoff
-        if (response.delegatedTo) {
-          addTraceStep(
-            trace.id,
-            'handoff',
-            `Delegated to ${response.delegatedTo}`,
-            { 
-              from: response.delegatedFrom || 'delegation-agent', 
-              to: response.delegatedTo,
-              reason: response.delegationReason || 'No reason provided'
-            }
-          );
+          // If response contains an agent handoff
+          if (response.delegatedTo) {
+            addTraceStep(
+              trace.id,
+              'handoff',
+              `Delegated to ${response.delegatedTo}`,
+              { 
+                from: response.delegatedFrom || 'delegation-agent', 
+                to: response.delegatedTo,
+                reason: response.delegationReason || 'No reason provided'
+              }
+            );
+            
+            // Update delegation status
+            setDelegationStatus('delegated');
+            setActiveAgent(response.delegatedTo);
+            setDelegationReason(response.delegationReason || 'No reason provided');
+          }
+        } catch (error) {
+          // Complete the streaming step with error if not already completed
+          completeStep(`Error processing request: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          throw error;
         }
       }
       
-      // Add final observation
-      addTraceStep(
+      // Create a streaming observation step for response generation
+      const { stepId, updateContent, completeStep } = addStreamingTraceStep(
         trace.id,
         'observation',
-        `Response generated successfully (${response.response.length} characters)`,
-        { responseLength: response.response.length }
+        `Generating response...`,
+        { responseLength: 0 }
       );
+      
+      // Simulate streaming updates for the response generation
+      const responseLength = response.response.length;
+      const updateInterval = Math.max(50, Math.min(200, responseLength / 20)); // Update between 50ms and 200ms
+      
+      // Update the streaming step with progress
+      for (let i = 1; i <= 5; i++) {
+        await new Promise(resolve => setTimeout(resolve, updateInterval));
+        updateContent(`Generating response... ${i * 20}%`);
+      }
+      
+      // Complete the streaming step
+      completeStep(`Response generated successfully (${responseLength} characters)`);
       
       // Complete the trace
       completeAgentTrace(

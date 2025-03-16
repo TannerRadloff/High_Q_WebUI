@@ -37,6 +37,10 @@ interface InputContextType {
   // Chat mode
   isDirectChatMode?: boolean;
   setIsDirectChatMode?: (value: boolean) => void;
+  
+  // Agent trace visibility
+  isAgentTraceVisible?: boolean;
+  setIsAgentTraceVisible?: (value: boolean) => void;
 }
 
 export const InputContext = createContext<InputContextType | null>(null);
