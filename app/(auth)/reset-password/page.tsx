@@ -1,4 +1,6 @@
-import { ResetPasswordForm } from '@/src/components/auth/reset-password-form'
+'use client';
+
+import { ResetPasswordForm } from '@/src/components/auth/reset-password-form';
 
 export default function ResetPasswordPage() {
   return (
@@ -6,5 +8,8 @@ export default function ResetPasswordPage() {
       <ResetPasswordForm />
     </div>
   )
-} 
+}
+
+// This tells Next.js to always render this page on the server
+export const dynamic = 'force-dynamic'; 
 

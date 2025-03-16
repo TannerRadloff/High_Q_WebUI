@@ -1,6 +1,7 @@
 import { Button } from '@/app/features/button/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/features/tooltip/tooltip';
-import { artifactDefinitions, type UIArtifact } from '@/app/features/artifact/artifact';
+import { artifactDefinitions } from '@/app/features/artifact/artifact-definitions';
+import type { UIArtifact } from '@/types/artifact';
 import { type Dispatch, memo, type SetStateAction, useState } from 'react';
 import type { ArtifactActionContext } from './create-artifact';
 import { cn } from '@/lib/utils';

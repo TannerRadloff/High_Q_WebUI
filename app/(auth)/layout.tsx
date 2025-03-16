@@ -1,3 +1,6 @@
+// Add export const dynamic = 'force-dynamic' to disable static generation
+export const dynamic = 'force-dynamic';
+
 export default function AuthLayout({
   children,
 }: {

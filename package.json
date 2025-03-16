@@ -3,16 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbo",
+    "dev": "next dev",
     "dev:clean": "rimraf .next && next dev --turbo",
     "build": "node scripts/simplified-build.js",
     "build:legacy": "node scripts/fix-build.js && next build && node scripts/post-build.js",
     "build:simple": "node scripts/simplified-build.js",
     "build:with-migrate": "tsx lib/db/migrate && node scripts/simplified-build.js",
+    "build:next": "next build",
     "start": "next start",
-    "lint": "biome lint ./app ./lib ./components ./utils",
+    "lint": "next lint",
     "lint:fix": "biome lint --apply ./app ./lib ./components ./utils",
-    "format": "biome format --write ./app ./lib ./components ./utils",
+    "format": "prettier --write .",
     "lint:next": "next lint",
     "setup:types": "node scripts/install-types.js",
     "update:lockfile": "node scripts/update-lockfile.js",
@@ -29,7 +30,8 @@
     "migrate:pages": "node scripts/update-page-imports.js",
     "test:urls": "node scripts/test-urls.js",
     "setup:agent-traces": "node scripts/setup-agent-traces.js",
-    "setup:agent-traces:manual": "node scripts/setup-agent-traces-manual.js"
+    "setup:agent-traces:manual": "node scripts/setup-agent-traces-manual.js",
+    "prepare": "husky install"
   },
   "dependencies": {
     "@ai-sdk/fireworks": "^0.1.14",

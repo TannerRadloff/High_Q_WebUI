@@ -32,7 +32,7 @@ import {
   StopIcon,
   SummarizeIcon,
 } from '@/app/features/icons/icons';
-import { artifactDefinitions } from '@/app/features/artifact/artifact';
+import { artifactDefinitions } from '@/app/features/artifact/artifact-definitions';
 import type { ArtifactKind } from '@/types/artifact';
 import type { ArtifactToolbarItem } from '@/app/features/artifacts/create-artifact';
 import type { UseChatHelpers } from 'ai/react';

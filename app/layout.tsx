@@ -12,6 +12,9 @@ import './modern-ui.css';
 
 import { ThemeProvider } from 'next-themes';
 
+// Add export const dynamic = 'force-dynamic' to disable static generation
+export const dynamic = 'force-dynamic';
+
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {

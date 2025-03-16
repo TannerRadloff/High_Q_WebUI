@@ -15,7 +15,7 @@ import {
   MoreHorizontalIcon,
   ShareIcon,
   TrashIcon,
-} from '@/components/icons';
+} from '@/app/features/icons/icons';
 import {
   AlertDialog,
   AlertDialogAction,

@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Artifact, ArtifactSelector, ArtifactCreator } from '@/app/features/artifact';
 import { useArtifact } from '@/hooks/use-artifact';
+import dynamic from 'next/dynamic';
 
 // Define the Artifact type locally
 interface ArtifactType {
@@ -15,7 +16,8 @@ interface ArtifactType {
   currentVersion?: string;
 }
 
-export default function ArtifactsPage() {
+// Create a client-side only component to avoid SSR issues
+const ArtifactsPage = () => {
   // Initial artifacts
   const initialArtifacts: ArtifactType[] = [
     {
@@ -128,4 +130,9 @@ export default function ArtifactsPage() {
       </div>
     </div>
   );
-} 
+};
+
+// Use dynamic import with SSR disabled to avoid auth provider issues during build
+export default dynamic(() => Promise.resolve(ArtifactsPage), {
+  ssr: false
+}); 

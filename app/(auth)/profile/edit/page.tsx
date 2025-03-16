@@ -3,20 +3,40 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { useAuth } from '@/components/auth/auth-provider'
 import { Button } from '@/app/features/button/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/app/features/card/card'
 import { Input } from '@/app/features/input/input'
 import { Label } from '@/app/features/label/label'
 import { createClient } from '@/lib/supabase/client'
+import type { User } from '@supabase/supabase-js'
 
 export default function EditProfilePage() {
-  const { user, isLoading, refreshSession } = useAuth()
   const router = useRouter()
   const supabase = createClient()
   
   const [username, setUsername] = useState('')
   const [isUpdating, setIsUpdating] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [user, setUser] = useState<User | null>(null)
+  const [refreshSession, setRefreshSession] = useState<(() => Promise<void>) | null>(null)
+  
+  // Load auth dynamically to avoid SSG issues
+  useEffect(() => {
+    const loadAuth = async () => {
+      try {
+        const { useAuth } = await import('@/components/auth/auth-provider')
+        const auth = useAuth()
+        setUser(auth.user)
+        setIsLoading(auth.isLoading)
+        setRefreshSession(() => auth.refreshSession)
+      } catch (error) {
+        console.error('Failed to load auth provider:', error)
+        setIsLoading(false)
+      }
+    }
+    
+    loadAuth()
+  }, [])
   
   useEffect(() => {
     if (user) {
@@ -68,7 +88,9 @@ export default function EditProfilePage() {
       }
       
       toast.success('Profile updated successfully')
-      await refreshSession() // Refresh to get updated user data
+      if (refreshSession) {
+        await refreshSession() // Refresh to get updated user data
+      }
       router.push('/profile')
     } catch (error) {
       console.error('Error updating profile:', error)

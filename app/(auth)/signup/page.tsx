@@ -3,13 +3,32 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { RegisterForm } from '@/src/components/auth/register-form'
-import { useAuth } from '@/components/auth/auth-provider'
 import { motion } from 'framer-motion'
+import type { User } from '@supabase/supabase-js'
 
 export default function SignupPage() {
-  const { user, isLoading } = useAuth()
   const router = useRouter()
   const [isRedirecting, setIsRedirecting] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [user, setUser] = useState<User | null>(null)
+
+  // We'll check for user in useEffect to avoid SSG issues
+  useEffect(() => {
+    // Import auth dynamically to avoid SSG issues
+    const loadAuth = async () => {
+      try {
+        const { useAuth } = await import('@/components/auth/auth-provider')
+        const { user, isLoading } = useAuth()
+        setUser(user)
+        setIsLoading(isLoading)
+      } catch (error) {
+        console.error('Failed to load auth provider:', error)
+        setIsLoading(false)
+      }
+    }
+    
+    loadAuth()
+  }, [])
 
   useEffect(() => {
     if (!isLoading && user) {
