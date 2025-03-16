@@ -5,7 +5,7 @@ import { getServerSession } from '@/lib/auth';
 import { Chat } from '@/src/components/features/chat';
 import { getChatById, getMessagesByChatId } from '@/lib/db/queries';
 import { convertToUIMessages } from '@/lib/utils';
-import { DataStreamHandler } from '@/src/components/data-stream-handler';
+import { DataStreamHandler } from '@/app/features/data-stream/data-stream-handler';
 import { DEFAULT_CHAT_MODEL, chatModels } from '@/lib/ai/models';
 
 // Force dynamic rendering for this route to handle cookies

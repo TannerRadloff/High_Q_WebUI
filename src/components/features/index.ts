@@ -28,6 +28,5 @@ export * from './artifact-close-button';
 export * from './model-selector';
 export * from './agent-selector';
 export * from './preview-attachment';
-export * from './data-stream-handler';
 export * from './overview';
 export * from './weather'; 

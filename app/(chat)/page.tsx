@@ -1,7 +1,8 @@
 import { Chat } from '@/src/components/features/chat';
 import { DEFAULT_CHAT_MODEL } from '@/lib/ai/models';
 import { generateUUID } from '@/utils/auth';
-import { DataStreamHandler } from '@/src/components/data-stream-handler';
+import { nanoid } from 'nanoid';
+import { DataStreamHandler } from '@/app/features/data-stream/data-stream-handler';
 
 // Configure page options
 export const dynamic = 'force-dynamic';
