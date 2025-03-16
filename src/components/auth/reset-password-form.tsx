@@ -6,10 +6,10 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 
-import { Button } from '@/src/components/ui/button'
-import { Input } from '@/src/components/ui/input'
-import { Label } from '@/src/components/ui/label'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/src/components/ui/card'
+import { Button } from '@/app/features/button/button'
+import { Input } from '@/app/features/input/input'
+import { Label } from '@/app/features/label/label'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/app/features/card/card'
 
 export function ResetPasswordForm() {
   const router = useRouter()

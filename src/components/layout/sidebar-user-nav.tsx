@@ -12,12 +12,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/src/components/ui/dropdown-menu';
+} from '@/app/features/dropdown-menu/dropdown-menu';
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from '@/src/components/ui/sidebar';
+} from '@/app/features/sidebar/sidebar';
 
 export function SidebarUserNav({ user }: { user: User }) {
   const router = useRouter();

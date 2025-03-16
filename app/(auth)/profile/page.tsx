@@ -2,9 +2,9 @@
 
 import { useAuth } from '@/components/auth/auth-provider'
 import { LogoutButton } from '@/src/components/auth/logout-button'
-import { Button } from '@/src/components/ui/button'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/src/components/ui/card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/src/components/ui/avatar'
+import { Button } from '@/app/features/button/button'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/app/features/card/card'
+import { Avatar, AvatarFallback, AvatarImage } from '@/app/features/avatar/avatar'
 import { useRouter } from 'next/navigation'
 
 export default function ProfilePage() {

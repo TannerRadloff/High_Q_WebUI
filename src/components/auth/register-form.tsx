@@ -8,11 +8,11 @@ import { FcGoogle } from 'react-icons/fc'
 import { createClient } from '@/lib/supabase/client'
 import { getOAuthRedirectUrl } from '@/lib/helpers/url'
 
-import { Button } from '@/src/components/ui/button'
-import { Input } from '@/src/components/ui/input'
-import { Label } from '@/src/components/ui/label'
-import { Separator } from '@/src/components/ui/separator'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/src/components/ui/card'
+import { Button } from '@/app/features/button/button'
+import { Input } from '@/app/features/input/input'
+import { Label } from '@/app/features/label/label'
+import { Separator } from '@/app/features/separator/separator'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/app/features/card/card'
 import { ErrorMessage } from '@/src/components/ui/error-message'
 
 export function RegisterForm() {

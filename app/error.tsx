@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { Button } from '@/src/components/ui/button'
+import { Button } from '@/app/features/button/button'
 import Link from 'next/link'
 
 export default function ErrorBoundary({

@@ -5,10 +5,10 @@ import type { User } from '@supabase/supabase-js';
 import { useRouter, usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
-import { PlusIcon, BoxIcon, InfoIcon, MenuIcon, RouteIcon } from '@/src/components/common/icons';
+import { PlusIcon, BoxIcon, InfoIcon, MenuIcon, RouteIcon } from '@/app/features/icons/icons';
 import { SidebarHistory } from '@/src/components/layout/sidebar-history';
 import { SidebarUserNav } from '@/src/components/layout/sidebar-user-nav';
-import { Button } from '@/src/components/ui/button';
+import { Button } from '@/app/features/button/button';
 import {
   Sidebar,
   SidebarContent,
@@ -18,10 +18,10 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   useSidebar
-} from '@/src/components/ui/sidebar';
+} from '@/app/features/sidebar/sidebar';
 // @ts-ignore - Next.js type declarations issue
 import Link from 'next/link';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/src/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/features/tooltip/tooltip';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function AppSidebar({ user }: { user: User | undefined }) {

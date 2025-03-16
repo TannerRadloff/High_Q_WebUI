@@ -3,11 +3,11 @@
 import { usePathname } from 'next/navigation';
 import { Toaster } from 'sonner';
 import { cn } from '@/lib/utils';
-import { ThemeProvider } from '@/src/components/common/theme-provider';
+import { ThemeProvider } from '@/app/features/theme-provider/theme-provider';
 import { Providers } from './providers';
 import { ErrorBoundary } from '@/src/components/ui/error-boundary';
 import { NavBar } from '@/src/components/layout/nav-bar';
-import { SidebarProvider } from '@/src/components/ui/sidebar';
+import { SidebarProvider } from '@/app/features/sidebar/sidebar';
 import ClientLayout from './client-layout';
 
 // Helper functions for path types - using the same definition across the app

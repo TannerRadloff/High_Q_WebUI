@@ -3,11 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth/auth-provider'
-import { Chat } from '@/src/components/features/chat'
+import { Chat } from '@/app/features/chat/chat'
 import HomeLayout from './home-layout'
-import { BrainIcon } from '@/src/components/common/icons'
+import { BrainIcon } from '@/app/features/icons/icons'
 import { Button } from '@/components/ui/button'
-import { CrossIcon } from '@/src/components/common/icons'
+import { CrossIcon } from '@/app/features/icons/icons'
 
 // Agent Welcome Banner Component
 const AgentWelcomeBanner = ({ onClose }: { onClose: () => void }) => {

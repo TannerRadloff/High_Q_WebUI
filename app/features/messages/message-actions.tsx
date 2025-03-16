@@ -6,14 +6,14 @@ import { useCopyToClipboard } from 'usehooks-ts';
 import type { Vote } from '@/lib/db/schema';
 import { notifications } from '@/lib/api-error-handler';
 
-import { CopyIcon, ThumbDownIcon, ThumbUpIcon } from '@/src/components/common/icons';
-import { Button } from '@/src/components/ui/button';
+import { CopyIcon, ThumbDownIcon, ThumbUpIcon } from '@/app/features/icons/icons';
+import { Button } from '@/app/features/button/button';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/src/components/ui/tooltip';
+} from '@/app/features/tooltip/tooltip';
 import { memo } from 'react';
 import equal from 'fast-deep-equal';
 

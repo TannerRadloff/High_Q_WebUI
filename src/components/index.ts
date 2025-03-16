@@ -5,7 +5,7 @@
  * Using this, you can import components with simplified paths:
  * 
  * // Before
- * import { Button } from '@/src/components/ui/button';
+ * import { Button } from '@/app/features/button/button';
  * 
  * // After
  * import { Button } from '@/src/components';

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { AppSidebar } from '@/src/components/layout/app-sidebar';
-import { SidebarInset, useSidebar } from '@/src/components/ui/sidebar';
+import { SidebarInset, useSidebar } from '@/app/features/sidebar/sidebar';
 import { useAuth } from '@/components/auth/auth-provider';
 
 export default function HomeLayout({

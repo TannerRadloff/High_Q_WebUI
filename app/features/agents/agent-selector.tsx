@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { AIModelSelector, ModelSelectorMode } from '@/src/components/features/model-selector';
+import { AIModelSelector, ModelSelectorMode } from '@/app/features/model-selector/model-selector';
 import { AgentType } from '@/agents/AgentFactory';
 import { agentTypeConfig } from '@/src/config/agent-types';
 
