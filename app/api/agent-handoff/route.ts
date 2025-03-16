@@ -2,10 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
 import { processWithAgents, initializeAgentSDK, processDirectChat } from '@/lib/agents/agentService';
-import { AgentType, determineAgentType } from '@/lib/agents/agentService';
-import { checkAuth } from '@/lib/auth-utils';
-import { getAgentById } from '@/lib/agents/agentRegistry';
 import { createAgentTrace, addTraceStep, completeAgentTrace } from '@/lib/agents/agentTraceService';
+
+// Define the agent result type to fix type errors
+type AgentResult = {
+  response: string;
+  agent?: {
+    id: string;
+    name: string;
+    type: string;
+    icon: string;
+  };
+  handoffId?: string;
+  traceId?: string;
+  handoffPath?: string[];
+  handoffData?: any;
+};
 
 /**
  * POST /api/agent-handoff
@@ -79,7 +91,7 @@ export async function POST(request: NextRequest) {
     // Record the start time for performance measurement
     const startTime = Date.now();
     
-    let result;
+    let result: AgentResult;
     let delegationReason = null;
     
     // Add action trace step
@@ -96,25 +108,59 @@ export async function POST(request: NextRequest) {
     
     // If directChatMode, process directly with the model
     if (directChatMode) {
-      result = await processDirectChat(message, previousMessages);
+      const directResult = await processDirectChat(message, previousMessages, chatId || uuidv4());
+      // Convert string result to AgentResult format
+      if (typeof directResult === 'string') {
+        result = {
+          response: directResult
+        };
+      } else {
+        result = directResult as AgentResult;
+      }
     } else {
       // Process through delegation agent or specified agent
-      result = await processWithAgents(message, chatId || uuidv4());
+      // Always start with Mimir delegation agent if no specific agent is targeted
+      const delegationAgentId = 'MimirAgent';
+      const startingAgentId = targetAgentId || delegationAgentId;
+      
+      // Add trace step for delegation flow
+      addTraceStep(
+        trace.id,
+        'thought',
+        `Starting with ${startingAgentId === delegationAgentId ? 'delegation agent (Mimir)' : 'specific agent'}`,
+        { startingAgentId },
+        'completed'
+      );
+      
+      result = await processWithAgents(message, chatId || uuidv4()) as AgentResult;
       
       // If the message was delegated, add it to the trace
-      if (result.agent && result.agent.id !== (targetAgentId || 'MimirAgent')) {
+      if (result.agent && result.agent.id !== startingAgentId) {
         addTraceStep(
           trace.id,
           'handoff',
           `Delegated to ${result.agent.name}`,
           {
-            from: targetAgentId || 'MimirAgent',
+            from: startingAgentId,
             to: result.agent.id,
             reason: 'Delegation based on message content analysis'
           }
         );
         
         delegationReason = 'Delegation based on message content analysis';
+      }
+      
+      // Ensure we have a final result to return to the user
+      if (!result.response) {
+        addTraceStep(
+          trace.id,
+          'error',
+          'No response received from agent',
+          { agentId: result.agent?.id || startingAgentId }
+        );
+        
+        // Provide a fallback response
+        result.response = "I'm sorry, but I couldn't process your request properly. Please try again.";
       }
     }
     
