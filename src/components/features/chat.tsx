@@ -333,6 +333,7 @@ export function Chat({
       selectedVisibilityType
     },
     initialMessages,
+    initialInput: "", // Add initialInput to prevent auto-submission with empty query
     onResponse(response) {
       // Reset error states when we get a successful response
       setHasError(false);
