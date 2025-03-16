@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/src/components/ui/button';
+import { cn } from '@/utils/formatting';
 
 // Define common error types
 export type ErrorType = 'general' | 'authentication' | 'network' | 'validation' | 'server';
@@ -38,10 +39,10 @@ export function ErrorMessage({
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className={`error-container ${className}`}
+      className={cn('error-container p-3 border border-destructive/30 rounded-md bg-destructive/10', className)}
       role="alert"
     >
-      <div className="flex-row-center justify-start">
+      <div className="flex items-center justify-between">
         <div className="flex-1">
           <p className="text-sm text-destructive font-medium">{displayMessage}</p>
         </div>
@@ -60,7 +61,7 @@ export function ErrorMessage({
       </div>
       
       {(onRetry || onLogin) && (
-        <div className="mt-2 flex-row gap-2">
+        <div className="mt-2 flex gap-2">
           {onRetry && (
             <Button
               variant="default"

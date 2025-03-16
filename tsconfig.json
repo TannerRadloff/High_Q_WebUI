@@ -56,7 +56,8 @@
       ],
       "@/artifacts/*": [
         "./src/artifacts/*"
-      ]
+      ],
+      "@/src/components/ui/*": ["./components/ui/*"]
     },
     "typeRoots": [
       "./node_modules/@types",

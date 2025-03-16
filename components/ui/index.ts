@@ -24,4 +24,7 @@ export * from './submit-button';
 export * from './switch';
 export * from './tabs';
 export * from './textarea';
-export * from './tooltip'; 
+export * from './tooltip';
+
+export { ErrorMessage } from './error-message'
+export { ErrorBoundary } from './error-boundary' 
