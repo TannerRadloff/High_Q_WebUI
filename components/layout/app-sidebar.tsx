@@ -5,7 +5,7 @@ import type { User } from '@supabase/supabase-js';
 import { useRouter, usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
-import { PlusIcon, BoxIcon, InfoIcon, MenuIcon, RouteIcon } from '@/src/components/common/icons';
+import { PlusIcon, BoxIcon, InfoIcon, MenuIcon, RouteIcon, BrainIcon } from '@/src/components/common/icons';
 import { SidebarHistory } from '@/src/components/layout/sidebar-history';
 import { SidebarUserNav } from '@/src/components/layout/sidebar-user-nav';
 import { Button } from '@/src/components/ui/button';
@@ -24,6 +24,9 @@ import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/src/components/ui/tooltip';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// Import Brain icon if not available in common icons
+import { Brain as BrainFallback } from '@/components/icons';
+
 export function AppSidebar({ user }: { user: User | undefined }) {
   const router = useRouter();
   const { openMobile, setOpenMobile } = useSidebar();
@@ -31,6 +34,9 @@ export function AppSidebar({ user }: { user: User | undefined }) {
   const [isRetrying, setIsRetrying] = useState(false);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const [logoClickCount, setLogoClickCount] = useState(0);
+
+  // Use BrainIcon if available, otherwise use our custom Brain component
+  const BrainIconComponent = BrainIcon || BrainFallback;
 
   // Handle logo clicks for easter egg
   const handleLogoClick = () => {
@@ -167,6 +173,23 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                   size="icon"
                   className="h-7 w-7"
                   onClick={() => {
+                    router.push('/agent-dashboard');
+                    setOpenMobile(false);
+                  }}
+                >
+                  <BrainIconComponent size={14} className="text-primary" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Agent Dashboard</TooltipContent>
+            </Tooltip>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => {
                     router.push('/agent-builder');
                     setOpenMobile(false);
                   }}
@@ -213,6 +236,22 @@ export function AppSidebar({ user }: { user: User | undefined }) {
       <SidebarFooter>
         <div className="px-3 py-2">
           <div className="text-xs text-muted-foreground mb-2 px-2">Powered by OpenAI Agents</div>
+          
+          {/* Agent Dashboard Link */}
+          <div className="mb-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start text-xs gap-2"
+              onClick={() => {
+                router.push('/agent-dashboard');
+                setOpenMobile(false);
+              }}
+            >
+              <BrainIconComponent size={14} />
+              <span>Agent Dashboard</span>
+            </Button>
+          </div>
         </div>
         {user && <SidebarUserNav user={user} />}
       </SidebarFooter>

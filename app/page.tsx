@@ -5,12 +5,65 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth/auth-provider'
 import { Chat } from '@/src/components/features/chat'
 import HomeLayout from './home-layout'
+import { BrainIcon } from '@/src/components/common/icons'
+import { Button } from '@/components/ui/button'
+import { CrossIcon } from '@/src/components/common/icons'
+
+// Agent Welcome Banner Component
+const AgentWelcomeBanner = ({ onClose }: { onClose: () => void }) => {
+  return (
+    <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 mb-6 relative">
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        className="absolute top-2 right-2 h-6 w-6" 
+        onClick={onClose}
+      >
+        <CrossIcon size={14} />
+      </Button>
+      <div className="flex items-start space-x-4">
+        <div className="bg-primary/10 rounded-full p-2 mt-1">
+          <BrainIcon size={20} className="text-primary" />
+        </div>
+        <div>
+          <h3 className="font-medium text-lg mb-1">Discover AI Agents</h3>
+          <p className="text-muted-foreground mb-3">
+            AI Agents can help you accomplish complex tasks by utilizing specialized capabilities.
+            Each agent is designed for specific use cases such as research, report generation, and more.
+          </p>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="text-xs"
+            onClick={() => window.location.href = '/agent-dashboard'}
+          >
+            Explore Agent Dashboard
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function Home() {
   const { user, isLoading, session } = useAuth()
   const router = useRouter()
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false)
+  const [showAgentBanner, setShowAgentBanner] = useState(true)
+
+  useEffect(() => {
+    // Check if banner has been dismissed before
+    const agentBannerDismissed = localStorage.getItem('agent-banner-dismissed')
+    if (agentBannerDismissed === 'true') {
+      setShowAgentBanner(false)
+    }
+  }, [])
+
+  const handleDismissBanner = () => {
+    setShowAgentBanner(false)
+    localStorage.setItem('agent-banner-dismissed', 'true')
+  }
 
   useEffect(() => {
     if (!isLoading && !hasCheckedAuth) {
@@ -76,6 +129,7 @@ export default function Home() {
     console.log('[HomePage] User authenticated, showing chat UI')
     return (
       <HomeLayout>
+        {showAgentBanner && <AgentWelcomeBanner onClose={handleDismissBanner} />}
         <Chat 
           id="create-new"
           initialMessages={[]}
@@ -96,12 +150,12 @@ export default function Home() {
         <p className="text-muted-foreground mb-4">
           You need to be logged in to access this page. Please sign in to continue.
         </p>
-        <button 
+        <Button 
           onClick={() => router.push('/login')}
           className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
         >
           Go to Login
-        </button>
+        </Button>
       </div>
     </div>
   )
