@@ -75,80 +75,47 @@ export function MultimodalInput({
   className?: string;
   selectedWorkflowId?: string | null;
 }) {
-  // Create a local state to override isLoading if it's stuck
-  const [forceNotLoading, setForceNotLoading] = useState(false);
+  // Track direct chat mode preference
+  const [isDirectChatMode, setIsDirectChatMode] = useLocalStorage<boolean>('direct-chat-mode', false);
   
-  // Add direct chat mode toggle
-  const [isDirectChatMode, setIsDirectChatMode] = useState<boolean>(false);
-  // Track whether this is an initial load or a user action
-  const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
-  
-  // Store the mode preference in local storage
+  // Show toast when changing modes
   useEffect(() => {
-    // Load initial preference, default to false (delegation mode)
-    const savedMode = localStorage.getItem('direct-chat-mode');
-    if (savedMode) {
-      setIsDirectChatMode(savedMode === 'true');
-    }
-    // After initial load, mark initialization as complete
-    setIsInitialLoad(false);
-  }, []);
-  
-  // Save the preference when it changes
-  useEffect(() => {
-    localStorage.setItem('direct-chat-mode', isDirectChatMode.toString());
-    
-    // Only show toast notification if this is not the initial load
-    if (!isInitialLoad) {
-      // Use the centralized notifications system with built-in debouncing
-      const message = isDirectChatMode 
-        ? "Direct chat mode enabled: Chatting directly with the model" 
-        : "Delegation agent mode enabled: Agent will help route your requests";
-      
-      notifications.info(message, { 
-        id: 'chat-mode-toggle',
-        debounceMs: 2000 
+    if (isDirectChatMode) {
+      toast.info('Direct chat mode enabled', {
+        description: 'Your messages will go directly to the AI assistant',
+        duration: 3000,
+      });
+    } else {
+      toast.info('Agent delegation mode enabled', {
+        description: 'The delegation agent will route your request to the most appropriate specialized agent',
+        duration: 3000,
       });
     }
-  }, [isDirectChatMode, isInitialLoad]);
+  }, [isDirectChatMode]);
   
-  // Force reset loading state after component mount
-  useEffect(() => {
-    // Short delay to ensure component is mounted before resetting
-    const timer = setTimeout(() => {
-      if (isLoading) {
-        console.log('[MultimodalInput] Force resetting initial loading state');
-        setForceNotLoading(true);
-      }
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, []); // Only run once on mount
-  
-  // Create modified context with the loading state fixed
-  const effectiveIsLoading = forceNotLoading ? false : isLoading;
-  
-  const contextValue = {
-    chatId,
-    input,
-    setInput,
-    isLoading: effectiveIsLoading,
-    stop,
-    attachments,
-    setAttachments,
-    messages,
-    setMessages,
-    append,
-    handleSubmit,
-    selectedWorkflowId,
-    isDirectChatMode,
-    setIsDirectChatMode
-  };
-
   return (
-    <InputProvider value={contextValue}>
-      <InputContainer className={className} />
-    </InputProvider>
+    <div className={cn("relative", className)}>
+      <InputProvider
+        value={{
+          input,
+          setInput,
+          isLoading,
+          chatId,
+          messages,
+          setMessages,
+          attachments,
+          setAttachments,
+          stop,
+          append,
+          handleSubmit,
+          selectedWorkflowId,
+          isDirectChatMode,
+          setIsDirectChatMode,
+        }}
+      >
+        <InputContainer className="enhanced-input" />
+      </InputProvider>
+    </div>
   );
 }
 
@@ -200,20 +167,33 @@ function MessageForm() {
     e.preventDefault();
     if (isLoading) {
       // If loading, stop generation when form is submitted
-      stop();
-      setMessages((messages) => sanitizeUIMessages(messages));
+      handleStopGeneration();
     } else {
       // Otherwise submit the message
       submitMessage(e);
     }
   };
   
+  // Function to handle stopping generation
+  const handleStopGeneration = () => {
+    // Call the stop function to stop generation
+    stop();
+    
+    // Sanitize the UI messages to clean up streaming state
+    setMessages((messages) => sanitizeUIMessages(messages));
+    
+    // Notify that generation was stopped by user
+    notifications.info('Generation stopped by user', { 
+      id: 'generation-stopped',
+      duration: 3000
+    });
+  };
+  
   // Add keyboard shortcut to stop generation (Escape key)
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isLoading && event.key === "Escape") {
-        stop();
-        setMessages((messages) => sanitizeUIMessages(messages));
+        handleStopGeneration();
       }
     };
     
@@ -306,72 +286,74 @@ function MessageForm() {
 
 // Textarea input component
 function TextareaInput() {
-  const { input, setInput, isLoading } = useInputContext();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [isFocused, setIsFocused] = useState(false);
-  const keyboardSubmit = useKeyboardSubmit();
+  const { 
+    input, 
+    setInput, 
+    isLoading,
+    attachments
+  } = useInputContext();
   
-  // Auto-resize textarea as user types
-  const handleInput = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const textarea = event.target;
-    setInput(textarea.value);
-    
-    // Auto-resize
-    textarea.style.height = 'auto';
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 300)}px`;
-  }, [setInput]);
-  
-  // Handle keyboard submission with Enter (without Shift)
-  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    keyboardSubmit(event);
-  }, [keyboardSubmit]);
-  
-  // Auto-focus the textarea on component mount
+  // Auto-resize textarea based on content
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, []);
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    
+    // Reset height to avoid issues with shrinking
+    textarea.style.height = 'auto';
+    
+    // Set the height based on scrollHeight (content height)
+    const newHeight = Math.min(
+      Math.max(textarea.scrollHeight, 24), // Min height of 24px
+      200 // Max height of 200px
+    );
+    textarea.style.height = `${newHeight}px`;
+  }, [input]);
   
-  // Get placeholder text based on state
-  const getPlaceholderText = () => {
-    if (isLoading) {
-      return "AI is generating...";
+  // Handle text input change
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+  };
+  
+  // Handle keyboard shortcuts (e.g., Enter to submit)
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Check for Enter without Shift (new line) or Ctrl/Cmd (formatting)
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      
+      // Trigger submit on parent form
+      const form = textareaRef.current?.closest('form');
+      if (form) {
+        form.requestSubmit();
+      }
     }
-    return "Message the AI assistant...";
+  };
+  
+  // Generate placeholder based on state
+  const getPlaceholder = () => {
+    if (isLoading) return "AI is generating...";
+    if (attachments.length > 0) return "Add a message or send attachments";
+    return "Ask me anything...";
   };
   
   return (
-    <div
+    <Textarea
+      ref={textareaRef}
+      name="message"
       className={cn(
-        'flex relative w-full font-sans group/input border rounded-md overflow-hidden',
-        'border-input bg-background px-3 py-2 text-sm',
-        'transition-all ease-in-out duration-200',
-        'hover:border-primary/50 hover:shadow-sm',
-        isFocused && 'ring-2 ring-primary/30 border-primary shadow-[0_0_10px_rgba(0,120,255,0.15)]',
+        "min-h-[24px] w-full resize-none border-0 bg-transparent px-3 py-2 focus-visible:ring-0",
+        "placeholder:text-muted-foreground text-base sm:text-sm",
+        "disabled:opacity-50"
       )}
-    >
-      <Textarea
-        ref={textareaRef}
-        tabIndex={0}
-        name="message"
-        placeholder={getPlaceholderText()}
-        className={cn(
-          'max-h-64 min-h-[60px] grow whitespace-break-spaces text-secondary-foreground resize-none',
-          'bg-transparent p-0 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0',
-          'relative z-10 h-full border-none outline-none placeholder:text-muted-foreground/70',
-          'transition-colors duration-300 pr-12',
-        )}
-        onInput={handleInput}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        value={input}
-        spellCheck={false}
-        rows={1}
-        onKeyDown={handleKeyDown}
-        disabled={isLoading}
-      />
-    </div>
+      placeholder={getPlaceholder()}
+      value={isLoading ? "AI is generating..." : input}
+      onChange={handleChange}
+      onKeyDown={handleKeyDown}
+      disabled={isLoading}
+      rows={1}
+      data-gramm="false" // Disable Grammarly
+      spellCheck={!isLoading}
+    />
   );
 }
 
@@ -387,27 +369,37 @@ function SendButton({
 }) {
   const { input, attachments } = useInputContext();
   const hasContent = input.trim().length > 0 || attachments.length > 0;
+  const [isStopping, setIsStopping] = useState(false);
   
   // Handle click based on state
   const handleClick = () => {
     if (isLoading) {
+      setIsStopping(true);
       onStopGeneration();
+      
+      // Add a short timeout to show "Stopping..." state
+      setTimeout(() => {
+        setIsStopping(false);
+      }, 1500);
     }
   };
   
   return (
-    <ButtonTooltip content={isLoading ? "Stop generating" : "Send message"}>
+    <ButtonTooltip content={isLoading ? (isStopping ? "Stopping generation..." : "Stop generating") : "Send message"}>
       <Button
         size="icon"
         type={isLoading ? "button" : "submit"}
         onClick={isLoading ? handleClick : undefined}
-        disabled={!isLoading && !hasContent}
+        disabled={(!isLoading && !hasContent) || isStopping}
         variant={isLoading ? "destructive" : "default"}
+        data-state={isLoading ? "stop" : "send"}
+        aria-label={isLoading ? (isStopping ? "Stopping generation" : "Stop generating") : "Send message"}
         className={cn(
           "rounded-full w-8 h-8 shrink-0",
           isLoading ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90",
           "transition-all duration-200",
-          uploadQueue.length > 0 && "animate-pulse"
+          uploadQueue.length > 0 && "animate-pulse",
+          isStopping && "opacity-70"
         )}
       >
         {isLoading ? (

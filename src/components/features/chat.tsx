@@ -27,10 +27,16 @@ import type { VisibilityType } from './visibility-selector';
 import { useArtifactSelector } from '@/hooks/use-artifact';
 import dynamic from 'next/dynamic';
 import AgentStatusPanel, { AgentStatus } from '@/src/components/features/agent-status-panel';
+import AgentTracePanel, { AgentTrace } from '@/src/components/features/agent-trace-panel';
 import { v4 as uuidv4 } from 'uuid';
 import { processWithAgents } from '@/lib/agents/agentService';
 import { WorkflowSelector } from './workflow-selector';
 import { executeWorkflow } from '@/lib/agents/workflowService';
+import { 
+  createAgentTrace, 
+  addTraceStep, 
+  completeAgentTrace 
+} from '@/lib/agents/agentTraceService';
 
 // Add type declaration for window.generateRandomStars
 declare global {
@@ -96,6 +102,10 @@ export function Chat({
   
   // Add state for selected workflow
   const [selectedWorkflowId, setSelectedWorkflowId] = useLocalStorage<string | null>('selected-workflow-id', null);
+  
+  // Add state for trace panel
+  const [currentTrace, setCurrentTrace] = useState<AgentTrace | null>(null);
+  const [isTraceVisible, setIsTraceVisible] = useState(false);
   
   // Handle network status and display
   useEffect(() => {
@@ -398,56 +408,6 @@ export function Chat({
     return null;
   };
 
-  // Handle custom form submission with authentication check
-  const customHandleSubmit = useCallback(
-    (
-      event?: { preventDefault?: () => void } | undefined,
-      chatRequestOptions?: ChatRequestOptions
-    ) => {
-      if (event && event.preventDefault) {
-        event.preventDefault();
-      }
-      
-      // If user is offline, show a toast
-      if (!isOnline) {
-        notifications.error('You are currently offline. Please reconnect to use the chat.', {
-          id: 'offline-submit-error'
-        });
-        return;
-      }
-      
-      // Check authentication status only when submitting
-      if (!user) {
-        setHasError(true);
-        setErrorType('authentication');
-        setErrorMessage('You need to be signed in to send messages.');
-        handleAPIError({ status: 401, message: 'Authentication required' }, 'Chat submission');
-        return;
-      }
-      
-      // Add subtle animation when sending a message
-      if (chatContainerRef.current) {
-        chatContainerRef.current.classList.add('chat-sending-pulse');
-        setTimeout(() => {
-          if (chatContainerRef.current) {
-            chatContainerRef.current.classList.remove('chat-sending-pulse');
-          }
-        }, 300);
-      }
-      
-      // Reset any previous errors
-      setHasError(false);
-      setErrorMessage(null);
-      
-      handleSubmit(event, chatRequestOptions);
-    },
-    [handleSubmit, isOnline, user]
-  );
-
-  const handleAuthentication = useCallback(() => {
-    window.location.href = '/login';
-  }, []);
-
   // Optimize the renderDelegationStatus function with useCallback
   const renderDelegationStatus = useCallback(() => {
     if (delegationStatus === 'idle' || isLoading) return null;
@@ -495,11 +455,107 @@ export function Chat({
     icon: string;
   } | null>(null);
 
-  // Optimize the toggleAgentPanel function with useCallback
+  // Track when AI is generating for the status panel
+  useEffect(() => {
+    // When AI is generating, add a generating agent to the active agents list if not already present
+    if (isLoading) {
+      const generatingAgentId = 'current-generation';
+      
+      // Check if we already have this agent in the list
+      const existingAgentIndex = activeAgents.findIndex(agent => agent.id === generatingAgentId);
+      
+      if (existingAgentIndex === -1) {
+        // Add new generating agent status
+        const generatingAgent: AgentStatus = {
+          id: generatingAgentId,
+          name: 'AI Assistant',
+          type: 'generation',
+          icon: '🤖',
+          originalTask: 'Processing current message',
+          currentAction: 'Generating response...',
+          status: 'working',
+          progress: 50, // Indeterminate progress
+          startTime: new Date(),
+          lastUpdateTime: new Date()
+        };
+        
+        setActiveAgents(prev => [...prev, generatingAgent]);
+        
+        // Ensure the agent panel is open when generating
+        if (!isAgentPanelOpen) {
+          setIsAgentPanelOpen(true);
+        }
+      }
+    } else {
+      // When AI stops generating, update the generating agent's status or remove it
+      const generatingAgentId = 'current-generation';
+      const existingAgentIndex = activeAgents.findIndex(agent => agent.id === generatingAgentId);
+      
+      if (existingAgentIndex !== -1) {
+        // Update to completed or remove based on your preference
+        setActiveAgents(prev => 
+          prev.map(agent => 
+            agent.id === generatingAgentId 
+              ? { 
+                  ...agent, 
+                  status: 'completed',
+                  currentAction: 'Response completed',
+                  progress: 100,
+                  lastUpdateTime: new Date() 
+                } 
+              : agent
+          )
+        );
+        
+        // Remove the generating agent after a delay
+        setTimeout(() => {
+          setActiveAgents(prev => prev.filter(agent => agent.id !== generatingAgentId));
+        }, 3000);
+      }
+    }
+  }, [isLoading, activeAgents, isAgentPanelOpen]);
+
+  // Customize the stop function to update agent status
+  const customStop = useCallback(() => {
+    // Update the generating agent's status to stopped
+    const generatingAgentId = 'current-generation';
+    const existingAgentIndex = activeAgents.findIndex(agent => agent.id === generatingAgentId);
+    
+    if (existingAgentIndex !== -1) {
+      setActiveAgents(prev => 
+        prev.map(agent => 
+          agent.id === generatingAgentId 
+            ? { 
+                ...agent, 
+                status: 'failed',
+                currentAction: 'Generation stopped by user',
+                progress: 100,
+                lastUpdateTime: new Date() 
+              } 
+            : agent
+        )
+      );
+      
+      // Remove the agent after a delay
+      setTimeout(() => {
+        setActiveAgents(prev => prev.filter(agent => agent.id !== generatingAgentId));
+      }, 3000);
+    }
+    
+    // Call the original stop function
+    stop();
+  }, [activeAgents, stop]);
+
+  // Customize the toggleAgentPanel function with useCallback
   const toggleAgentPanel = useCallback(() => {
     setIsAgentPanelOpen(prev => !prev);
   }, []);
-  
+
+  // Toggle trace panel visibility
+  const toggleTracePanel = useCallback(() => {
+    setIsTraceVisible(prev => !prev);
+  }, []);
+
   // Update the chat with agent processing and track agent progress
   const processMessageWithAgents = async (
     message: string, 
@@ -530,11 +586,34 @@ export function Chat({
       
       setActiveAgents(prev => [...prev, newAgentStatus]);
       
+      // Create a new agent trace
+      const trace = createAgentTrace(agentId, agentName, agentIcon, message);
+      setCurrentTrace(trace);
+      setIsTraceVisible(true);
+      
+      // Add initial thought step to trace
+      addTraceStep(
+        trace.id,
+        'thought',
+        `Starting to process request: "${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`,
+        { messageLength: message.length, previousMessagesCount: previousMessages.length },
+        'completed'
+      );
+      
       let response;
       
       // If a workflow is selected and we're using it, execute the workflow
       if (selectedWorkflowId && useWorkflow) {
         setDelegationStatus('delegating');
+        
+        // Add trace step for workflow execution
+        addTraceStep(
+          trace.id,
+          'action',
+          `Executing workflow: ${selectedWorkflowId}`,
+          { workflowId: selectedWorkflowId },
+          'in-progress'
+        );
         
         // Call the workflow execution API
         const apiResponse = await fetch('/api/agent-workflow-execute', {
@@ -550,16 +629,43 @@ export function Chat({
         });
         
         if (!apiResponse.ok) {
+          // Add error trace step
+          addTraceStep(
+            trace.id,
+            'error',
+            `Failed to execute workflow: ${apiResponse.status} ${apiResponse.statusText}`,
+            { status: apiResponse.status }
+          );
+          
+          completeAgentTrace(trace.id, false, 'API request failed');
           throw new Error('Failed to execute workflow');
         }
         
         response = await apiResponse.json();
+        
+        // Add observation trace step
+        addTraceStep(
+          trace.id,
+          'observation',
+          `Workflow execution completed successfully`,
+          { workflowResult: response.success }
+        );
         
         // Update delegation status
         setDelegationStatus('delegated');
         setActiveAgent('Workflow Agent');
         setDelegationReason(`Using workflow: ${selectedWorkflowId}`);
       } else {
+        // Add decision step about using standard agent handoff
+        addTraceStep(
+          trace.id,
+          'decision',
+          sourceAgentId 
+            ? `Delegating from ${sourceAgentId} to ${targetAgentId || 'delegation agent'}`
+            : `Using standard agent handoff`,
+          { sourceAgentId, targetAgentId, messageLength: message.length }
+        );
+        
         // Use the standard agent handoff
         const apiResponse = await fetch('/api/agent-handoff', {
           method: 'POST',
@@ -576,11 +682,49 @@ export function Chat({
         });
         
         if (!apiResponse.ok) {
+          // Add error trace step
+          addTraceStep(
+            trace.id,
+            'error',
+            `Agent handoff failed: ${apiResponse.status} ${apiResponse.statusText}`,
+            { status: apiResponse.status }
+          );
+          
+          completeAgentTrace(trace.id, false, 'API request failed');
           throw new Error('Failed to process message with agent');
         }
         
         response = await apiResponse.json();
+        
+        // If response contains an agent handoff
+        if (response.delegatedTo) {
+          addTraceStep(
+            trace.id,
+            'handoff',
+            `Delegated to ${response.delegatedTo}`,
+            { 
+              from: response.delegatedFrom || 'delegation-agent', 
+              to: response.delegatedTo,
+              reason: response.delegationReason || 'No reason provided'
+            }
+          );
+        }
       }
+      
+      // Add final observation
+      addTraceStep(
+        trace.id,
+        'observation',
+        `Response generated successfully (${response.response.length} characters)`,
+        { responseLength: response.response.length }
+      );
+      
+      // Complete the trace
+      completeAgentTrace(
+        trace.id, 
+        true, 
+        response.reasoning || 'Request processed successfully'
+      );
       
       // Update current agent
       setCurrentAgent(response.agent);
@@ -609,6 +753,22 @@ export function Chat({
     } catch (error) {
       console.error('Error processing message with agents:', error);
       
+      // Update trace with error
+      if (currentTrace) {
+        addTraceStep(
+          currentTrace.id,
+          'error',
+          `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          { error: String(error) }
+        );
+        
+        completeAgentTrace(
+          currentTrace.id, 
+          false, 
+          `Failed to process: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      }
+      
       // Update the status to failed
       setActiveAgents(prev => 
         prev.map(agent => 
@@ -627,70 +787,144 @@ export function Chat({
       throw error;
     }
   };
-  
+
   // Simplified handleSubmitWithAgents that uses the consolidated processMessageWithAgents
-  const handleSubmitWithAgents = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!input.trim() || isLoading) {
-      return;
-    }
-    
-    try {
-      // Add user message to UI
-      const userMessage = {
-        id: uuidv4(),
-        role: 'user',
-        content: input
-      };
-      
-      // Update chat using the existing append function to show user message
-      append({
-        id: userMessage.id,
-        content: userMessage.content,
-        role: 'user'
-      });
-      
-      // Process with either workflow or delegation agent
-      const delegationResult = await processMessageWithAgents(
-        input, 
-        chatMessages, 
-        null, 
-        null, 
-        !!selectedWorkflowId // Use workflow if selected
-      );
-      
-      // Add agent response to UI
-      const agentMessage = {
-        id: uuidv4(),
-        role: 'assistant',
-        content: delegationResult.response,
-        agentInfo: delegationResult.agent
-      };
-      
-      // Add the agent response
-      append({
-        id: agentMessage.id,
-        content: agentMessage.content,
-        role: 'assistant'
-      });
-      
-      // Clear input
-      setInput('');
-      
-      // Should we open the agent panel when first agent becomes active?
-      if (activeAgents.length === 1 && !isAgentPanelOpen) {
-        setIsAgentPanelOpen(true);
+  const handleSubmitWithAgents = useCallback(
+    async (
+      event?: { preventDefault?: () => void } | undefined,
+      chatRequestOptions?: ChatRequestOptions
+    ) => {
+      if (event && event.preventDefault) {
+        event.preventDefault();
       }
       
-    } catch (error) {
-      console.error('Error submitting message with agents:', error);
-      notifications.error('Failed to process your message', { id: 'message-error' });
+      if (!input.trim() || isLoading) {
+        return;
+      }
       
-      // Stop loading state on error
-      stop();
-    }
-  };
+      try {
+        // Add user message to UI
+        const userMessage = {
+          id: uuidv4(),
+          role: 'user',
+          content: input
+        };
+        
+        // Update chat using the existing append function to show user message
+        append({
+          id: userMessage.id,
+          content: userMessage.content,
+          role: 'user'
+        }, chatRequestOptions);
+        
+        // Process with either workflow or delegation agent
+        const delegationResult = await processMessageWithAgents(
+          input, 
+          messages.map(msg => ({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content
+          })), 
+          null, 
+          null, 
+          !!selectedWorkflowId // Use workflow if selected
+        );
+        
+        // Add agent response to UI
+        const agentMessage = {
+          id: uuidv4(),
+          role: 'assistant',
+          content: delegationResult.response,
+          agentInfo: delegationResult.agent
+        };
+        
+        // Add the agent response
+        append({
+          id: agentMessage.id,
+          content: agentMessage.content,
+          role: 'assistant'
+        }, chatRequestOptions);
+        
+        // Clear input
+        setInput('');
+        
+        // Should we open the agent panel when first agent becomes active?
+        if (activeAgents.length === 1 && !isAgentPanelOpen) {
+          setIsAgentPanelOpen(true);
+        }
+        
+      } catch (error) {
+        console.error('Error submitting message with agents:', error);
+        notifications.error('Failed to process your message', { id: 'message-error' });
+        
+        // Stop loading state on error
+        customStop();
+      }
+    },
+    [
+      input, 
+      isLoading, 
+      append, 
+      setInput, 
+      activeAgents, 
+      isAgentPanelOpen, 
+      setIsAgentPanelOpen, 
+      customStop, 
+      selectedWorkflowId, 
+      messages,
+      processMessageWithAgents
+    ]
+  );
+
+  // Custom handleSubmit function - chooses which approach to use based on config
+  const customHandleSubmit = useCallback(
+    (
+      event?: { preventDefault?: () => void } | undefined,
+      chatRequestOptions?: ChatRequestOptions
+    ) => {
+      if (event && event.preventDefault) {
+        event.preventDefault();
+      }
+      
+      // Don't submit empty messages or when loading
+      if (!input.trim() || isLoading || isCreatingChat) {
+        return;
+      }
+      
+      // Track that we've made a chat request
+      setHasMadeInitialChatRequest(true);
+      
+      // Hide welcome pane on submit
+      if (showWelcome) {
+        setShowWelcome(false);
+      }
+      
+      // If we're using a workflow or agent mode, handle with agents
+      if (selectedWorkflowId || isAgentMode) {
+        handleSubmitWithAgents(event, chatRequestOptions);
+      } else {
+        // Otherwise use the standard handleSubmit from useChat
+        handleSubmit(event, chatRequestOptions);
+      }
+    },
+    [
+      input, 
+      isLoading, 
+      isCreatingChat, 
+      setHasMadeInitialChatRequest,
+      showWelcome, 
+      setShowWelcome,
+      selectedWorkflowId, 
+      isAgentMode, 
+      handleSubmitWithAgents, 
+      handleSubmit
+    ]
+  );
+
+  // Handle authentication
+  const handleAuthentication = useCallback(() => {
+    window.location.href = '/login';
+  }, []);
 
   // Optimize the handleAgentModeToggle function with useCallback
   const handleAgentModeToggle = useCallback(() => {
@@ -875,6 +1109,14 @@ export function Chat({
           {renderDelegationStatus()}
         </AnimatePresence>
         
+        {/* Agent Trace Panel */}
+        <AgentTracePanel 
+          trace={currentTrace}
+          isVisible={isTraceVisible}
+          isLoading={isLoading}
+          onClose={toggleTracePanel}
+        />
+        
         {/* Loading indicator when no messages yet */}
         {isLoading && messages.length === 0 && !showWelcome && (
           <div className="flex justify-center items-center h-32">
@@ -912,7 +1154,7 @@ export function Chat({
             input={input}
             setInput={setInput}
             isLoading={isLoading}
-            stop={stop}
+            stop={customStop}
             attachments={attachments}
             setAttachments={setAttachments}
             messages={messages}
@@ -946,7 +1188,21 @@ export function Chat({
         <div className="max-w-3xl mx-auto">
           {/* Workflow selector with a clear label */}
           {!showWelcome && (
-            <div className="mb-3 flex items-center justify-end">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={toggleTracePanel}
+                  className={`px-3 py-1 text-xs rounded-md flex items-center gap-1 transition-colors ${isTraceVisible ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' : 'bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground'}`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 22C6.5 22 2 17.5 2 12S6.5 2 12 2s10 4.5 10 10-4.5 10-10 10z"></path>
+                    <path d="M12 18c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6z"></path>
+                    <circle cx="12" cy="12" r="1"></circle>
+                  </svg>
+                  {currentTrace ? 'View Agent Trace' : 'No Trace Available'}
+                </button>
+              </div>
+              
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Agent workflow:</span>
                 <WorkflowSelector
@@ -964,7 +1220,7 @@ export function Chat({
             input={input}
             setInput={setInput}
             isLoading={isLoading || isCreatingChat}
-            stop={stop}
+            stop={customStop}
             attachments={attachments}
             setAttachments={setAttachments}
             messages={messages}
