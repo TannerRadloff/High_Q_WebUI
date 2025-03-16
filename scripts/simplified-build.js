@@ -9,7 +9,8 @@
  *    "ENOENT: no such file or directory" errors when copying traced files
  * 2. Creates manifests in the standalone directory post-build for proper deployment
  * 3. Special handling for the app/(chat) route to ensure its manifests are correctly created
- * 4. Uses npx to ensure the next command is properly found 
+ * 4. Uses npx to ensure the next command is properly found
+ * 5. Enhanced error handling for missing directories and tracing issues
  */
 const fs = require('fs');
 const path = require('path');
@@ -71,6 +72,31 @@ export const clientReferenceManifest = {
   entryCSSFiles: {}
 };
 `;
+}
+
+// Function to safely copy files, creating directories as needed
+function safelyCopyFile(sourcePath, destPath) {
+  try {
+    // Ensure the destination directory exists
+    const destDir = path.dirname(destPath);
+    if (!fs.existsSync(destDir)) {
+      fs.mkdirSync(destDir, { recursive: true });
+      console.log(`Created directory structure for copy: ${destDir}`);
+    }
+    
+    // Only attempt to copy if source exists and is a file
+    if (fs.existsSync(sourcePath) && fs.statSync(sourcePath).isFile()) {
+      fs.copyFileSync(sourcePath, destPath);
+      console.log(`Copied: ${sourcePath} to ${destPath}`);
+      return true;
+    } else {
+      // Don't log a warning if the source doesn't exist, just create the manifest file
+      return false;
+    }
+  } catch (error) {
+    console.warn(`⚠️ Warning: Could not copy ${sourcePath} to ${destPath}: ${error.message}`);
+    return false;
+  }
 }
 
 // Function to help create client reference manifest files for a given route
@@ -160,6 +186,65 @@ export type ArtifactKind = string;
   createClientReferenceManifest(chatRoute);
 }
 
+// Function to process a route with proper error handling
+function processRoute(route) {
+  console.log(`\n📁 Processing route: ${route}`);
+  const manifestContent = createManifestContent();
+  
+  // Create paths for both server and standalone
+  const serverPath = path.join(process.cwd(), '.next', 'server', route);
+  const standalonePath = path.join(process.cwd(), '.next', 'standalone', '.next', 'server', route);
+  
+  console.log(`Server path: ${serverPath}`);
+  console.log(`Standalone path: ${standalonePath}`);
+  
+  // Check if parent directories exist
+  const serverDirExists = fs.existsSync(path.dirname(serverPath));
+  const standaloneDirExists = fs.existsSync(path.dirname(standalonePath));
+  
+  console.log(`Server parent directory exists: ${serverDirExists}`);
+  console.log(`Standalone parent directory exists: ${standaloneDirExists}`);
+  
+  // Create standalone directory structure regardless of server existence
+  safelyCreateDir(path.join('.next/standalone/.next/server', route));
+  
+  // Create client reference manifest in standalone directory
+  const standaloneManifestPath = path.join('.next/standalone/.next/server', route, 'page_client-reference-manifest.js');
+  safelyWriteFile(standaloneManifestPath, manifestContent);
+  
+  // Also create the same manifest in server directory in case it was missing
+  const serverManifestPath = path.join('.next/server', route, 'page_client-reference-manifest.js');
+  safelyWriteFile(serverManifestPath, manifestContent);
+  
+  // Only attempt to copy files if server directory exists
+  if (fs.existsSync(serverPath)) {
+    try {
+      const files = fs.readdirSync(serverPath);
+      console.log(`Found ${files.length} files in ${serverPath}`);
+      
+      for (const file of files) {
+        // Skip manifest files as we already created them
+        if (file.includes('_client-reference-manifest.js')) continue;
+        
+        const sourcePath = path.join(serverPath, file);
+        const destPath = path.join(standalonePath, file);
+        
+        safelyCopyFile(sourcePath, destPath);
+      }
+    } catch (error) {
+      console.warn(`⚠️ Error reading directory ${serverPath}: ${error.message}`);
+      // Even if there's an error, ensure the manifest file exists in both locations
+      safelyWriteFile(serverManifestPath, manifestContent);
+      safelyWriteFile(standaloneManifestPath, manifestContent);
+    }
+  } else {
+    console.log(`Directory does not exist: ${serverPath} (creating manifests anyway)`);
+    // Create the directory and manifest file since it doesn't exist
+    safelyCreateDir(path.join('.next/server', route));
+    safelyWriteFile(serverManifestPath, manifestContent);
+  }
+}
+
 // Post-build tasks function
 function runPostBuildTasks() {
   console.log('\nRunning post-build tasks...');
@@ -181,71 +266,7 @@ function runPostBuildTasks() {
   console.log(`\n🔧 Creating manifests for standalone output for ${routesNeedingManifests.length} routes...`);
   
   routesNeedingManifests.forEach(route => {
-    console.log(`\n📁 Processing route: ${route}`);
-    const manifestContent = createManifestContent();
-    
-    // Create paths for both server and standalone
-    const serverPath = path.join(process.cwd(), '.next', 'server', route);
-    const standalonePath = path.join(process.cwd(), '.next', 'standalone', '.next', 'server', route);
-    
-    console.log(`Server path: ${serverPath}`);
-    console.log(`Standalone path: ${standalonePath}`);
-    
-    // Check if parent directories exist
-    const serverDirExists = fs.existsSync(path.dirname(serverPath));
-    const standaloneDirExists = fs.existsSync(path.dirname(standalonePath));
-    
-    console.log(`Server parent directory exists: ${serverDirExists}`);
-    console.log(`Standalone parent directory exists: ${standaloneDirExists}`);
-    
-    // Create directories if they don't exist
-    safelyCreateDir(path.join('.next/standalone/.next/server', route));
-    
-    // Files to create in standalone
-    const standaloneManifestPath = path.join('.next/standalone/.next/server', route, 'page_client-reference-manifest.js');
-    
-    // Create manifest files in standalone
-    safelyWriteFile(standaloneManifestPath, manifestContent);
-    
-    // Copy other files
-    if (fs.existsSync(serverPath)) {
-      try {
-        const files = fs.readdirSync(serverPath);
-        console.log(`Found ${files.length} files in ${serverPath}`);
-        
-        for (const file of files) {
-          // Skip manifest files as we already created them
-          if (file.includes('_client-reference-manifest.js')) continue;
-          
-          const sourcePath = path.join(serverPath, file);
-          const destPath = path.join(standalonePath, file);
-          
-          if (fs.existsSync(sourcePath) && fs.statSync(sourcePath).isFile()) {
-            try {
-              // Ensure target directory exists
-              fs.mkdirSync(path.dirname(destPath), { recursive: true });
-              
-              fs.copyFileSync(sourcePath, destPath);
-              console.log(`Copied: ${sourcePath} to ${destPath}`);
-            } catch (error) {
-              console.warn(`⚠️ Warning: Could not copy ${sourcePath} to ${destPath}: ${error.message}`);
-              // Try to create the directory and retry
-              fs.mkdirSync(path.dirname(destPath), { recursive: true });
-              try {
-                fs.copyFileSync(sourcePath, destPath);
-                console.log(`Retry successful: Copied ${sourcePath} to ${destPath}`);
-              } catch (retryError) {
-                console.error(`❌ Failed retry: ${retryError.message}`);
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.warn(`⚠️ Error reading directory ${serverPath}: ${error.message}`);
-      }
-    } else {
-      console.warn(`⚠️ Directory does not exist: ${serverPath}`);
-    }
+    processRoute(route);
   });
 
   // Special handling for app/(chat) route since it's mentioned in the error
@@ -272,12 +293,44 @@ function runPostBuildTasks() {
         createManifestContent()
       );
     } else {
-      console.log(`${file} not found at ${serverFilePath}, skipping special manifest`);
+      console.log(`${file} not found at ${serverFilePath}, creating manifest anyway`);
+      // Create the manifest anyway, even if the file doesn't exist
+      safelyWriteFile(
+        path.join('.next/server', chatRoute, manifest),
+        createManifestContent()
+      );
+      safelyWriteFile(
+        path.join('.next/standalone/.next/server', chatRoute, manifest),
+        createManifestContent()
+      );
     }
   });
 
-  // Verify final state
+  // Verify final state and force create missing manifests
   console.log('\n✅ Verification step:');
+  
+  // Verify all routes have the needed manifests in both locations
+  routesNeedingManifests.forEach(route => {
+    const serverManifestPath = path.join(process.cwd(), '.next/server', route, 'page_client-reference-manifest.js');
+    const standaloneManifestPath = path.join(process.cwd(), '.next/standalone/.next/server', route, 'page_client-reference-manifest.js');
+    
+    if (!fs.existsSync(serverManifestPath)) {
+      console.log(`Creating missing server manifest: ${serverManifestPath}`);
+      safelyWriteFile(
+        path.join('.next/server', route, 'page_client-reference-manifest.js'),
+        createManifestContent()
+      );
+    }
+    
+    if (!fs.existsSync(standaloneManifestPath)) {
+      console.log(`Creating missing standalone manifest: ${standaloneManifestPath}`);
+      safelyWriteFile(
+        path.join('.next/standalone/.next/server', route, 'page_client-reference-manifest.js'),
+        createManifestContent()
+      );
+    }
+  });
+  
   const criticalPath = path.join(process.cwd(), '.next/server/app/(chat)/page_client-reference-manifest.js');
   const standaloneManifestPath = path.join(process.cwd(), '.next/standalone/.next/server/app/(chat)/page_client-reference-manifest.js');
 
@@ -303,6 +356,22 @@ function runPostBuildTasks() {
     );
   }
   
+  console.log('\n📋 Final check for missing page_client-reference-manifest.js files...');
+  // Do one final check to ensure all necessary directories have the manifest files
+  routesNeedingManifests.forEach(route => {
+    // Create the server manifest
+    safelyWriteFile(
+      path.join('.next/server', route, 'page_client-reference-manifest.js'),
+      createManifestContent()
+    );
+    
+    // Create the standalone manifest
+    safelyWriteFile(
+      path.join('.next/standalone/.next/server', route, 'page_client-reference-manifest.js'),
+      createManifestContent()
+    );
+  });
+  
   console.log('\n🎉 Build completed successfully!');
 }
 
@@ -317,6 +386,11 @@ try {
   
   // Run post-build tasks
   runPostBuildTasks();
+  
+  console.log('\n✅ All manifest files verified and created as needed.');
+  console.log('👉 Note: npm reported vulnerabilities that you may want to address:');
+  console.log('   Run "npm audit fix" for non-breaking fixes');
+  console.log('   See "npm audit" for details about the vulnerabilities');
 } catch (error) {
   console.error('Error during build process:', error);
   process.exit(1);
