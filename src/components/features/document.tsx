@@ -1,9 +1,10 @@
 import { memo } from 'react';
 
-import type { ArtifactKind } from './artifact';
+import type { ArtifactKind } from '../../types/artifact';
 import { FileIcon, LoaderIcon, MessageIcon, PencilEditIcon } from '@/src/components/common/icons';
 import { toast } from 'sonner';
 import { useArtifact } from '@/hooks/use-artifact';
+import { notifications } from '@/lib/api-error-handler';
 
 const getActionText = (
   type: 'create' | 'update' | 'request-suggestions',
@@ -42,8 +43,9 @@ function PureDocumentToolResult({
       className="bg-background cursor-pointer border py-2 px-3 rounded-xl w-fit flex flex-row gap-3 items-start"
       onClick={(event) => {
         if (isReadonly) {
-          toast.error(
+          notifications.error(
             'Viewing files in shared chats is currently not supported.',
+            { id: 'shared-file-error' }
           );
           return;
         }
@@ -105,8 +107,9 @@ function PureDocumentToolCall({
       className="cursor pointer w-fit border py-2 px-3 rounded-xl flex flex-row items-start justify-between gap-3"
       onClick={(event) => {
         if (isReadonly) {
-          toast.error(
+          notifications.error(
             'Viewing files in shared chats is currently not supported.',
+            { id: 'shared-file-error' }
           );
           return;
         }

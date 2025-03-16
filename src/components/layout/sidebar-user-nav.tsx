@@ -5,6 +5,7 @@ import type { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
+import { notifications } from '@/lib/api-error-handler';
 
 import {
   DropdownMenu,
@@ -24,19 +25,18 @@ export function SidebarUserNav({ user }: { user: User }) {
   
   const handleSignOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        toast.error('Error signing out');
-        console.error('Sign out error:', error);
-        return;
-      }
-      
-      toast.success('Signed out successfully');
-      router.push('/login');
-      router.refresh();
+      await supabase.auth.signOut();
     } catch (error) {
-      console.error('Sign out exception:', error);
-      toast.error('Failed to sign out');
+      console.error('Error signing out:', error);
+      notifications.error('Error signing out', { id: 'signout-error' });
+      return;
+    }
+
+    if (status === 'unauthenticated') {
+      notifications.success('Signed out successfully', { id: 'signout-success' });
+      router.push('/login');
+    } else {
+      notifications.error('Failed to sign out', { id: 'signout-error' });
     }
   };
   

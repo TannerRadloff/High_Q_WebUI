@@ -35,6 +35,7 @@ import { sanitizeUIMessages } from '@/utils/messages';
 import { ExtendedAttachment } from '@/types';
 import { useFileUpload } from './hooks/useFileUpload';
 import { InputProvider, useInputContext } from './InputContext';
+import { notifications } from '@/lib/api-error-handler';
 
 // Main exported component that uses the context provider
 export function MultimodalInput({
@@ -99,20 +100,15 @@ export function MultimodalInput({
     
     // Only show toast notification if this is not the initial load
     if (!isInitialLoad) {
-      // Check if we've already shown this notification recently (within 2 seconds)
-      const lastToastTime = parseInt(sessionStorage.getItem('last-chat-mode-toast') || '0', 10);
-      const now = Date.now();
+      // Use the centralized notifications system with built-in debouncing
+      const message = isDirectChatMode 
+        ? "Direct chat mode enabled: Chatting directly with the model" 
+        : "Delegation agent mode enabled: Agent will help route your requests";
       
-      if (now - lastToastTime > 2000) {
-        // Update the last toast time
-        sessionStorage.setItem('last-chat-mode-toast', now.toString());
-        
-        toast.info(
-          isDirectChatMode 
-            ? "Direct chat mode enabled: Chatting directly with the model" 
-            : "Delegation agent mode enabled: Agent will help route your requests"
-        );
-      }
+      notifications.info(message, { 
+        id: 'chat-mode-toggle',
+        debounceMs: 2000 
+      });
     }
   }, [isDirectChatMode, isInitialLoad]);
   

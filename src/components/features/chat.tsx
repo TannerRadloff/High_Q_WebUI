@@ -15,7 +15,7 @@ import type { Vote } from '@/lib/db/schema';
 import { fetcher } from '@/utils';
 import { generateUUID } from '@/utils/auth';
 import type { ExtendedAttachment } from '@/types';
-import { logError as logApiError } from '@/lib/api-error-handler';
+import { notifications, showErrorToast } from '@/lib/api-error-handler';
 import { isAuthenticationError, handleAPIError } from '@/utils/auth';
 import { ErrorMessage } from '@/src/components/ui/error-message';
 
@@ -101,7 +101,7 @@ export function Chat({
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      toast.success('Connection restored', { 
+      notifications.success('Connection restored', { 
         id: 'connection-status',
         duration: 3000 
       });
@@ -109,7 +109,7 @@ export function Chat({
     
     const handleOffline = () => {
       setIsOnline(false);
-      toast.error('Network connection lost', { 
+      notifications.error('Network connection lost', { 
         id: 'connection-status',
         duration: Infinity
       });
@@ -125,7 +125,7 @@ export function Chat({
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       // Dismiss the toast when component unmounts
-      toast.dismiss('connection-status');
+      notifications.dismiss('connection-status');
     };
   }, []);
 
@@ -225,7 +225,7 @@ export function Chat({
             throw new Error('No chat ID returned from server');
           }
         } catch (error) {
-          logApiError(error, 'Failed to create new chat');
+          showErrorToast(error, { id: 'create-chat-error' });
           setHasError(true);
           
           // Check if it's an auth error
@@ -322,7 +322,9 @@ export function Chat({
           // Handle other errors
           setErrorType('general');
           setErrorMessage(`API error: ${response.statusText || 'Request failed'}`);
-          toast.error(`API error: ${response.statusText || 'Request failed'}`);
+          notifications.error(`API error: ${response.statusText || 'Request failed'}`, {
+            id: 'chat-api-error'
+          });
         }
       } else {
         // Reset error state on successful response
@@ -345,7 +347,9 @@ export function Chat({
       if (message.content.includes('fallback model')) {
         console.log('[CHAT] Using fallback model detected');
         setUsesFallbackModel(true);
-        toast.warning(`The ${selectedChatModel} model is currently unavailable. Using a fallback model instead.`);
+        notifications.warning(`The ${selectedChatModel} model is currently unavailable. Using a fallback model instead.`, {
+          id: 'fallback-model'
+        });
       }
       
       // Refresh chat history
@@ -367,7 +371,9 @@ export function Chat({
       } else {
         setErrorType('general');
         setErrorMessage('An error occurred while processing your message. Please try again.');
-        toast.error('An error occurred while processing your message. Please try again.');
+        notifications.error('An error occurred while processing your message. Please try again.', {
+          id: 'chat-processing-error'
+        });
       }
     },
   });
@@ -404,7 +410,7 @@ export function Chat({
       
       // If user is offline, show a toast
       if (!isOnline) {
-        toast.error('You are currently offline. Please reconnect to use the chat.', {
+        notifications.error('You are currently offline. Please reconnect to use the chat.', {
           id: 'offline-submit-error'
         });
         return;
@@ -679,7 +685,7 @@ export function Chat({
       
     } catch (error) {
       console.error('Error submitting message with agents:', error);
-      toast.error('Failed to process your message');
+      notifications.error('Failed to process your message', { id: 'message-error' });
       
       // Stop loading state on error
       stop();
@@ -696,6 +702,31 @@ export function Chat({
       setActiveAgents([]);
     }
   }, [isAgentMode]);
+
+  // This function sends the chat state to the clipboard for debugging
+  const sendStateToClipboard = () => {
+    try {
+      const debugText = JSON.stringify(
+        {
+          chatId: id,
+          messageCount: messages.length,
+          modelId: selectedChatModel,
+          visibility: selectedVisibilityType,
+          hasError,
+          errorType,
+          errorMessage
+        },
+        null,
+        2
+      );
+      
+      navigator.clipboard.writeText(debugText);
+      console.log("[CHAT] Debug state copied to clipboard");
+      notifications.info('Debug info copied to clipboard', { id: 'debug-info' });
+    } catch (error) {
+      console.error("[CHAT] Error copying debug info:", error);
+    }
+  };
 
   return (
     <div 

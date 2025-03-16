@@ -1,6 +1,7 @@
 import { useState, useCallback, Dispatch, SetStateAction } from 'react';
 import { toast } from 'sonner';
 import { ExtendedAttachment } from '@/types';
+import { notifications } from '@/lib/api-error-handler';
 
 export function useFileUpload(
   onAttachmentsChange: Dispatch<SetStateAction<Array<ExtendedAttachment>>>
@@ -48,7 +49,9 @@ export function useFileUpload(
         onAttachmentsChange(prevAttachments => [...prevAttachments, ...newAttachments]);
       } catch (error) {
         console.error('Error processing files:', error);
-        toast.error(`Error uploading files: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        notifications.error(`Error uploading files: ${error instanceof Error ? error.message : 'Unknown error'}`, {
+          id: 'file-upload-error'
+        });
       } finally {
         // Clear the input and upload queue
         event.target.value = '';

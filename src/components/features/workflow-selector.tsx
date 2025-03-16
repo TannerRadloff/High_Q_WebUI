@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, memo } from 'react';
 import { motion } from 'framer-motion';
 import { fetchWorkflows } from '@/lib/agent-workflow';
 import { toast } from 'sonner';
+import { notifications } from '@/lib/api-error-handler';
 import { Button } from '@/src/components/ui/button';
 import { Check, ChevronDown } from 'lucide-react';
 import {
@@ -55,7 +56,7 @@ function WorkflowSelectorComponent({
       setWorkflows(workflowSummaries);
     } catch (error) {
       console.error('Error loading workflows:', error);
-      toast.error('Failed to load your agent workflows');
+      notifications.error('Failed to load your agent workflows', { id: 'workflow-load-error' });
     } finally {
       setIsLoading(false);
     }

@@ -59,17 +59,6 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
                 </ClientLayout>
               </main>
             </div>
-            <Toaster
-              position="top-center"
-              toastOptions={{
-                className: 'border rounded-lg shadow-md',
-                classNames: {
-                  toast: 'group',
-                  title: 'group-[.toast]:text-foreground',
-                  description: 'group-[.toast]:text-muted-foreground',
-                },
-              }}
-            />
           </SidebarProvider>
         </ThemeProvider>
       </Providers>
