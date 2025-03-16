@@ -160,8 +160,28 @@ function MessageForm() {
   // Handle form submission
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    submitMessage(e);
+    if (isLoading) {
+      // If loading, stop generation when form is submitted
+      stop();
+      setMessages((messages) => sanitizeUIMessages(messages));
+    } else {
+      // Otherwise submit the message
+      submitMessage(e);
+    }
   };
+  
+  // Add keyboard shortcut to stop generation (Escape key)
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isLoading && event.key === "Escape") {
+        stop();
+        setMessages((messages) => sanitizeUIMessages(messages));
+      }
+    };
+    
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isLoading, stop, setMessages]);
   
   return (
     <form
@@ -359,62 +379,48 @@ function SendButton({
 }) {
   const { input } = useInputContext();
   const handleAgentSubmit = useAgentSubmit();
-  const isDisabled = !input.trim() && uploadQueue.length === 0;
+  const isDisabled = (!input.trim() && uploadQueue.length === 0) || isLoading;
   const hasContent = !!input.trim() || uploadQueue.length > 0;
   
-  // To prevent any key conflicts when rendering with React
-  const buttonKey = isLoading ? 'stop-button' : 'send-button';
+  // Always use send-button as the key
+  const buttonKey = 'send-button';
   
   const handleClick = () => {
-    if (isLoading) {
-      // When loading, the button acts as a stop button
-      onStopGeneration();
-    } else {
-      // Otherwise it sends the message
+    if (!isLoading) {
+      // Only handle submit when not loading
       handleAgentSubmit(input);
     }
   };
   
   return (
-    <ButtonTooltip content={isLoading ? "Stop generation" : "Send message"} side="top">
+    <ButtonTooltip content="Send message" side="top">
       <Button
         key={buttonKey}
         type="button"
         size="icon"
-        variant={isLoading ? "ghost" : "default"}
+        variant="default"
         className={cn(
           // Base styling
           "size-10 rounded-lg flex items-center justify-center",
           "transition-all duration-300 ease-in-out",
           
-          // Conditional styling based on loading state
-          !isLoading && [
-            // Send button styling
-            "bg-primary text-primary-foreground",
-            "hover:bg-primary-600 hover:scale-105", 
-            "hover:shadow-[0_0_15px_rgba(0,130,255,0.7)]",
-            "active:scale-95 active:shadow-[0_0_10px_rgba(0,130,255,0.8)]",
-            "shadow-[0_0_5px_rgba(0,120,255,0.3)]",
-            // Add pulsing animation when there's content to send
-            hasContent && "send-button-pulse",
-          ],
+          // Send button styling
+          "bg-primary text-primary-foreground",
+          "hover:bg-primary-600 hover:scale-105", 
+          "hover:shadow-[0_0_15px_rgba(0,130,255,0.7)]",
+          "active:scale-95 active:shadow-[0_0_10px_rgba(0,130,255,0.8)]",
+          "shadow-[0_0_5px_rgba(0,120,255,0.3)]",
           
-          // Stop button styling when loading
-          isLoading && [
-            "text-destructive-foreground hover:bg-destructive/20",
-            "hover:text-destructive hover:scale-105", 
-            "hover:shadow-[0_0_15px_rgba(255,50,50,0.5)]",
-            "active:scale-95 active:shadow-[0_0_10px_rgba(255,50,50,0.6)]",
-            "shadow-[0_0_5px_rgba(255,50,50,0.2)]"
-          ],
+          // Add pulsing animation when there's content to send
+          hasContent && "send-button-pulse",
           
           // Disabled state
-          !isLoading && isDisabled && "opacity-70 hover:scale-100 hover:shadow-none"
+          isDisabled && "opacity-70 hover:scale-100 hover:shadow-none"
         )}
-        disabled={!isLoading && isDisabled}
+        disabled={isDisabled}
         onClick={handleClick}
-        aria-label={isLoading ? "Stop generation" : "Send message"}
-        data-state={isLoading ? "stop" : "send"}
+        aria-label="Send message"
+        data-state="send"
       >
         <motion.div
           key={`icon-${buttonKey}`}
@@ -423,11 +429,7 @@ function SendButton({
           transition={{ duration: 0.15 }}
           className="flex items-center justify-center"
         >
-          {isLoading ? (
-            <StopIcon size={18} />
-          ) : (
-            <ArrowUpIcon size={18} />
-          )}
+          <ArrowUpIcon size={18} />
         </motion.div>
       </Button>
     </ButtonTooltip>
