@@ -30,9 +30,42 @@ const DEV_MODE = process.env.NODE_ENV === 'development'
  * 2. Handles API routes differently from page routes
  * 3. Redirects unauthenticated users to login for protected routes
  * 4. Includes enhanced logging in development mode
+ * 5. Special handling for Next.js data fetch requests to prevent 500 errors
  */
 export async function middleware(request: NextRequest) {
   try {
+    // SPECIAL CASE: Handle Next.js data fetches to prevent 500 errors
+    const url = new URL(request.url)
+    const pathname = url.pathname
+    
+    // If this is a Next.js data request for index.json (homepage data)
+    if (pathname.includes('/_next/data/') && pathname.endsWith('/index.json')) {
+      // Check for auth cookies before trying to create the Supabase client
+      const hasAuthCookies = checkSupabaseAuthCookies(request)
+      
+      if (!hasAuthCookies) {
+        // Instead of 500 error, redirect to login with proper JSON response
+        // This prevents the client from getting a 500 error
+        console.log('[Middleware] Intercepting unauthenticated data request:', pathname)
+        
+        if (request.method === 'HEAD') {
+          // For HEAD requests, just return a 307 redirect status
+          return NextResponse.redirect(new URL('/login', request.url), { status: 307 })
+        }
+        
+        // For full requests, return a proper JSON response
+        const loginRedirectResponse = NextResponse.redirect(
+          new URL('/login', request.url), 
+          { status: 307 }
+        )
+        
+        // Add content type for data requests
+        loginRedirectResponse.headers.set('Content-Type', 'application/json')
+        
+        return loginRedirectResponse
+      }
+    }
+    
     // Create a Supabase client configured to use cookies
     const { supabase, response } = createMiddlewareClient(request)
 
@@ -42,6 +75,26 @@ export async function middleware(request: NextRequest) {
 
     return response
   } catch (e) {
+    // Handle critical errors gracefully to avoid 500 responses
+    console.error('[Middleware] Critical error:', e)
+    
+    const url = new URL(request.url)
+    const pathname = url.pathname
+    
+    // If this is a Next.js data request, return a specialized response instead of 500
+    if (pathname.includes('/_next/data/')) {
+      if (request.method === 'HEAD') {
+        // For HEAD requests, respond with 307 redirect
+        return NextResponse.redirect(new URL('/login', request.url), { status: 307 })
+      }
+      
+      // Create a proper JSON error response
+      return NextResponse.json(
+        { error: 'Authentication required', redirectTo: '/login' },
+        { status: 401 }
+      )
+    }
+    
     // If you are here, a Supabase client could not be created!
     // This is likely because you have not set up environment variables.
     // Check your env vars: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY

@@ -251,19 +251,74 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const refreshSession = async () => {
     try {
+      console.log('[AuthProvider] Attempting to refresh session...')
+      
+      // First try to refresh the session
       const { data, error } = await supabase.auth.refreshSession()
       
       if (error) {
-        console.error('Session refresh error:', error)
+        console.error('[AuthProvider] Session refresh error:', error)
+        
+        // Check if it's a network error vs auth error
+        if (error.message.includes('network') || error.message.includes('fetch')) {
+          console.log('[AuthProvider] Network error during refresh - will retry')
+          
+          // Wait a moment and try one more time for network issues
+          await new Promise(resolve => setTimeout(resolve, 1500))
+          
+          // One more attempt
+          const retryResult = await supabase.auth.refreshSession()
+          if (retryResult.error) {
+            console.error('[AuthProvider] Retry session refresh also failed:', retryResult.error)
+            throw retryResult.error
+          }
+          
+          if (retryResult.data && retryResult.data.session) {
+            console.log('[AuthProvider] Session refresh successful on retry')
+            setSession(retryResult.data.session)
+            setUser(retryResult.data.session.user)
+            return
+          }
+        }
+        
+        // For auth errors or failed retries, sign out gracefully
+        console.log('[AuthProvider] Session could not be refreshed - signing out')
+        
+        // Don't throw, try to clean up quietly
+        try {
+          await supabase.auth.signOut()
+          setSession(null)
+          setUser(null)
+          
+          // Clear any auth-related storage
+          try {
+            localStorage.removeItem('auth_redirect_count')
+            sessionStorage.removeItem('homeRedirectCount')
+            sessionStorage.removeItem('home_last_redirect')
+            sessionStorage.removeItem('last_auth_redirect')
+            sessionStorage.removeItem('last_auth_redirect_path')
+          } catch (storageError) {
+            console.error('[AuthProvider] Storage cleanup error:', storageError)
+          }
+        } catch (signOutError) {
+          console.error('[AuthProvider] Error during sign out:', signOutError)
+        }
+        
         throw error
       }
       
       if (data && data.session) {
+        console.log('[AuthProvider] Session refreshed successfully')
         setSession(data.session)
         setUser(data.session.user)
+      } else {
+        console.log('[AuthProvider] No session returned from refresh')
+        // Silently clear the state without an error
+        setSession(null)
+        setUser(null)
       }
     } catch (error: any) {
-      console.error('Failed to refresh session:', error)
+      console.error('[AuthProvider] Failed to refresh session:', error)
       throw error
     }
   }
