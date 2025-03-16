@@ -244,7 +244,7 @@ function InputContainer({ className }: { className?: string }) {
                   className="flex-shrink-0 p-1 rounded-full bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-800/50 text-blue-700 dark:text-blue-300 transition-colors"
                   aria-label="Stop generation"
                 >
-                  <StopIcon className="h-3 w-3" />
+                  <StopIcon size={12} />
                 </button>
               )}
             </div>
@@ -492,6 +492,41 @@ function useSubmitMessage() {
       console.log('[MultimodalInput] Prevented form submission with no input and no attachments');
     }
   }, [input, attachments, contextHandleSubmit, setAttachments, resetTextarea]);
+}
+
+// Message form component
+function MessageForm() {
+  const { 
+    isLoading,
+    attachments 
+  } = useInputContext();
+  const submitMessage = useSubmitMessage();
+  
+  // Use empty array as default for uploadQueue
+  const uploadQueue: string[] = [];
+  
+  return (
+    <form 
+      onSubmit={submitMessage}
+      className="flex items-center gap-2 w-full"
+    >
+      <div className="flex-1 relative">
+        <TextareaInput />
+      </div>
+      
+      <div className="flex items-center gap-2">
+        <AttachButton 
+          onClick={() => document.getElementById('file-upload')?.click()} 
+          disabled={isLoading} 
+        />
+        <SendButton 
+          uploadQueue={uploadQueue} 
+          isLoading={isLoading} 
+          onStopGeneration={() => {}} 
+        />
+      </div>
+    </form>
+  );
 }
 
 // Button tooltip component
