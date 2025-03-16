@@ -1,7 +1,7 @@
 'use client';
 
 import { useChat } from 'ai/react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { artifactDefinitions } from '@/src/components/features/artifact';
 import type { ArtifactKind } from '@/src/types/artifact';
 import type { Suggestion } from '@/lib/db/schema';
@@ -28,11 +28,17 @@ export type DataStreamDelta = {
 };
 
 export function DataStreamHandler({ id }: { id: string }) {
+  // Add a state to prevent automatic submission
+  const [shouldSubmit, setShouldSubmit] = useState(false);
+  
   const { data: dataStream } = useChat({ 
     id,
     initialInput: "",
-    initialMessages: []
+    initialMessages: [],
+    // Prevent automatic submission of empty query
+    api: shouldSubmit ? '/api/agent-query' : undefined
   });
+  
   const { artifact, setArtifact, setMetadata } = useArtifact();
   const lastProcessedIndex = useRef(-1);
 
