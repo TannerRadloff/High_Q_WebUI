@@ -136,12 +136,12 @@ function MessageForm() {
   const { 
     input,
     isLoading,
+    stop,
     attachments, 
-    setAttachments
+    setAttachments,
+    setMessages
   } = useInputContext();
   
-  // Local state to track button visibility
-  const [showStopButton, setShowStopButton] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const submitMessage = useSubmitMessage();
   
@@ -156,19 +156,6 @@ function MessageForm() {
       setAttachments(attachments.filter((_, i) => i !== index));
     }
   };
-  
-  // Update button visibility based on loading state
-  useEffect(() => {
-    if (isLoading) {
-      setShowStopButton(true);
-    } else {
-      // Small delay to ensure smooth transition
-      const timer = setTimeout(() => {
-        setShowStopButton(false);
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [isLoading]);
   
   // Handle form submission
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -205,7 +192,7 @@ function MessageForm() {
         >
           <TextareaInput />
           
-          {/* Send/Stop button container */}
+          {/* Send button container */}
           <div 
             className={cn(
               "absolute bottom-1 right-1.5",
@@ -214,31 +201,14 @@ function MessageForm() {
               "send-button-container"
             )}
           >
-            <AnimatePresence mode="wait">
-              {showStopButton ? (
-                <motion.div
-                  key="stop"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.2 }}
-                  className="absolute bottom-0 right-0"
-                >
-                  <StopButton />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="send"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.2 }}
-                  className="absolute bottom-0 right-0"
-                >
-                  <SendButton uploadQueue={uploadQueue} />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <SendButton 
+              uploadQueue={uploadQueue} 
+              isLoading={isLoading}
+              onStopGeneration={() => {
+                stop();
+                setMessages((messages) => sanitizeUIMessages(messages));
+              }}
+            />
           </div>
         </motion.div>
 
@@ -379,9 +349,13 @@ function TextareaInput() {
 
 // Send button component with callback
 function SendButton({ 
-  uploadQueue
+  uploadQueue,
+  isLoading,
+  onStopGeneration
 }: { 
   uploadQueue: string[];
+  isLoading: boolean;
+  onStopGeneration: () => void;
 }) {
   const { input } = useInputContext();
   const handleAgentSubmit = useAgentSubmit();
@@ -389,75 +363,53 @@ function SendButton({
   const hasContent = !!input.trim() || uploadQueue.length > 0;
   
   const handleClick = () => {
-    handleAgentSubmit(input);
+    if (isLoading) {
+      // When loading, the button acts as a stop button
+      onStopGeneration();
+    } else {
+      // Otherwise it sends the message
+      handleAgentSubmit(input);
+    }
   };
   
   return (
-    <ButtonTooltip content="Send message" side="top">
+    <ButtonTooltip content={isLoading ? "Stop generation" : "Send message"} side="top">
       <Button
         type="button"
         size="icon"
-        variant="default"
+        variant={isLoading ? "ghost" : "default"}
         className={cn(
-          // Increase size from size-8 to size-10
-          "size-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center",
-          // Enhanced hover effects with stronger glow and color change
-          "transition-all duration-300 ease-in-out",
-          "hover:bg-primary-600 hover:scale-105", 
-          "hover:shadow-[0_0_15px_rgba(0,130,255,0.7)]",
-          "active:scale-95 active:shadow-[0_0_10px_rgba(0,130,255,0.8)]",
-          // Stronger resting state with subtle glow
-          "shadow-[0_0_5px_rgba(0,120,255,0.3)]",
-          // Add pulsing animation when there's content to send
-          hasContent && "send-button-pulse",
-          isDisabled && "opacity-70 hover:scale-100 hover:shadow-none"
-        )}
-        disabled={isDisabled}
-        onClick={handleClick}
-        aria-label="Send message"
-      >
-        <motion.div
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          transition={{ duration: 0.15 }}
-          className="flex items-center justify-center"
-        >
-          <ArrowUpIcon size={18} />
-        </motion.div>
-      </Button>
-    </ButtonTooltip>
-  );
-}
-
-// Stop button component with callback
-function StopButton() {
-  const { stop, setMessages } = useInputContext();
-  
-  const handleClick = () => {
-    stop();
-    setMessages((messages) => sanitizeUIMessages(messages));
-  };
-  
-  return (
-    <ButtonTooltip content="Stop generation" side="top">
-      <Button
-        type="button"
-        size="icon"
-        variant="ghost"
-        className={cn(
-          // Match size with SendButton for consistency
+          // Base styling
           "size-10 rounded-lg flex items-center justify-center",
-          // Enhanced hover effects with destructive color theme
           "transition-all duration-300 ease-in-out",
-          "text-destructive-foreground hover:bg-destructive/20",
-          "hover:text-destructive hover:scale-105", 
-          "hover:shadow-[0_0_15px_rgba(255,50,50,0.5)]",
-          "active:scale-95 active:shadow-[0_0_10px_rgba(255,50,50,0.6)]",
-          // Subtle glow in resting state
-          "shadow-[0_0_5px_rgba(255,50,50,0.2)]"
+          
+          // Conditional styling based on loading state
+          !isLoading && [
+            // Send button styling
+            "bg-primary text-primary-foreground",
+            "hover:bg-primary-600 hover:scale-105", 
+            "hover:shadow-[0_0_15px_rgba(0,130,255,0.7)]",
+            "active:scale-95 active:shadow-[0_0_10px_rgba(0,130,255,0.8)]",
+            "shadow-[0_0_5px_rgba(0,120,255,0.3)]",
+            // Add pulsing animation when there's content to send
+            hasContent && "send-button-pulse",
+          ],
+          
+          // Stop button styling when loading
+          isLoading && [
+            "text-destructive-foreground hover:bg-destructive/20",
+            "hover:text-destructive hover:scale-105", 
+            "hover:shadow-[0_0_15px_rgba(255,50,50,0.5)]",
+            "active:scale-95 active:shadow-[0_0_10px_rgba(255,50,50,0.6)]",
+            "shadow-[0_0_5px_rgba(255,50,50,0.2)]"
+          ],
+          
+          // Disabled state
+          !isLoading && isDisabled && "opacity-70 hover:scale-100 hover:shadow-none"
         )}
+        disabled={!isLoading && isDisabled}
         onClick={handleClick}
-        aria-label="Stop generation"
+        aria-label={isLoading ? "Stop generation" : "Send message"}
       >
         <motion.div
           whileHover={{ scale: 1.1 }}
@@ -465,7 +417,11 @@ function StopButton() {
           transition={{ duration: 0.15 }}
           className="flex items-center justify-center"
         >
-          <StopIcon size={18} /> {/* Match icon size with SendButton */}
+          {isLoading ? (
+            <StopIcon size={18} />
+          ) : (
+            <ArrowUpIcon size={18} />
+          )}
         </motion.div>
       </Button>
     </ButtonTooltip>
