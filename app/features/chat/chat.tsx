@@ -32,6 +32,11 @@ import { processWithAgents } from '@/lib/agents/agentService';
 import { WorkflowSelector } from './workflow-selector';
 import { executeWorkflow } from '@/lib/agents/workflowService';
 
+// Lazy load the workflow selector component
+const WorkflowSelector = dynamic(() => import('@/src/components/features/workflow-selector'), {
+  ssr: false,
+});
+
 // Add type declaration for window.generateRandomStars
 declare global {
   interface Window {
