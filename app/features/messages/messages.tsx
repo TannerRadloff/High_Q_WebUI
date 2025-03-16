@@ -1,6 +1,6 @@
 import type { ChatRequestOptions, Message } from 'ai';
 import { PreviewMessage, ThinkingMessage } from './message';
-import { useScrollToBottom } from '@/hooks';
+import { useScrollToBottom } from '@/app/utils/hooks';
 import { Overview } from './overview';
 import { memo } from 'react';
 import type { Vote } from '@/lib/db/schema';

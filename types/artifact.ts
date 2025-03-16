@@ -13,4 +13,4 @@ export interface UIArtifact {
   };
 }
 
-export type ArtifactKind = string; 
+export type ArtifactKind = string;

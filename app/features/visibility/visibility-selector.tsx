@@ -16,7 +16,7 @@ import {
   GlobeIcon,
   LockIcon,
 } from '@/app/features/icons/icons';
-import { useChatVisibility } from '@/hooks/use-chat-visibility';
+import { useChatVisibility } from '@/app/utils/hooks/use-chat-visibility';
 
 export type VisibilityType = 'private' | 'public';
 

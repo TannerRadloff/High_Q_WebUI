@@ -12,7 +12,7 @@ import {
 } from '@/src/components/common/icons';
 import { toast } from 'sonner';
 import { generateUUID } from '@/lib/utils';
-import type { UIArtifact } from '@/src/types/artifact';
+import type { UIArtifact } from '@/types/artifact';
 import {
   Console,
   type ConsoleOutput,

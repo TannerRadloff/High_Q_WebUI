@@ -1,5 +1,5 @@
 import { getServerSession } from '@/lib/auth';
-import type { ArtifactKind } from '@/src/types/artifact';
+import type { ArtifactKind } from '@/types/artifact';
 import {
   deleteDocumentsByIdAfterTimestamp,
   getDocumentsById,

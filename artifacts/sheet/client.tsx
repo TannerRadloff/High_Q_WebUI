@@ -7,7 +7,7 @@ import {
   UndoIcon,
 } from '@/src/components/common/icons';
 import { SpreadsheetEditor } from '@/src/components/common/sheet-editor';
-import type { UIArtifact } from '@/src/types/artifact';
+import type { UIArtifact } from '@/types/artifact';
 import { parse, unparse } from 'papaparse';
 import { toast } from 'sonner';
 

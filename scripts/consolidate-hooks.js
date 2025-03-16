@@ -1,297 +1,208 @@
 /**
- * Hooks Consolidation Script
+ * Hook Consolidation Script
  * 
- * This script consolidates duplicate hook implementations between
- * src/hooks and app/utils/hooks directories into a canonical location
- * under lib/hooks.
+ * This script consolidates duplicate hooks from src/hooks to app/utils/hooks
+ * and updates imports throughout the codebase.
  * 
- * Usage: node scripts/consolidate-hooks.js [--hook HookName]
+ * Usage: node scripts/consolidate-hooks.js --hook HookName
+ * Example: node scripts/consolidate-hooks.js --hook useChatVisibility
  */
 
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
-
-console.log('Starting hooks consolidation process...');
 
 // Parse command line arguments
 const args = process.argv.slice(2);
-let specificHook = '';
+let hookName = '';
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--hook' && args[i + 1]) {
-    specificHook = args[i + 1];
+    hookName = args[i + 1];
     break;
   }
 }
 
-// Define source directories to check for hooks
-const sourceDirs = [
-  path.join('src', 'hooks'),
-  path.join('app', 'utils', 'hooks')
-];
-
-// Define the canonical directory for hooks
-const canonicalDir = path.join('lib', 'hooks');
-
-// Get all hook files from a directory
-function getHookFiles(dir) {
-  if (!fs.existsSync(dir)) {
-    return [];
-  }
-  
-  try {
-    return fs.readdirSync(dir)
-      .filter(file => 
-        (file.endsWith('.ts') || file.endsWith('.tsx')) && 
-        file.startsWith('use-') &&
-        file !== 'index.ts' &&
-        fs.statSync(path.join(dir, file)).isFile()
-      );
-  } catch (error) {
-    console.error(`Error reading directory ${dir}: ${error.message}`);
-    return [];
-  }
+if (!hookName) {
+  console.error('Error: Hook name is required');
+  console.log('Usage: node scripts/consolidate-hooks.js --hook HookName');
+  process.exit(1);
 }
 
-// Process a hook file
-async function processHook(hookFile) {
-  console.log(`\nProcessing hook: ${hookFile}`);
-  
-  // Check if hook already exists in canonical location
-  const canonicalPath = path.join(canonicalDir, hookFile);
-  const srcPath = path.join('src', 'hooks', hookFile);
-  const appPath = path.join('app', 'utils', 'hooks', hookFile);
-  
-  // Ensure canonical directory exists
-  if (!fs.existsSync(canonicalDir)) {
-    console.log(`Creating canonical directory: ${canonicalDir}`);
-    fs.mkdirSync(canonicalDir, { recursive: true });
-  }
-  
-  // Check if hook already exists in canonical location
-  if (fs.existsSync(canonicalPath)) {
-    console.log(`Hook already exists in canonical location: ${canonicalPath}`);
+// Convert camelCase to kebab-case for file paths
+function toKebabCase(str) {
+  return str
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .toLowerCase();
+}
+
+// Configuration
+const hookKebab = toKebabCase(hookName);
+
+const srcPath = path.join('src', 'hooks', `${hookKebab}.ts`);
+const srcTsxPath = path.join('src', 'hooks', `${hookKebab}.tsx`);
+const destPath = path.join('app', 'utils', 'hooks', `${hookKebab}.ts`);
+const destTsxPath = path.join('app', 'utils', 'hooks', `${hookKebab}.tsx`);
+const srcIndexPath = path.join('src', 'hooks', 'index.ts');
+const destIndexPath = path.join('app', 'utils', 'hooks', 'index.ts');
+
+console.log(`Consolidating hook: ${hookName} (${hookKebab})`);
+
+// 1. Ensure destination directory exists
+if (!fs.existsSync(path.join('app', 'utils', 'hooks'))) {
+  console.log('Creating directory: app/utils/hooks');
+  fs.mkdirSync(path.join('app', 'utils', 'hooks'), { recursive: true });
+}
+
+// 2. Check if the hook exists in the source location
+let hookContent = '';
+let sourceFile = '';
+let destFile = '';
+
+if (fs.existsSync(srcPath)) {
+  console.log(`Found hook at: ${srcPath}`);
+  hookContent = fs.readFileSync(srcPath, 'utf8');
+  sourceFile = srcPath;
+  destFile = destPath;
+} else if (fs.existsSync(srcTsxPath)) {
+  console.log(`Found hook at: ${srcTsxPath}`);
+  hookContent = fs.readFileSync(srcTsxPath, 'utf8');
+  sourceFile = srcTsxPath;
+  destFile = destTsxPath;
+} else {
+  console.error(`Hook ${hookName} not found at ${srcPath} or ${srcTsxPath}`);
+  process.exit(1);
+}
+
+// 3. Check if hook already exists in destination
+if (fs.existsSync(destFile)) {
+  console.log(`Hook already exists at: ${destFile}`);
+  // Compare the content to see if it needs updating
+  const existingContent = fs.readFileSync(destFile, 'utf8');
+  if (existingContent.trim() === hookContent.trim()) {
+    console.log('Existing hook is identical, no need to update.');
   } else {
-    // Copy hook from src or app directory to canonical location
-    if (fs.existsSync(srcPath)) {
-      console.log(`Copying from src/hooks to canonical location: ${canonicalPath}`);
-      fs.copyFileSync(srcPath, canonicalPath);
-    } else if (fs.existsSync(appPath)) {
-      console.log(`Copying from app/utils/hooks to canonical location: ${canonicalPath}`);
-      fs.copyFileSync(appPath, canonicalPath);
-    } else {
-      console.error(`Hook not found in either src/hooks or app/utils/hooks: ${hookFile}`);
-      return { status: 'error', hook: hookFile };
-    }
+    console.log('Updating existing hook with the source version.');
+    fs.writeFileSync(destFile, hookContent);
   }
-  
-  // Update index.ts in canonical directory
-  const indexPath = path.join(canonicalDir, 'index.ts');
-  const exportLine = `export * from './${hookFile.replace('.ts', '').replace('.tsx', '')}';`;
-  
+} else {
+  // Copy hook to destination
+  console.log(`Copying hook to: ${destFile}`);
+  fs.writeFileSync(destFile, hookContent);
+}
+
+// 4. Update index files
+function updateIndex(indexPath, hookKebab) {
   if (fs.existsSync(indexPath)) {
-    const currentContent = fs.readFileSync(indexPath, 'utf8');
-    if (!currentContent.includes(exportLine)) {
-      console.log(`Updating index.ts at: ${indexPath}`);
-      fs.appendFileSync(indexPath, `\n${exportLine}`);
+    const indexContent = fs.readFileSync(indexPath, 'utf8');
+    const exportStatement = `export * from './${hookKebab}';`;
+    
+    if (!indexContent.includes(exportStatement)) {
+      console.log(`Updating index at: ${indexPath}`);
+      fs.appendFileSync(indexPath, `\n${exportStatement}\n`);
     }
   } else {
-    console.log(`Creating index.ts at: ${indexPath}`);
-    const indexContent = `/**
+    console.log(`Creating index at: ${indexPath}`);
+    fs.writeFileSync(indexPath, `/**
  * Hooks
  * 
  * This barrel file exports all custom hooks
  */
 
-${exportLine}
-`;
-    fs.writeFileSync(indexPath, indexContent);
-  }
-  
-  // Remove hook from src/hooks and app/utils/hooks
-  if (fs.existsSync(srcPath) && srcPath !== canonicalPath) {
-    console.log(`Removing hook from src/hooks: ${srcPath}`);
-    try {
-      fs.unlinkSync(srcPath);
-    } catch (error) {
-      console.error(`Error removing file: ${error.message}`);
-    }
-  }
-  
-  if (fs.existsSync(appPath) && appPath !== canonicalPath) {
-    console.log(`Removing hook from app/utils/hooks: ${appPath}`);
-    try {
-      fs.unlinkSync(appPath);
-    } catch (error) {
-      console.error(`Error removing file: ${error.message}`);
-    }
-  }
-  
-  // Update imports throughout the codebase
-  await updateImports(hookFile);
-  
-  return { status: 'success', hook: hookFile };
-}
-
-// Update imports throughout the codebase
-async function updateImports(hookFile) {
-  console.log(`Updating imports for ${hookFile} throughout the codebase...`);
-  
-  const hookName = hookFile.replace('.ts', '').replace('.tsx', '');
-  
-  // Use grep to find all imports of this hook
-  return new Promise((resolve, reject) => {
-    exec(`npx grep-cli -r "from ['\\\"]@\\/hooks\\/${hookName}['\\\"]|from ['\\\"]@\\/src\\/hooks\\/${hookName}['\\\"]|from ['\\\"]@\\/app\\/utils\\/hooks\\/${hookName}['\\\"]" --include="*.{ts,tsx,js,jsx}" ./app ./src ./components`, (error, stdout) => {
-      if (error && error.code !== 1) { // grep returns 1 if no matches
-        console.error(`Error searching for imports: ${error.message}`);
-        reject(error);
-        return;
-      }
-      
-      const filesToUpdate = stdout.split('\n')
-        .filter(line => line.trim())
-        .map(line => line.split(':')[0])
-        .filter((file, index, self) => self.indexOf(file) === index); // Remove duplicates
-      
-      console.log(`Found ${filesToUpdate.length} files with imports to update`);
-      
-      for (const file of filesToUpdate) {
-        try {
-          let content = fs.readFileSync(file, 'utf8');
-          
-          // Replace imports
-          content = content.replace(
-            new RegExp(`from ['"]@/hooks/${hookName}['"]`, 'g'),
-            `from '@/lib/hooks/${hookName}'`
-          );
-          
-          content = content.replace(
-            new RegExp(`from ['"]@/src/hooks/${hookName}['"]`, 'g'),
-            `from '@/lib/hooks/${hookName}'`
-          );
-          
-          content = content.replace(
-            new RegExp(`from ['"]@/app/utils/hooks/${hookName}['"]`, 'g'),
-            `from '@/lib/hooks/${hookName}'`
-          );
-          
-          fs.writeFileSync(file, content);
-          console.log(`Updated imports in: ${file}`);
-        } catch (error) {
-          console.error(`Error updating file ${file}: ${error.message}`);
-        }
-      }
-      
-      resolve();
-    });
-  });
-}
-
-// Update index files
-async function updateIndexFiles() {
-  // Update src/hooks/index.ts to re-export from lib/hooks
-  const srcIndexPath = path.join('src', 'hooks', 'index.ts');
-  if (fs.existsSync(srcIndexPath)) {
-    console.log(`Updating src/hooks/index.ts to re-export from lib/hooks`);
-    const content = `/**
- * Hooks
- * 
- * This file re-exports hooks from the canonical lib/hooks directory
- */
-
-export * from '@/lib/hooks';
-`;
-    fs.writeFileSync(srcIndexPath, content);
-  }
-  
-  // Update app/utils/hooks/index.ts to re-export from lib/hooks
-  const appIndexPath = path.join('app', 'utils', 'hooks', 'index.ts');
-  if (fs.existsSync(appIndexPath)) {
-    console.log(`Updating app/utils/hooks/index.ts to re-export from lib/hooks`);
-    const content = `/**
- * Hooks
- * 
- * This file re-exports hooks from the canonical lib/hooks directory
- */
-
-export * from '@/lib/hooks';
-`;
-    fs.writeFileSync(appIndexPath, content);
+export * from './${hookKebab}';\n`);
   }
 }
 
-async function consolidateHooks() {
-  let hooksToProcess = [];
+// Update destination index
+updateIndex(destIndexPath, hookKebab);
+
+// 5. Update imports throughout the codebase
+console.log('Updating imports throughout the codebase...');
+
+// Define find patterns and replacement patterns
+const findPatterns = [
+  `from '@/src/hooks/${hookKebab}'`,
+  `from '@/hooks/${hookKebab}'`,
+  `from '@/src/hooks'`,
+  `from '@/hooks'`,
+];
+
+const replacePatterns = [
+  `from '@/app/utils/hooks/${hookKebab}'`,
+  `from '@/app/utils/hooks/${hookKebab}'`,
+  `from '@/app/utils/hooks'`,
+  `from '@/app/utils/hooks'`,
+];
+
+// Recursively search and update files
+function updateImports(dir) {
+  const fileTypes = ['.ts', '.tsx', '.js', '.jsx'];
+  const excludeDirs = ['node_modules', '.git', '.next', 'dist', 'build'];
   
-  if (specificHook) {
-    // Process only the specified hook
-    const hookFile = specificHook.endsWith('.ts') || specificHook.endsWith('.tsx') 
-      ? specificHook 
-      : `${specificHook}.ts`; // Default to .ts extension
+  if (!fs.existsSync(dir)) {
+    console.log(`Directory not found: ${dir}`);
+    return;
+  }
+  
+  const files = fs.readdirSync(dir);
+  
+  for (const file of files) {
+    const fullPath = path.join(dir, file);
     
-    hooksToProcess.push(hookFile);
-  } else {
-    // Find all hooks across directories
-    for (const dir of sourceDirs) {
-      const hooks = getHookFiles(dir);
+    try {
+      if (fs.statSync(fullPath).isDirectory()) {
+        if (!excludeDirs.includes(file)) {
+          updateImports(fullPath);
+        }
+        continue;
+      }
       
-      for (const hook of hooks) {
-        if (!hooksToProcess.includes(hook)) {
-          hooksToProcess.push(hook);
+      if (!fileTypes.includes(path.extname(file))) {
+        continue;
+      }
+      
+      let content = fs.readFileSync(fullPath, 'utf8');
+      let modified = false;
+      
+      // Update direct imports
+      for (let i = 0; i < findPatterns.length; i++) {
+        if (content.includes(findPatterns[i])) {
+          content = content.replace(
+            new RegExp(findPatterns[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+            replacePatterns[i]
+          );
+          modified = true;
         }
       }
-    }
-  }
-  
-  console.log(`Found ${hooksToProcess.length} hooks to consolidate`);
-  
-  // Process each hook
-  const results = {
-    success: [],
-    error: []
-  };
-  
-  for (const hook of hooksToProcess) {
-    try {
-      const result = await processHook(hook);
       
-      if (result.status === 'success') {
-        results.success.push(result.hook);
-      } else {
-        results.error.push(result.hook);
+      // Update named imports from index
+      if (content.includes(`import { ${hookName} } from '@/src/hooks'`) || 
+          content.includes(`import { ${hookName} } from '@/hooks'`)) {
+        content = content
+          .replace(`import { ${hookName} } from '@/src/hooks'`, `import { ${hookName} } from '@/app/utils/hooks'`)
+          .replace(`import { ${hookName} } from '@/hooks'`, `import { ${hookName} } from '@/app/utils/hooks'`);
+        modified = true;
       }
       
-      // Small delay to avoid file system race conditions
-      await new Promise(resolve => setTimeout(resolve, 500));
+      if (modified) {
+        console.log(`Updated imports in: ${fullPath}`);
+        fs.writeFileSync(fullPath, content);
+      }
     } catch (error) {
-      console.error(`Error processing hook ${hook}: ${error.message}`);
-      results.error.push(hook);
+      console.error(`Error processing file ${fullPath}: ${error.message}`);
     }
-  }
-  
-  // Update index files to re-export from lib/hooks
-  await updateIndexFiles();
-  
-  // Print summary
-  console.log('\n--- Hooks Consolidation Summary ---');
-  console.log(`Hooks found: ${hooksToProcess.length}`);
-  console.log(`Successfully consolidated: ${results.success.length}`);
-  console.log(`Errors: ${results.error.length}`);
-  
-  if (results.error.length > 0) {
-    console.log('\nHooks with errors:');
-    results.error.forEach(hook => console.log(`- ${hook}`));
-  }
-  
-  if (results.success.length > 0) {
-    console.log('\nSuccessfully consolidated hooks:');
-    results.success.forEach(hook => console.log(`- ${hook}`));
   }
 }
 
-// Start the consolidation process
-consolidateHooks().catch(error => {
-  console.error('Unhandled error during consolidation:', error);
-  process.exit(1);
-}); 
+// Start updating imports
+updateImports('./src');
+updateImports('./app');
+updateImports('./lib');
+updateImports('./components');
+
+// 6. Remove the original file (only if we've successfully copied it)
+if (fs.existsSync(destFile) && fs.existsSync(sourceFile)) {
+  console.log(`Removing original hook at: ${sourceFile}`);
+  fs.unlinkSync(sourceFile);
+}
+
+console.log(`Hook ${hookName} has been successfully consolidated!`); 

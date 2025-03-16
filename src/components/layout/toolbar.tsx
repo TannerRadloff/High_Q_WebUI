@@ -33,7 +33,7 @@ import {
   SummarizeIcon,
 } from '@/app/features/icons/icons';
 import { artifactDefinitions } from '@/app/features/artifact/artifact';
-import type { ArtifactKind } from '@/src/types/artifact';
+import type { ArtifactKind } from '@/types/artifact';
 import type { ArtifactToolbarItem } from '@/app/features/artifacts/create-artifact';
 import type { UseChatHelpers } from 'ai/react';
 

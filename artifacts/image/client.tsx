@@ -1,7 +1,7 @@
 import { Artifact } from '@/src/components/features/create-artifact';
 import { CopyIcon, RedoIcon, UndoIcon } from '@/src/components/common/icons';
 import { ImageEditor } from '@/src/components/common/image-editor';
-import type { UIArtifact } from '@/src/types/artifact';
+import type { UIArtifact } from '@/types/artifact';
 import { toast } from 'sonner';
 
 export const imageArtifact = new Artifact({

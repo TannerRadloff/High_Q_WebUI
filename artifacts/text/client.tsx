@@ -11,7 +11,7 @@ import {
   UndoIcon,
 } from '@/src/components/common/icons';
 import type { Suggestion } from '@/lib/db/schema';
-import type { UIArtifact } from '@/src/types/artifact';
+import type { UIArtifact } from '@/types/artifact';
 import { toast } from 'sonner';
 import { getSuggestions } from '../actions';
 

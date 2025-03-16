@@ -1,7 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
-import type { UIArtifact, ArtifactKind } from '@/src/types/artifact';
+import type { UIArtifact, ArtifactKind } from '@/types/artifact';
 import { useCallback, useMemo } from 'react';
 
 export const initialArtifactData: UIArtifact = {

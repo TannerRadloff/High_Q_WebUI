@@ -47,7 +47,7 @@ import {
 } from '@/app/features/sidebar/sidebar';
 import type { Chat } from '@/lib/db/schema';
 import { fetcher } from '@/lib/utils';
-import { useChatVisibility } from '@/hooks/use-chat-visibility';
+import { useChatVisibility } from '@/app/utils/hooks/use-chat-visibility';
 import { isAuthenticationError, handleAPIError } from '@/utils/auth';
 import { ErrorMessage } from '@/src/components/ui/error-message';
 
