@@ -1,6 +1,7 @@
 import { Agent, Runner, set_default_openai_key, set_tracing_export_api_key, set_tracing_disabled, handoff, Handoff } from './openai-agents';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
+import OpenAI from 'openai';
 
 // Define the AgentStatus interface directly
 export interface AgentStatus {
@@ -468,4 +469,59 @@ async function getDelegationAgent(): Promise<Agent> {
   agentInstances.set(delegationId, agent);
   
   return agent;
+}
+
+/**
+ * Process a message directly with OpenAI model without delegation
+ */
+export async function processDirectChat(
+  message: string,
+  previousMessages: any[] = [],
+  chatId: string
+): Promise<string> {
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+  });
+  
+  try {
+    // Format messages for the OpenAI chat API
+    const formattedMessages = formatMessagesForOpenAI(previousMessages, message);
+    
+    // Call the API with the model
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: formattedMessages,
+      temperature: 0.7,
+      max_tokens: 4000
+    });
+    
+    // Return the completion text
+    return completion.choices[0]?.message?.content || "Sorry, I couldn't generate a response";
+  } catch (error) {
+    console.error('Error in direct chat processing:', error);
+    return "Sorry, there was an error processing your request.";
+  }
+}
+
+/**
+ * Format messages for the OpenAI chat API
+ */
+function formatMessagesForOpenAI(previousMessages: any[], newMessage: string): any[] {
+  // If no previous messages, just return a single user message
+  if (!previousMessages || previousMessages.length === 0) {
+    return [{ role: "user", content: newMessage }];
+  }
+  
+  // Format previous messages for OpenAI API
+  const formattedMessages = previousMessages.map(msg => {
+    return {
+      role: msg.role === 'user' ? 'user' : 'assistant',
+      content: msg.content
+    };
+  });
+  
+  // Add the new message
+  formattedMessages.push({ role: "user", content: newMessage });
+  
+  return formattedMessages;
 } 

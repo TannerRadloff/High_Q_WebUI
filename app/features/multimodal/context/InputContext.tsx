@@ -33,6 +33,10 @@ interface InputContextType {
   
   // Configuration
   selectedWorkflowId?: string | null;
+  
+  // Chat mode
+  isDirectChatMode?: boolean;
+  setIsDirectChatMode?: (value: boolean) => void;
 }
 
 export const InputContext = createContext<InputContextType | null>(null);

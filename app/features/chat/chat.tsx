@@ -397,51 +397,31 @@ export function Chat({
     return null;
   };
 
-  // Handle custom form submission with authentication check
-  const customHandleSubmit = useCallback(
-    (
-      event?: { preventDefault?: () => void } | undefined,
-      chatRequestOptions?: ChatRequestOptions
-    ) => {
-      if (event && event.preventDefault) {
-        event.preventDefault();
-      }
-      
-      // If user is offline, show a toast
-      if (!isOnline) {
-        toast.error('You are currently offline. Please reconnect to use the chat.', {
-          id: 'offline-submit-error'
-        });
-        return;
-      }
-      
-      // Check authentication status only when submitting
-      if (!user) {
-        setHasError(true);
-        setErrorType('authentication');
-        setErrorMessage('You need to be signed in to send messages.');
-        handleAPIError({ status: 401, message: 'Authentication required' }, 'Chat submission');
-        return;
-      }
-      
-      // Add subtle animation when sending a message
-      if (chatContainerRef.current) {
-        chatContainerRef.current.classList.add('chat-sending-pulse');
-        setTimeout(() => {
-          if (chatContainerRef.current) {
-            chatContainerRef.current.classList.remove('chat-sending-pulse');
-          }
-        }, 300);
-      }
-      
-      // Reset any previous errors
-      setHasError(false);
-      setErrorMessage(null);
-      
-      handleSubmit(event, chatRequestOptions);
+  // Custom handleSubmit that can handle additional options
+  const customHandleSubmit = async (
+    event?: {
+      preventDefault?: () => void;
     },
-    [handleSubmit, isOnline, user]
-  );
+    chatRequestOptions?: ChatRequestOptions
+  ) => {
+    // Setup for agent mode
+    if (isAgentMode) {
+      // When using agents, we intercept the normal submit
+      if (event) {
+        event.preventDefault?.();
+      }
+      
+      // Use our custom agent submission handler
+      await handleSubmitWithAgents(
+        event || { preventDefault: () => {} },
+        chatRequestOptions
+      );
+      return;
+    }
+    
+    // For regular chat mode, just use the standard handler
+    handleSubmit(event, chatRequestOptions);
+  };
 
   const handleAuthentication = useCallback(() => {
     window.location.href = '/login';
@@ -505,19 +485,32 @@ export function Chat({
     previousMessages: any[] = [], 
     sourceAgentId: string | null = null, 
     targetAgentId: string | null = null,
-    useWorkflow: boolean = false
+    useWorkflow: boolean = false,
+    directChatMode: boolean = false
   ) => {
     try {
       // Create a new agent status entry
-      const agentId = targetAgentId || 'delegation-agent';
-      const agentName = targetAgentId ? currentAgent?.name || 'Specialized Agent' : useWorkflow ? 'Workflow Agent' : 'Delegation Agent';
-      const agentIcon = targetAgentId ? currentAgent?.icon || '🤖' : useWorkflow ? '🔄' : '👨‍💼';
+      const agentId = targetAgentId || (directChatMode ? 'direct-chat' : 'delegation-agent');
+      const agentName = targetAgentId 
+        ? currentAgent?.name || 'Specialized Agent' 
+        : directChatMode 
+          ? 'GPT-4o' 
+          : useWorkflow 
+            ? 'Workflow Agent' 
+            : 'Delegation Agent';
+      const agentIcon = targetAgentId 
+        ? currentAgent?.icon || '🤖' 
+        : directChatMode 
+          ? '🤖' 
+          : useWorkflow 
+            ? '🔄' 
+            : '👨‍💼';
       
       // Add agent to the active agents list
       const newAgentStatus: AgentStatus = {
         id: agentId,
         name: agentName,
-        type: targetAgentId ? 'specialized' : useWorkflow ? 'workflow' : 'delegation',
+        type: targetAgentId ? 'specialized' : directChatMode ? 'direct' : useWorkflow ? 'workflow' : 'delegation',
         originalTask: message,
         currentAction: 'Processing request...',
         status: 'working',
@@ -559,7 +552,7 @@ export function Chat({
         setActiveAgent('Workflow Agent');
         setDelegationReason(`Using workflow: ${selectedWorkflowId}`);
       } else {
-        // Use the standard agent handoff
+        // Use the standard agent handoff or direct chat
         const apiResponse = await fetch('/api/agent-handoff', {
           method: 'POST',
           headers: {
@@ -570,7 +563,8 @@ export function Chat({
             sourceAgentId,
             targetAgentId,
             chatId,
-            previousMessages
+            previousMessages,
+            directChatMode
           })
         });
         
@@ -628,7 +622,7 @@ export function Chat({
   };
   
   // Simplified handleSubmitWithAgents that uses the consolidated processMessageWithAgents
-  const handleSubmitWithAgents = async (e: React.FormEvent) => {
+  const handleSubmitWithAgents = async (e: React.FormEvent, options?: ChatRequestOptions) => {
     e.preventDefault();
     
     if (!input.trim() || isLoading) {
@@ -636,6 +630,11 @@ export function Chat({
     }
     
     try {
+      // Extract directChatMode from options if provided
+      const directChatMode = options?.data && typeof options.data === 'object' 
+        ? (options.data as Record<string, any>).directChatMode === true
+        : false;
+      
       // Add user message to UI
       const userMessage = {
         id: uuidv4(),
@@ -650,13 +649,14 @@ export function Chat({
         role: 'user'
       });
       
-      // Process with either workflow or delegation agent
+      // Process with either workflow or delegation agent or direct chat
       const delegationResult = await processMessageWithAgents(
         input, 
         chatMessages, 
         null, 
         null, 
-        !!selectedWorkflowId // Use workflow if selected
+        !!selectedWorkflowId, // Use workflow if selected
+        directChatMode // Pass direct chat mode flag
       );
       
       // Add agent response to UI

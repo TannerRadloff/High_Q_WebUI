@@ -33,6 +33,8 @@ import { sanitizeUIMessages } from '@/utils/messages';
 import { useFileUpload } from './hooks/useFileUpload';
 import { InputProvider, useInputContext } from './context/InputContext';
 import { ExtendedAttachment } from '@/types';
+import { Switch } from '@/src/components/ui/switch';
+import { Label } from '@/src/components/ui/label';
 
 // Main exported component that uses the context provider
 export function MultimodalInput({
@@ -75,6 +77,23 @@ export function MultimodalInput({
   // Create a local state to override isLoading if it's stuck
   const [forceNotLoading, setForceNotLoading] = useState(false);
   
+  // Add direct chat mode toggle
+  const [isDirectChatMode, setIsDirectChatMode] = useState<boolean>(false);
+  
+  // Store the mode preference in local storage
+  useEffect(() => {
+    // Load initial preference, default to false (delegation mode)
+    const savedMode = localStorage.getItem('direct-chat-mode');
+    if (savedMode) {
+      setIsDirectChatMode(savedMode === 'true');
+    }
+  }, []);
+  
+  // Save the preference when it changes
+  useEffect(() => {
+    localStorage.setItem('direct-chat-mode', isDirectChatMode.toString());
+  }, [isDirectChatMode]);
+  
   // Force reset loading state after component mount
   useEffect(() => {
     // Short delay to ensure component is mounted before resetting
@@ -104,7 +123,9 @@ export function MultimodalInput({
     setMessages,
     append,
     handleSubmit,
-    selectedWorkflowId
+    selectedWorkflowId,
+    isDirectChatMode,
+    setIsDirectChatMode
   };
 
   return (
@@ -139,7 +160,9 @@ function MessageForm() {
     stop,
     attachments, 
     setAttachments,
-    setMessages
+    setMessages,
+    isDirectChatMode,
+    setIsDirectChatMode
   } = useInputContext();
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -183,11 +206,37 @@ function MessageForm() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isLoading, stop, setMessages]);
   
+  // Toggle between delegation agent and direct chat modes
+  const handleToggleMode = () => {
+    setIsDirectChatMode(!isDirectChatMode);
+    toast.info(
+      !isDirectChatMode 
+        ? "Direct chat mode enabled: Chatting directly with the model" 
+        : "Delegation agent mode enabled: Agent will help route your requests"
+    );
+  };
+  
   return (
     <form
       onSubmit={handleSubmit}
       className="relative flex w-full flex-col gap-2"
     >
+      {/* Mode switch */}
+      <div className="flex items-center justify-end mb-1 space-x-2">
+        <Label 
+          htmlFor="direct-chat-mode"
+          className="text-xs text-muted-foreground cursor-pointer"
+        >
+          {isDirectChatMode ? "Direct Chat" : "Delegation Agent"}
+        </Label>
+        <Switch
+          id="direct-chat-mode"
+          checked={isDirectChatMode}
+          onCheckedChange={handleToggleMode}
+          aria-label="Toggle between delegation agent and direct chat"
+        />
+      </div>
+      
       {/* TextareaInput container */}
       <div className="relative">
         {/* Attach button */}
@@ -570,24 +619,23 @@ function useSubmitMessage() {
 }
 
 function useAgentSubmit() {
-  const { handleSubmit, selectedWorkflowId } = useInputContext();
+  const context = useInputContext();
+  const { selectedWorkflowId, isDirectChatMode } = context;
+  // Use type assertion since we know handleSubmit is defined (useInputContext throws if context is null)
+  const handleSubmit = context.handleSubmit as NonNullable<typeof context.handleSubmit>;
   
   return useCallback((userInput: string) => {
     // We're always using Mimir (default agent) first, but may include workflow metadata
     const options: ChatRequestOptions = {
       data: {
-        ...(selectedWorkflowId ? { workflowId: selectedWorkflowId } : {})
-      } as any // Use type assertion to avoid TypeScript errors
+        ...(selectedWorkflowId ? { workflowId: selectedWorkflowId } : {}),
+        directChatMode: isDirectChatMode === true
+      } as any // Use type assertion for data
     };
     
-    // Only pass options if we have a selected workflow
-    if (selectedWorkflowId) {
-      handleSubmit(undefined, options);
-    } else {
-      // Regular submission for default agent
-      handleSubmit();
-    }
-  }, [handleSubmit, selectedWorkflowId]);
+    // Always pass options now to include directChatMode
+    handleSubmit(undefined, options);
+  }, [handleSubmit, selectedWorkflowId, isDirectChatMode]);
 }
 
 // Create a reusable tooltip component for our buttons
