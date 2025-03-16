@@ -68,6 +68,25 @@ function safeRedirect(path: string, forceReload = false) {
     
     // Proceed with redirect if allowed
     if (shouldRedirect) {
+      // Track redirect attempts to detect loops
+      const redirectCountKey = 'auth_redirect_count';
+      const redirectCount = parseInt(localStorage.getItem(redirectCountKey) || '0', 10);
+      
+      // If we've redirected too many times in a short period, stop to prevent loops
+      if (redirectCount > 5) {
+        console.warn('Too many redirects detected, stopping to prevent loop');
+        localStorage.removeItem(redirectCountKey);
+        return;
+      }
+      
+      // Increment redirect count
+      localStorage.setItem(redirectCountKey, (redirectCount + 1).toString());
+      
+      // Clear the count after 10 seconds to reset the counter if no loops occur
+      setTimeout(() => {
+        localStorage.removeItem(redirectCountKey);
+      }, 10000);
+      
       // Use direct location change for more reliable cross-domain redirects
       if (forceReload) {
         window.location.href = path;
@@ -105,6 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Missing Supabase environment variables')
       setHasEnvError(true)
       setIsLoading(false)
+      setHasInitialized(true)
       return
     }
     
@@ -116,6 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error('Failed to get session:', error)
           setIsLoading(false)
+          setHasInitialized(true)
           return
         }
         
@@ -124,8 +145,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(data.session.user)
           
           // Handle initial redirect if we're authenticated and on an auth page
-          if (isAuthPage(pathname)) {
-            safeRedirect('/', true);
+          // But only if we haven't already initialized to prevent double redirects
+          if (!hasInitialized && isAuthPage(pathname)) {
+            // Add a small delay to ensure state is updated
+            setTimeout(() => {
+              safeRedirect('/', false);
+            }, 300);
           }
         }
       } catch (e) {
@@ -139,6 +164,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, currentSession: Session | null) => {
+        console.log(`[AuthProvider] Auth state change: ${event}`);
+        
         // Update the state with the new session
         setSession(currentSession)
         setUser(currentSession?.user ?? null)
@@ -148,14 +175,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           case 'SIGNED_IN':
             // If we just signed in and are on an auth page, redirect to chat
             if (isAuthPage(pathname)) {
-              safeRedirect('/', true);
+              // Add a small delay to ensure state is updated
+              setTimeout(() => {
+                safeRedirect('/', false);
+              }, 300);
             }
             break
             
           case 'SIGNED_OUT':
             // If we just signed out, redirect to login page if not already there
             if (!isAuthPage(pathname)) {
-              safeRedirect('/login');
+              // Add a small delay to ensure state is updated
+              setTimeout(() => {
+                safeRedirect('/login', false);
+              }, 300);
             }
             break
             
@@ -169,7 +202,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           case 'INITIAL_SESSION':
             // Only redirect if authenticated and on a login/register page
             if (currentSession && isAuthPage(pathname)) {
-              safeRedirect('/', true);
+              // Add a small delay to ensure state is updated
+              setTimeout(() => {
+                safeRedirect('/', false);
+              }, 300);
             }
             break
         }
@@ -209,11 +245,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Update state with new session information
       toast.success('Signed in successfully')
       
-      // Manually redirect to ensure it happens
-      // Add a small delay to ensure state is updated before redirect
-      setTimeout(() => {
-        safeRedirect('/', true);
-      }, 300);
+      // Let the auth state change event handle the redirect
+      // Don't manually redirect here to avoid conflicts with the auth state listener
     } catch (error: any) {
       toast.error(error.message || 'Failed to sign in')
       throw error

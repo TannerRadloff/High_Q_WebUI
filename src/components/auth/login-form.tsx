@@ -170,13 +170,8 @@ function LoginFormContent() {
       // Show success message
       toast.success('Login successful! Redirecting to dashboard...')
       
-      // Add a fallback redirect in case the auth provider's redirect doesn't work
-      setTimeout(() => {
-        if (window.location.pathname.includes('/login')) {
-          console.log('Fallback redirect triggered from login form')
-          window.location.href = '/'
-        }
-      }, 2000)
+      // Let the auth provider handle the redirect
+      // Don't add a fallback redirect to avoid conflicts with the auth provider
     } catch (error: any) {
       showErrorNotification(error.message || 'Failed to sign in')
       setIsLoading(false)

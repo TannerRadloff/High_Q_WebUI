@@ -59,6 +59,7 @@ function LoginPage() {
   const [dbError, setDbError] = useState<string | null>(null)
   const [isCheckingEnv, setIsCheckingEnv] = useState(false) // Start with false to improve loading experience
   const [isRedirecting, setIsRedirecting] = useState(false)
+  const [hasAttemptedRedirect, setHasAttemptedRedirect] = useState(false)
 
   // Environment check function - simplified to avoid blocking login
   const checkEnvironment = useCallback(async () => {
@@ -86,57 +87,53 @@ function LoginPage() {
         setIsCheckingEnv(false)
       })
 
-      // Check if we're in a redirect loop
-      const urlParams = new URLSearchParams(window.location.search);
-      const redirectParam = urlParams.get('redirect');
-      const isHomeRedirect = redirectParam === '/' || !redirectParam;
-      const hasRedirectLoopParam = urlParams.get('loop_detected') === 'true';
-      
-      // If we're already authenticated and being redirected back to home,
-      // we might be in a loop - break it by skipping redirect
-      if (!isAuthLoading && user) {
-        // Track this to prevent unnecessary UI flashing
+      // Only proceed if auth loading is complete and we haven't already attempted a redirect
+      if (isAuthLoading || hasAttemptedRedirect) {
+        return;
+      }
+
+      // If user is authenticated, handle redirect
+      if (user) {
+        // Prevent multiple redirect attempts
+        setHasAttemptedRedirect(true);
+        
+        // Check for explicit loop detection in localStorage
+        const loopCount = parseInt(localStorage.getItem('auth_redirect_count') || '0', 10);
+        
+        if (loopCount > 3) {
+          console.log('[LoginPage] Detected potential redirect loop, staying on login page');
+          localStorage.removeItem('auth_redirect_count');
+          return;
+        }
+        
+        // Set redirecting state for UI
         setIsRedirecting(true);
         
-        if (hasRedirectLoopParam) {
-          console.log('[LoginPage] Loop detected, staying on login page');
-          return; // Don't redirect
-        }
-
-        if (isHomeRedirect && window.location.pathname.includes('/login')) {
-          console.log('[LoginPage] Potential redirect loop detected - adding param');
-          // Add a loop parameter to track this situation
-          const newUrl = new URL(window.location.href);
-          newUrl.searchParams.set('loop_detected', 'true');
-          window.history.replaceState({}, '', newUrl.toString());
-        }
+        // Increment the loop counter
+        localStorage.setItem('auth_redirect_count', (loopCount + 1).toString());
         
-        // Add a small delay for a smoother transition
+        // Use a timeout to ensure state updates before redirect
         const redirectTimeout = setTimeout(() => {
-          // Only redirect if we're actually on the login page
-          if (window.location.pathname.includes('/login')) {
-            // Track redirect attempts in session storage to limit redirects
-            const redirectCount = sessionStorage.getItem('redirectCount') || '0';
-            const count = parseInt(redirectCount, 10);
-            
-            if (count < 3) {
-              console.log(`[LoginPage] Redirecting to home (attempt ${count + 1})`);
-              sessionStorage.setItem('redirectCount', (count + 1).toString());
-              router.push('/');
-            } else {
-              console.log('[LoginPage] Too many redirects, stopping redirect loop');
-              sessionStorage.removeItem('redirectCount');
-            }
-          }
-        }, 300)
-
-        return () => clearTimeout(redirectTimeout)
+          console.log('[LoginPage] Authenticated user detected, redirecting to home');
+          router.push('/');
+          
+          // Clear the redirect count after successful navigation
+          setTimeout(() => {
+            localStorage.removeItem('auth_redirect_count');
+          }, 1000);
+        }, 500);
+        
+        return () => clearTimeout(redirectTimeout);
+      } else {
+        // If we reach here, user is not authenticated, so we should stay on login page
+        // Reset the redirect count since we're properly on the login page
+        localStorage.removeItem('auth_redirect_count');
       }
     } catch (error) {
       console.error('[LoginPage] Unhandled error in effect:', error)
       setIsCheckingEnv(false)
     }
-  }, [user, isAuthLoading, router, checkEnvironment])
+  }, [user, isAuthLoading, router, checkEnvironment, hasAttemptedRedirect])
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen py-6 bg-gradient-to-b from-black via-slate-900 to-slate-950">
