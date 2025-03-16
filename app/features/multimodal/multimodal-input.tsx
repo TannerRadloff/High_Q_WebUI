@@ -362,6 +362,9 @@ function SendButton({
   const isDisabled = !input.trim() && uploadQueue.length === 0;
   const hasContent = !!input.trim() || uploadQueue.length > 0;
   
+  // To prevent any key conflicts when rendering with React
+  const buttonKey = isLoading ? 'stop-button' : 'send-button';
+  
   const handleClick = () => {
     if (isLoading) {
       // When loading, the button acts as a stop button
@@ -375,6 +378,7 @@ function SendButton({
   return (
     <ButtonTooltip content={isLoading ? "Stop generation" : "Send message"} side="top">
       <Button
+        key={buttonKey}
         type="button"
         size="icon"
         variant={isLoading ? "ghost" : "default"}
@@ -410,8 +414,10 @@ function SendButton({
         disabled={!isLoading && isDisabled}
         onClick={handleClick}
         aria-label={isLoading ? "Stop generation" : "Send message"}
+        data-state={isLoading ? "stop" : "send"}
       >
         <motion.div
+          key={`icon-${buttonKey}`}
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           transition={{ duration: 0.15 }}

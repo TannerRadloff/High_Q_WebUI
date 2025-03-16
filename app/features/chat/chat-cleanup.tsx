@@ -31,16 +31,19 @@ export function ChatCleanup() {
         
         // Fix any stuck loading states
         document.querySelectorAll('.enhanced-input').forEach(input => {
-          // Find send button in the enhanced-input
-          const stopButtons = input.querySelectorAll('button[aria-label="Stop generation"]');
-          const sendButtons = input.querySelectorAll('button[aria-label="Send message"]');
+          // In the updated design, we have a single button that changes state rather than separate buttons
+          // Check for buttons with data-state="stop"
+          const stuckButton = input.querySelector('button[data-state="stop"]') as HTMLButtonElement;
           
-          if (stopButtons.length > 0 && sendButtons.length === 0) {
-            console.log('[ChatCleanup] Found stop button without send button - fixing stuck loading state');
+          if (stuckButton) {
+            // See if this stop button has been displayed for too long (check class names or other indicators)
+            const textarea = input.querySelector('textarea[name="message"]');
             
-            // Create a click event on the stop button
-            const stopButton = stopButtons[0] as HTMLButtonElement;
-            stopButton.click();
+            // Only force click if textarea is editable and not disabled - this suggests a stuck state
+            if (textarea && !textarea.hasAttribute('disabled')) {
+              console.log('[ChatCleanup] Found button in stop state with editable textarea - fixing stuck loading state');
+              stuckButton.click();
+            }
           }
         });
       };
@@ -60,6 +63,7 @@ export function ChatCleanup() {
             opacity: 1 !important;
             visibility: visible !important;
             display: flex !important;
+            pointer-events: auto !important;
           }
         `;
         document.head.appendChild(style);
@@ -93,6 +97,23 @@ export function ChatCleanup() {
         console.log('[ChatCleanup] Detected disabled textarea in periodic check');
         cleanup();
       }
+      
+      // Also check for stuck buttons - buttons in stop state that have been shown for too long
+      document.querySelectorAll('button[data-state="stop"]').forEach(button => {
+        // Add logic here to determine if a button has been stuck in stop state
+        // For example, you could use a data attribute to track when it entered stop state
+        
+        // This is a simple heuristic - if there's a stop button visible and text is editable,
+        // it might be stuck
+        const input = button.closest('.enhanced-input');
+        if (input) {
+          const textarea = input.querySelector('textarea[name="message"]');
+          if (textarea && !textarea.hasAttribute('disabled')) {
+            console.log('[ChatCleanup] Detected button stuck in stop state');
+            cleanup();
+          }
+        }
+      });
     }, 3000);
     
     // Clean up interval when component unmounts
@@ -110,6 +131,13 @@ export function ChatCleanup() {
     disabledTextareas.forEach(textarea => {
       console.log('[ChatCleanup] Enabling disabled textarea after path change');
       textarea.removeAttribute('disabled');
+    });
+    
+    // Reset any buttons stuck in stop state
+    document.querySelectorAll('button[data-state="stop"]').forEach(button => {
+      // When changing paths, always force reset stop buttons
+      console.log('[ChatCleanup] Resetting button in stop state after path change');
+      (button as HTMLButtonElement).click();
     });
   }, [pathname]);
   
