@@ -7,29 +7,29 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
-import { User, Session, AuthChangeEvent } from '@supabase/supabase-js'
 import { useRouter, usePathname } from 'next/navigation'
 import { toast } from 'sonner'
 
 import { createClient } from '@/lib/supabase/client'
+import { AuthChangeEvent } from '@supabase/supabase-js'
 
-// Define the User type
-interface User {
+// Define our custom User type
+interface AppUser {
   id: string;
   email: string;
   name?: string;
 }
 
-// Define the Session type
-interface Session {
-  user: User;
+// Define our custom Session type
+interface AppSession {
+  user: AppUser;
   expires: string;
 }
 
 // Define the AuthContextType
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: AppUser | null;
+  session: AppSession | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -49,8 +49,14 @@ function isAuthPage(pathname: string | null): boolean {
          pathname.includes('/reset-password');
 }
 
+// Helper to check if running in browser environment
+const isBrowser = typeof window !== 'undefined';
+
 // Helper to safely redirect to avoid loops
 function safeRedirect(path: string, forceReload = false) {
+  // Only run redirects in browser environment
+  if (!isBrowser) return;
+  
   // Get the current location
   const currentPath = window.location.pathname;
   
@@ -67,7 +73,7 @@ function safeRedirect(path: string, forceReload = false) {
     let shouldRedirect = true;
     
     // Only use localStorage if available
-    if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+    if (typeof localStorage !== 'undefined') {
       try {
         const lastRedirect = localStorage.getItem(redirectKey);
         const now = Date.now();
@@ -100,142 +106,232 @@ function safeRedirect(path: string, forceReload = false) {
   } catch (e) {
     // Fallback if any error occurs in redirection
     console.error('Redirect error:', e);
-    window.location.href = path;
+    if (isBrowser) {
+      window.location.href = path;
+    }
+  }
+}
+
+// Helper function to convert Supabase session to our custom session type
+function convertSession(supabaseSession: any): AppSession | null {
+  if (!supabaseSession) return null;
+  
+  try {
+    return {
+      user: {
+        id: supabaseSession.user.id,
+        email: supabaseSession.user.email || '',
+        name: supabaseSession.user.user_metadata?.name
+      },
+      expires: new Date(
+        supabaseSession.expires_at 
+          ? supabaseSession.expires_at * 1000 
+          : Date.now() + 24 * 60 * 60 * 1000
+      ).toISOString()
+    };
+  } catch (error) {
+    console.error('Error converting session:', error);
+    return null;
   }
 }
 
 // Create the AuthProvider component
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>({
-    id: '1',
-    email: 'demo@example.com',
-    name: 'Demo User'
-  });
-  const [session, setSession] = useState<Session | null>({
-    user: {
-      id: '1',
-      email: 'demo@example.com',
-      name: 'Demo User'
-    },
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-  });
-  const [isLoading, setIsLoading] = useState(false);
+  // Set initial state depending on whether we're in browser or server
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [session, setSession] = useState<AppSession | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isClient, setIsClient] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const supabase = createClient();
+  
+  // Only initialize Supabase client in browser environment
+  const supabase = isBrowser ? createClient() : null;
   
   // Track if we've already initialized
-  const [hasInitialized, setHasInitialized] = useState(false)
+  const [hasInitialized, setHasInitialized] = useState(false);
+  
+  // Set isClient on mount to confirm we're in browser environment
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
   
   // Initial session check
   useEffect(() => {
+    // Don't run this on the server
+    if (!isBrowser || !supabase) {
+      setIsLoading(false);
+      return;
+    }
+    
     // Prevent duplicate initialization
-    if (hasInitialized) return
+    if (hasInitialized) return;
     
     // Check if API keys are available
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      console.error('Missing Supabase environment variables')
-      setIsLoading(false)
-      setHasInitialized(true)
-      return
+      console.error('Missing Supabase environment variables');
+      setIsLoading(false);
+      setHasInitialized(true);
+      return;
     }
     
     const setupUser = async () => {
       try {
         // Get auth state from Supabase
-        const { data, error } = await supabase.auth.getSession()
+        const { data, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Failed to get session:', error)
-          setIsLoading(false)
-          setHasInitialized(true)
-          return
+          console.error('Failed to get session:', error);
+          setIsLoading(false);
+          setHasInitialized(true);
+          return;
         }
         
         if (data.session) {
-          setSession(data.session)
-          setUser(data.session.user)
-          
-          // Handle initial redirect if we're authenticated and on an auth page
-          if (isAuthPage(pathname)) {
-            safeRedirect('/', true);
-          }
-        }
-      } catch (e) {
-        console.error('Error during auth initialization:', e)
-      } finally {
-        setIsLoading(false)
-        setHasInitialized(true)
-      }
-    }
-    
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: AuthChangeEvent, currentSession: Session | null) => {
-        // Update the state with the new session
-        setSession(currentSession)
-        setUser(currentSession?.user ?? null)
-        
-        // Handle different auth events
-        switch (event) {
-          case 'SIGNED_IN':
-            // If we just signed in and are on an auth page, redirect to chat
+          const appSession = convertSession(data.session);
+          if (appSession) {
+            setSession(appSession);
+            setUser(appSession.user);
+            
+            // Handle initial redirect if we're authenticated and on an auth page
             if (isAuthPage(pathname)) {
               safeRedirect('/', true);
             }
-            break
-            
-          case 'SIGNED_OUT':
-            // If we just signed out, redirect to login page if not already there
-            if (!isAuthPage(pathname)) {
-              safeRedirect('/login');
-            }
-            break
-            
-          // Handle token refresh silently
-          case 'TOKEN_REFRESHED':
-          case 'USER_UPDATED':
-          case 'PASSWORD_RECOVERY':
-            // No navigation needed
-            break
-            
-          case 'INITIAL_SESSION':
-            // Only redirect if authenticated and on a login/register page
-            if (currentSession && isAuthPage(pathname)) {
-              safeRedirect('/', true);
-            }
-            break
+          }
         }
+      } catch (e) {
+        console.error('Error during auth initialization:', e);
+      } finally {
+        setIsLoading(false);
+        setHasInitialized(true);
       }
-    )
+    };
+    
+    // Set up auth state listener - only in browser environment
+    let subscription: { unsubscribe: () => void } | null = null;
+    
+    if (supabase) {
+      const { data } = supabase.auth.onAuthStateChange(
+        async (event: AuthChangeEvent, currentSupabaseSession: any) => {
+          // Convert the Supabase session to our app session
+          const currentSession = convertSession(currentSupabaseSession);
+          
+          // Update the state with the new session
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          
+          // Handle different auth events
+          switch (event) {
+            case 'SIGNED_IN':
+              // If we just signed in and are on an auth page, redirect to chat
+              if (isAuthPage(pathname)) {
+                safeRedirect('/', true);
+              }
+              break;
+              
+            case 'SIGNED_OUT':
+              // If we just signed out, redirect to login page if not already there
+              if (!isAuthPage(pathname)) {
+                safeRedirect('/login');
+              }
+              break;
+              
+            // Handle token refresh silently
+            case 'TOKEN_REFRESHED':
+            case 'USER_UPDATED':
+            case 'PASSWORD_RECOVERY':
+              // No navigation needed
+              break;
+              
+            case 'INITIAL_SESSION':
+              // Only redirect if authenticated and on a login/register page
+              if (currentSession && isAuthPage(pathname)) {
+                safeRedirect('/', true);
+              }
+              break;
+          }
+        }
+      );
+      
+      subscription = data.subscription;
+    }
     
     // Initial session check
-    setupUser()
+    setupUser();
     
     // Clean up subscription on component unmount
     return () => {
-      subscription?.unsubscribe()
-    }
-  }, [router, pathname, supabase, hasInitialized])
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+    };
+  }, [router, pathname, supabase, hasInitialized]);
   
-  // Mock sign in function
+  // Initialize with demo values in development mode or when Supabase is not configured
+  useEffect(() => {
+    if (isClient && isLoading && !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      console.log('No Supabase config found, using demo mode');
+      // Use demo data after a small delay
+      const timer = setTimeout(() => {
+        const demoUser: AppUser = {
+          id: '1',
+          email: 'demo@example.com',
+          name: 'Demo User'
+        };
+        
+        setUser(demoUser);
+        setSession({
+          user: demoUser,
+          expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        });
+        setIsLoading(false);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isClient, isLoading]);
+  
+  // Sign in function
   const signIn = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Check if we're in browser environment
+      if (!isBrowser) {
+        throw new Error('Cannot sign in outside of browser environment');
+      }
       
-      const mockUser = {
-        id: '1',
-        email,
-        name: 'Demo User'
-      };
-      
-      setUser(mockUser);
-      setSession({
-        user: mockUser,
-        expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      });
+      // Check if we have Supabase configured
+      if (supabase) {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+        
+        if (error) throw error;
+        
+        if (data.session) {
+          const appSession = convertSession(data.session);
+          if (appSession) {
+            setSession(appSession);
+            setUser(appSession.user);
+          }
+        }
+      } else {
+        // Simulate API call for demo mode
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        const demoUser: AppUser = {
+          id: '1',
+          email,
+          name: 'Demo User'
+        };
+        
+        setUser(demoUser);
+        setSession({
+          user: demoUser,
+          expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+        });
+      }
       
       router.push('/');
     } catch (error) {
@@ -246,63 +342,83 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Mock sign out function
+  // Sign out function
   const signOut = async () => {
+    // Skip if not in browser
+    if (!isBrowser) return;
+    
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      if (supabase) {
+        await supabase.auth.signOut();
+      }
       
+      // Always reset state regardless of API success
       setUser(null);
       setSession(null);
       
       router.push('/login');
     } catch (error) {
       console.error('Sign out error:', error);
-      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Mock refresh session function
+  // Function to refresh the session
   const refreshSession = async () => {
+    // Skip if not in browser
+    if (!isBrowser || !supabase) return;
+    
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const { data, error } = await supabase.auth.refreshSession();
       
-      if (user) {
-        setSession({
-          user,
-          expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-        });
+      if (error) {
+        console.error('Failed to refresh session:', error);
+        // If we can't refresh, sign the user out
+        await signOut();
+        return;
+      }
+      
+      if (data.session) {
+        const appSession = convertSession(data.session);
+        if (appSession) {
+          setSession(appSession);
+          setUser(appSession.user);
+        } else {
+          // No valid session returned from refresh, sign out
+          await signOut();
+        }
+      } else {
+        // No session returned from refresh, sign out
+        await signOut();
       }
     } catch (error) {
-      console.error('Refresh session error:', error);
-      throw error;
+      console.error('Session refresh error:', error);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Memoize value to prevent unnecessary re-renders
+  const contextValue: AuthContextType = {
+    user,
+    session,
+    isLoading,
+    signIn,
+    signOut,
+    refreshSession
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        isLoading,
-        signIn,
-        signOut,
-        refreshSession
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-// Create the useAuth hook
+// Export the hook to use the auth context
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

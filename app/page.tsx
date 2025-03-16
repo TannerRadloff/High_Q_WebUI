@@ -9,6 +9,10 @@ import { BrainIcon } from '@/app/features/icons/icons'
 import { Button } from '@/components/ui/button'
 import { CrossIcon } from '@/app/features/icons/icons'
 
+// Add export for client-side only rendering
+export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
+
 // Agent Welcome Banner Component
 const AgentWelcomeBanner = ({ onClose }: { onClose: () => void }) => {
   return (
@@ -50,27 +54,44 @@ export default function Home() {
   const router = useRouter()
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false)
-  const [showAgentBanner, setShowAgentBanner] = useState(true)
+  const [showAgentBanner, setShowAgentBanner] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
 
+  // Run client-side only code after mount
   useEffect(() => {
-    // Check if banner has been dismissed before
-    const agentBannerDismissed = localStorage.getItem('agent-banner-dismissed')
-    if (agentBannerDismissed === 'true') {
-      setShowAgentBanner(false)
+    setIsMounted(true)
+    
+    // Check if banner has been dismissed before - only on client
+    try {
+      const agentBannerDismissed = localStorage.getItem('agent-banner-dismissed')
+      if (agentBannerDismissed !== 'true') {
+        setShowAgentBanner(true)
+      }
+    } catch (e) {
+      console.error('LocalStorage error:', e)
+      // Default to showing banner if localStorage fails
+      setShowAgentBanner(true)
     }
   }, [])
 
   const handleDismissBanner = () => {
     setShowAgentBanner(false)
-    localStorage.setItem('agent-banner-dismissed', 'true')
+    try {
+      localStorage.setItem('agent-banner-dismissed', 'true')
+    } catch (e) {
+      console.error('LocalStorage error during banner dismiss:', e)
+    }
   }
 
   useEffect(() => {
+    // Only run auth check on client side after mount
+    if (!isMounted) return
+    
     if (!isLoading && !hasCheckedAuth) {
       console.log('[HomePage] Auth state loaded:', { 
         hasUser: !!user, 
         hasSession: !!session,
-        sessionExpiry: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'N/A'
+        sessionExpiry: session?.expires ? new Date(session.expires).toISOString() : 'N/A'
       })
       
       setHasCheckedAuth(true)
@@ -79,35 +100,67 @@ export default function Home() {
         console.log('[HomePage] User not authenticated, redirecting to login')
         
         // Check if we're in a potential redirect loop
-        const redirectCount = sessionStorage.getItem('homeRedirectCount') || '0';
-        const count = parseInt(redirectCount, 10);
+        let redirectCount = 0
+        try {
+          const storedCount = sessionStorage.getItem('homeRedirectCount')
+          redirectCount = storedCount ? parseInt(storedCount, 10) : 0
+        } catch (e) {
+          console.error('SessionStorage error:', e)
+        }
         
         // Only redirect if we're actually on the home page to prevent loops
         // and only if we're not already redirecting and haven't redirected too many times
-        if (window.location.pathname === '/' && !isRedirecting && count < 3) {
+        if (window.location.pathname === '/' && !isRedirecting && redirectCount < 3) {
           setIsRedirecting(true)
           
           // Increment redirect count
-          sessionStorage.setItem('homeRedirectCount', (count + 1).toString());
-          console.log(`[HomePage] Redirecting to login (attempt ${count + 1})`);
+          try {
+            sessionStorage.setItem('homeRedirectCount', (redirectCount + 1).toString())
+          } catch (e) {
+            console.error('SessionStorage error during redirect:', e)
+          }
+          
+          console.log(`[HomePage] Redirecting to login (attempt ${redirectCount + 1})`)
           
           // Add a small delay to prevent rapid redirects
           setTimeout(() => {
             // Add a query param to help with loop detection
             router.push('/login?from=home')
           }, 300)
-        } else if (count >= 3) {
-          console.log('[HomePage] Too many redirects, stopping redirect loop');
+        } else if (redirectCount >= 3) {
+          console.log('[HomePage] Too many redirects, stopping redirect loop')
           // Reset counter and show an error state instead
-          sessionStorage.removeItem('homeRedirectCount');
+          try {
+            sessionStorage.removeItem('homeRedirectCount')
+          } catch (e) {
+            console.error('SessionStorage error during redirect count reset:', e)
+          }
         }
       } else {
         console.log('[HomePage] User authenticated, staying on home page')
         // Reset redirect counter when authentication succeeds
-        sessionStorage.removeItem('homeRedirectCount');
+        try {
+          sessionStorage.removeItem('homeRedirectCount')
+        } catch (e) {
+          console.error('SessionStorage error during counter reset:', e)
+        }
       }
     }
-  }, [user, isLoading, router, session, hasCheckedAuth, isRedirecting])
+  }, [user, isLoading, router, session, hasCheckedAuth, isRedirecting, isMounted])
+
+  // Show a simple loading state until client-side code can run
+  if (!isMounted) {
+    return (
+      <div className="flex h-dvh w-screen items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+            Loading...
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   // Show loading state while checking auth
   if (isLoading || isRedirecting) {
