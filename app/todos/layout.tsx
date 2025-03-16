@@ -1,4 +1,4 @@
-import TodoNav from "@/components/features/todos/TodoNav";
+import TodoNav from "./components/TodoNav";
 
 export default function TodosLayout({
   children,
