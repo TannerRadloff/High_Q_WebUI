@@ -1269,3 +1269,41 @@
 .messages-container .random-stars {
   z-index: 1; /* Higher z-index to ensure visibility */
 }
+
+/* Fix textarea clickability issues */
+textarea, 
+input, 
+button,
+[role="button"],
+a {
+  pointer-events: auto !important;
+}
+
+/* Ensure input container z-index is high enough */
+.enhanced-input {
+  position: relative;
+  z-index: 20 !important; /* Higher z-index to ensure it's above other elements */
+  pointer-events: auto !important;
+}
+
+/* Debug outlines for development */
+.debug-outlines * {
+  outline: 1px solid rgba(255, 0, 0, 0.2);
+}
+
+/* Force allow interaction with textarea */
+textarea[name="message"] {
+  pointer-events: auto !important;
+  position: relative;
+  z-index: 1;
+}
+
+/* Messages container should not block input */
+.messages-container {
+  pointer-events: auto;
+}
+
+/* Apply this class to body during debugging */
+.debug-mode .enhanced-input * {
+  pointer-events: auto !important;
+}
