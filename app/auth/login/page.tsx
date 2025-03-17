@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import Script from 'next/script';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useUser } from '@/contexts/user-context';
@@ -50,6 +52,58 @@ export default function LoginPage() {
       console.error(err);
     }
   };
+
+  // Generate nonce for extra security
+  const generateNonce = async (): Promise<string[]> => {
+    const nonce = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
+    const encoder = new TextEncoder()
+    const encodedNonce = encoder.encode(nonce)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', encodedNonce)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    const hashedNonce = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+    return [nonce, hashedNonce]
+  };
+
+  useEffect(() => {
+    const initializeGoogleSignIn = async () => {
+      const [nonce, hashedNonce] = await generateNonce();
+      
+      // @ts-ignore - Google Identity Services type
+      window.handleSignInWithGoogle = async (response: any) => {
+        try {
+          const { error } = await supabase.auth.signInWithIdToken({
+            provider: 'google',
+            token: response.credential,
+            nonce: nonce,
+          });
+
+          if (error) throw error;
+          router.push('/'); // Redirect to home page after successful login
+        } catch (error) {
+          console.error('Error signing in with Google:', error);
+        }
+      };
+
+      // Initialize Google Identity Services
+      // @ts-ignore - Google Identity Services type
+      google.accounts.id.initialize({
+        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+        callback: 'handleSignInWithGoogle',
+        nonce: hashedNonce,
+        use_fedcm_for_prompt: true // For Chrome's third-party cookie phase-out
+      });
+
+      // @ts-ignore - Google Identity Services type
+      google.accounts.id.renderButton(
+        document.getElementById('googleSignInButton'),
+        { theme: 'outline', size: 'large', width: 250 }
+      );
+    };
+
+    // Initialize when the script is loaded
+    window.addEventListener('load', initializeGoogleSignIn);
+    return () => window.removeEventListener('load', initializeGoogleSignIn);
+  }, []);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
