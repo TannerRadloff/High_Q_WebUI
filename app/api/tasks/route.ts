@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createAgentTask, getAgentTasks } from '@/lib/supabase';
+import { getUserTasks, createTask } from '@/lib/supabase';
 import { verifyAuth } from '@/lib/auth';
 
 // GET /api/tasks - Get all tasks for the current user
-// Can filter by query_id using ?query_id=xxx
+// Can filter by workflow_id using ?workflow_id=xxx
 export async function GET(request: Request) {
   // Verify authentication
   const { authenticated, userId, error: authError } = await verifyAuth();
@@ -17,19 +17,19 @@ export async function GET(request: Request) {
   
   try {
     // Get tasks for this user
-    const result = await getAgentTasks(userId);
+    const result = await getUserTasks(userId);
     
-    if (!result.success) {
+    if (!result.data) {
       throw new Error(result.error as any);
     }
     
-    // Filter by query_id if provided
+    // Filter by workflow_id if provided
     const url = new URL(request.url);
-    const queryId = url.searchParams.get('query_id');
+    const workflowId = url.searchParams.get('workflow_id');
     
     let tasks = result.data || [];
-    if (queryId) {
-      tasks = tasks.filter(task => task.query_id === queryId);
+    if (workflowId) {
+      tasks = tasks.filter(task => task.workflow_id === workflowId);
     }
     
     return NextResponse.json({ tasks });
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
   
   try {
     const body = await request.json();
-    const { query_id, description, agent, status = 'queued', parent_task_id } = body;
+    const { workflow_id, description, agent, status = 'queued', parent_task_id } = body;
     
     if (!description || !agent) {
       return NextResponse.json(
@@ -66,20 +66,23 @@ export async function POST(request: Request) {
     }
     
     // Create the task
-    const result = await createAgentTask({
+    const result = await createTask({
       user_id: userId,
-      query_id: query_id || undefined,
+      workflow_id: workflow_id || undefined,
       description,
       agent,
       status,
       parent_task_id,
     });
     
-    if (!result.success) {
+    if (!result.data) {
       throw new Error(result.error as any);
     }
     
-    return NextResponse.json({ success: true, taskId: result.id });
+    return NextResponse.json({ 
+      success: true, 
+      task: result.data 
+    });
   } catch (error) {
     console.error('Error creating task:', error);
     return NextResponse.json(

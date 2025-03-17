@@ -84,11 +84,10 @@ export async function POST(request: Request) {
     const { data: workflow, error: createError } = await supabase
       .from('workflows')
       .insert({
+        user_id: userId,
         name,
         description,
-        nodes,
-        edges,
-        user_id: userId,
+        graph: { nodes, edges },
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
