@@ -13,34 +13,48 @@ export type WorkflowData = {
   id?: string;
   user_id: string;
   name: string;
+  description?: string;
   graph: any; // JSON representation of the workflow
   created_at?: string;
   updated_at?: string;
 };
 
-// Types for custom agents
-export type CustomAgentData = {
+// Types for tasks
+export type TaskData = {
   id?: string;
   user_id: string;
-  name: string;
-  type: string; // e.g., 'research', 'code', 'analysis', etc.
-  instructions: string; // Custom instructions/prompt for the agent
+  workflow_id?: string; // Optional, if it's part of a workflow
+  description: string;
+  agent: string; // Which agent handled it
+  status: 'queued' | 'in_progress' | 'completed' | 'error';
+  result?: any;
+  parent_task_id?: string; // Optional, if it was spawned by another task
   created_at?: string;
   updated_at?: string;
 };
 
-// Types for agent tasks
-export type AgentTaskData = {
+// Types for chat messages
+export type ChatMessageData = {
+  id?: number;
+  user_id: string;
+  role: 'user' | 'assistant' | 'system' | string; // 'agent:name' for specific agents
+  content: string;
+  session_id: string;
+  task_id?: string; // Optional, if associated with a task
+  created_at?: string;
+};
+
+// Types for files
+export type FileData = {
   id?: string;
   user_id: string;
-  query_id?: string;
-  description: string;
-  agent: string;
-  status: 'queued' | 'in_progress' | 'completed' | 'error';
-  result?: any;
-  parent_task_id?: string;
-  created_at?: string;
-  updated_at?: string;
+  file_name: string;
+  file_path: string;
+  file_type: string;
+  file_size: number;
+  task_id?: string; // Optional, if associated with a task
+  workflow_id?: string; // Optional, if associated with a workflow
+  uploaded_at?: string;
 };
 
 // Function to save a workflow
@@ -109,147 +123,156 @@ export async function deleteWorkflow(id: string) {
   }
 }
 
-// Function to save a custom agent
-export async function saveCustomAgent(agent: CustomAgentData) {
+// Function to get user tasks
+export async function getUserTasks(userId: string) {
   try {
     const { data, error } = await supabase
-      .from('custom_agents')
-      .upsert(agent, { onConflict: 'id' })
-      .select('id');
-    
-    if (error) throw error;
-    return { success: true, id: data?.[0]?.id };
-  } catch (error) {
-    console.error('Error saving custom agent:', error);
-    return { success: false, error };
-  }
-}
-
-// Function to get all custom agents for a user
-export async function getUserCustomAgents(userId: string) {
-  try {
-    const { data, error } = await supabase
-      .from('custom_agents')
-      .select('*')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: false });
-    
-    if (error) throw error;
-    return { success: true, data };
-  } catch (error) {
-    console.error('Error getting custom agents:', error);
-    return { success: false, error };
-  }
-}
-
-// Function to get a specific custom agent
-export async function getCustomAgent(id: string) {
-  try {
-    const { data, error } = await supabase
-      .from('custom_agents')
-      .select('*')
-      .eq('id', id)
-      .single();
-    
-    if (error) throw error;
-    return { success: true, data };
-  } catch (error) {
-    console.error('Error getting custom agent:', error);
-    return { success: false, error };
-  }
-}
-
-// Function to delete a custom agent
-export async function deleteCustomAgent(id: string) {
-  try {
-    const { error } = await supabase
-      .from('custom_agents')
-      .delete()
-      .eq('id', id);
-    
-    if (error) throw error;
-    return { success: true };
-  } catch (error) {
-    console.error('Error deleting custom agent:', error);
-    return { success: false, error };
-  }
-}
-
-// Function to create a new agent task
-export async function createAgentTask(task: AgentTaskData) {
-  try {
-    const { data, error } = await supabase
-      .from('agent_tasks')
-      .insert(task)
-      .select('id');
-    
-    if (error) throw error;
-    return { success: true, id: data?.[0]?.id };
-  } catch (error) {
-    console.error('Error creating agent task:', error);
-    return { success: false, error };
-  }
-}
-
-// Function to update an agent task
-export async function updateAgentTask(id: string, updates: Partial<AgentTaskData>) {
-  try {
-    // Add updated_at timestamp
-    const updateData = {
-      ...updates,
-      updated_at: new Date().toISOString()
-    };
-    
-    const { error } = await supabase
-      .from('agent_tasks')
-      .update(updateData)
-      .eq('id', id);
-    
-    if (error) throw error;
-    return { success: true };
-  } catch (error) {
-    console.error('Error updating agent task:', error);
-    return { success: false, error };
-  }
-}
-
-// Function to get all agent tasks for a user
-export async function getAgentTasks(userId: string) {
-  try {
-    const { data, error } = await supabase
-      .from('agent_tasks')
+      .from('tasks')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
-    
+
     if (error) throw error;
-    return { success: true, data };
+    return { data, error: null };
   } catch (error) {
-    console.error('Error getting agent tasks:', error);
-    return { success: false, error };
+    console.error('Error fetching user tasks:', error);
+    return { data: null, error };
   }
 }
 
-// Function to get all agent tasks for a specific query/conversation
-export async function getAgentTasksByQuery(userId: string, queryId: string | null) {
+// Function to get task details
+export async function getTask(id: string) {
   try {
-    const query = supabase
-      .from('agent_tasks')
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error fetching task:', error);
+    return { data: null, error };
+  }
+}
+
+// Function to create a task
+export async function createTask(task: TaskData) {
+  try {
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert(task)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error creating task:', error);
+    return { data: null, error };
+  }
+}
+
+// Function to update a task
+export async function updateTask(id: string, updates: Partial<TaskData>) {
+  try {
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error updating task:', error);
+    return { data: null, error };
+  }
+}
+
+// Function to save a chat message
+export async function saveChatMessage(message: ChatMessageData) {
+  try {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .insert(message)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error saving chat message:', error);
+    return { data: null, error };
+  }
+}
+
+// Function to get chat messages for a session
+export async function getChatMessages(sessionId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error fetching chat messages:', error);
+    return { data: null, error };
+  }
+}
+
+// Function to save file metadata
+export async function saveFileMetadata(file: FileData) {
+  try {
+    const { data, error } = await supabase
+      .from('files')
+      .insert(file)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error saving file metadata:', error);
+    return { data: null, error };
+  }
+}
+
+// Function to get files for a user
+export async function getUserFiles(userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('files')
       .select('*')
       .eq('user_id', userId)
-      .order('created_at', { ascending: true });
-    
-    // Only add query_id filter if queryId is provided
-    if (queryId) {
-      query.eq('query_id', queryId);
-    }
-    
-    const { data, error } = await query;
-    
+      .order('uploaded_at', { ascending: false });
+
     if (error) throw error;
-    return { success: true, data };
+    return { data, error: null };
   } catch (error) {
-    console.error('Error getting agent tasks by query:', error);
-    return { success: false, error };
+    console.error('Error fetching user files:', error);
+    return { data: null, error };
+  }
+}
+
+// Function to get files for a task
+export async function getTaskFiles(taskId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('files')
+      .select('*')
+      .eq('task_id', taskId)
+      .order('uploaded_at', { ascending: false });
+
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    console.error('Error fetching task files:', error);
+    return { data: null, error };
   }
 } 
