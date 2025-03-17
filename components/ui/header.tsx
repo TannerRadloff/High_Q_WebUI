@@ -1,6 +1,11 @@
+'use client';
+
 import { WorkflowSelector } from './workflow-selector';
 import { WorkflowData } from '@/lib/supabase';
 import Link from 'next/link';
+import { useUser } from '@/contexts/user-context';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 interface HeaderProps {
   onClearChat?: () => void;
@@ -19,6 +24,22 @@ export function Header({
   activeWorkflowId = null,
   onWorkflowChange
 }: HeaderProps) {
+  const { user, signOut } = useUser();
+  const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleSignOut = async () => {
+    setIsLoggingOut(true);
+    try {
+      await signOut();
+      router.push('/auth/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
     <header className="sticky top-0 z-50 flex h-16 w-full shrink-0 items-center justify-between border-b bg-white px-4">
       <div className="flex items-center">
@@ -91,10 +112,33 @@ export function Header({
             Clear Chat
           </button>
         )}
-        <button
-          className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 h-9 px-4 py-2 hover:bg-zinc-100"
+        
+        <Link 
+          href="/profile"
+          className="group flex items-center gap-2"
         >
-          Logout
+          <div className="h-8 w-8 overflow-hidden rounded-full bg-gray-200 border">
+            {user?.avatar_url ? (
+              <img 
+                src={user.avatar_url} 
+                alt={user.name || 'User'} 
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-violet-100 text-violet-700">
+                {user?.name ? user.name[0].toUpperCase() : 'U'}
+              </div>
+            )}
+          </div>
+          <span className="text-sm font-medium">{user?.name || user?.email || 'Account'}</span>
+        </Link>
+        
+        <button
+          onClick={handleSignOut}
+          disabled={isLoggingOut}
+          className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 h-9 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700"
+        >
+          {isLoggingOut ? 'Signing out...' : 'Sign out'}
         </button>
       </div>
     </header>

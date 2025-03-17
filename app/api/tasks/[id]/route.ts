@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { verifyAuth } from '@/lib/auth';
+import { updateAgentTask } from '@/lib/supabase';
 
 export async function GET(
   request: Request,
@@ -9,7 +10,7 @@ export async function GET(
   // Verify authentication
   const { authenticated, userId, error: authError } = await verifyAuth();
   
-  if (!authenticated) {
+  if (!authenticated || !userId) {
     return NextResponse.json(
       { error: 'Authentication required', details: authError },
       { status: 401 }
@@ -61,27 +62,20 @@ export async function GET(
   }
 }
 
-// Update task status
+// PATCH /api/tasks/:id - Update a task
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const taskId = params.id;
+  
   // Verify authentication
   const { authenticated, userId, error: authError } = await verifyAuth();
   
-  if (!authenticated) {
+  if (!authenticated || !userId) {
     return NextResponse.json(
       { error: 'Authentication required', details: authError },
       { status: 401 }
-    );
-  }
-  
-  const taskId = params.id;
-  
-  if (!taskId) {
-    return NextResponse.json(
-      { error: 'Task ID is required' },
-      { status: 400 }
     );
   }
   
@@ -89,41 +83,30 @@ export async function PATCH(
     const body = await request.json();
     const { status, result } = body;
     
-    if (!status) {
+    // Ensure at least one field is provided
+    if (!status && result === undefined) {
       return NextResponse.json(
-        { error: 'Status is required' },
+        { error: 'At least one field (status or result) must be provided' },
         { status: 400 }
       );
     }
     
-    // Update the task in the database
-    const { data: updatedTask, error: updateError } = await supabase
-      .from('tasks')
-      .update({
-        status,
-        result,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', taskId)
-      .eq('user_id', userId)
-      .select()
-      .single();
-    
-    if (updateError) {
-      return NextResponse.json(
-        { error: 'Failed to update task', details: updateError },
-        { status: 500 }
-      );
-    }
-    
-    return NextResponse.json({
-      task: updatedTask
+    // Update the task
+    const updateResult = await updateAgentTask(taskId, {
+      status,
+      result,
+      updated_at: new Date().toISOString()
     });
     
+    if (!updateResult.success) {
+      throw new Error(updateResult.error as any);
+    }
+    
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating task:', error);
     return NextResponse.json(
-      { error: 'Failed to update task', details: error },
+      { error: 'Failed to update task' },
       { status: 500 }
     );
   }

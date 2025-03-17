@@ -2,20 +2,25 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
+import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 
 // Define types for our user
 export type User = {
   id: string;
   email?: string;
   name?: string;
+  avatar_url?: string;
 };
 
 // Define the context type
 type UserContextType = {
   user: User | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: any }>;
+  signInWithEmail: (email: string, password: string) => Promise<{ success: boolean; error?: any }>;
+  signUpWithEmail: (email: string, password: string) => Promise<{ success: boolean; error?: any }>;
+  signInWithGoogle: () => Promise<{ success: boolean; error?: any }>;
   signOut: () => Promise<void>;
+  session: Session | null;
 };
 
 // Create the context with a default value
@@ -33,39 +38,60 @@ export function useUser() {
 // Provider component that wraps the app
 export function UserProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // For demo purposes, we're using a mock user
-  // In a real app, you would use Supabase Auth
+  // Listen for authentication state changes
   useEffect(() => {
-    // Simulate loading user data
-    const loadUser = async () => {
-      try {
-        // For demo, just create a mock user
-        setUser({
-          id: 'demo-user-id',
-          email: 'demo@example.com',
-          name: 'Demo User',
-        });
-      } catch (error) {
-        console.error('Error loading user:', error);
-      } finally {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+        if (session?.user) {
+          setUser({
+            id: session.user.id,
+            email: session.user.email || undefined,
+            name: session.user.user_metadata.full_name || session.user.user_metadata.name,
+            avatar_url: session.user.user_metadata.avatar_url,
+          });
+        } else {
+          setUser(null);
+        }
         setLoading(false);
       }
+    );
+
+    // Initial session check
+    const initializeAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setSession(session);
+        setUser({
+          id: session.user.id,
+          email: session.user.email || undefined,
+          name: session.user.user_metadata.full_name || session.user.user_metadata.name,
+          avatar_url: session.user.user_metadata.avatar_url,
+        });
+      }
+      setLoading(false);
     };
 
-    loadUser();
+    initializeAuth();
+
+    // Clean up subscription on unmount
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  // Mock sign in function
-  const signIn = async (email: string, password: string) => {
+  // Sign in with email and password
+  const signInWithEmail = async (email: string, password: string) => {
     try {
-      // In a real app, you would call supabase.auth.signInWithPassword
-      setUser({
-        id: 'demo-user-id',
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        name: 'Demo User',
+        password,
       });
+
+      if (error) throw error;
       return { success: true };
     } catch (error) {
       console.error('Error signing in:', error);
@@ -73,11 +99,45 @@ export function UserProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Mock sign out function
+  // Sign up with email and password
+  const signUpWithEmail = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Error signing up:', error);
+      return { success: false, error };
+    }
+  };
+
+  // Sign in with Google
+  const signInWithGoogle = async () => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Error signing in with Google:', error);
+      return { success: false, error };
+    }
+  };
+
+  // Sign out
   const signOut = async () => {
     try {
-      // In a real app, you would call supabase.auth.signOut
-      setUser(null);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
     } catch (error) {
       console.error('Error signing out:', error);
     }
@@ -85,7 +145,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   // Provide the user context to children components
   return (
-    <UserContext.Provider value={{ user, loading, signIn, signOut }}>
+    <UserContext.Provider value={{ 
+      user, 
+      loading, 
+      signInWithEmail, 
+      signUpWithEmail, 
+      signInWithGoogle, 
+      signOut,
+      session
+    }}>
       {children}
     </UserContext.Provider>
   );

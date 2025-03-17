@@ -3,10 +3,11 @@ import { UserProvider } from '@/contexts/user-context';
 import { WorkflowProvider } from '@/contexts/workflow-context';
 import { AgentProvider } from '@/contexts/agent-context';
 import { Toaster } from '@/components/ui/toaster';
+import { TaskProvider } from '@/contexts/task-context';
 
 export const metadata = {
-  title: 'AI Agent Workflow Builder',
-  description: 'Build and manage AI agent workflows',
+  title: 'Mimir - AI Orchestration',
+  description: 'An AI orchestration system with dynamic delegation',
 };
 
 export default function RootLayout({
@@ -19,10 +20,12 @@ export default function RootLayout({
       <body>
         <UserProvider>
           <WorkflowProvider>
-            <AgentProvider>
-              {children}
-              <Toaster />
-            </AgentProvider>
+            <TaskProvider>
+              <AgentProvider>
+                {children}
+                <Toaster />
+              </AgentProvider>
+            </TaskProvider>
           </WorkflowProvider>
         </UserProvider>
       </body>

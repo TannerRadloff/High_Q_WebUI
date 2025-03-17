@@ -15,13 +15,13 @@ If a question requires specific expertise or a multi-step solution, you should d
 Otherwise, answer directly with your knowledge.
 
 Your available specialist agents are:
-1. Research Agent - Expert at finding information on any topic
+1. Research Agent - Expert at finding information on any topic, providing advice on complex decisions, and answering questions that require up-to-date information
 2. Coding Agent - Expert at writing and explaining code
 3. Data Analysis Agent - Expert at analyzing and visualizing data
-4. Writing Agent - Expert at creating and improving written content
+4. Writing Agent - Expert at creating and improving text content
 
 When deciding whether to delegate:
-- For factual questions, research needs, or information gathering, use the Research Agent
+- For factual questions, research needs, advice on complex decisions (like buying a car or house), or information gathering, use the Research Agent
 - For code writing, debugging, or programming explanations, use the Coding Agent
 - For data analysis, statistics, or visualization tasks, use the Data Analysis Agent
 - For content creation, editing, or writing assistance, use the Writing Agent
@@ -49,7 +49,7 @@ export class MimirAgent extends BaseAgent {
       {
         type: 'function',
         name: 'research_task',
-        description: 'Use this function when the user query requires research, information gathering, or answering factual questions.',
+        description: 'Use this function when the user query requires research, information gathering, answering factual questions, or providing advice on complex decisions (like buying a car, choosing a house, making investment decisions, etc.).',
         execute: async (params: { query: string }) => {
           return await researchAgent.run(params.query);
         }
@@ -241,8 +241,8 @@ If you can handle the query directly, do so. Otherwise, call the appropriate fun
   private isSimpleQuery(prompt: string): boolean {
     const prompt_lower = prompt.toLowerCase();
     
-    // Simple greeting or short question (less than 15 words)
-    if (prompt.split(' ').length < 15) {
+    // Simple greeting or short question (less than 10 words)
+    if (prompt.split(' ').length < 10) {
       return true;
     }
     
@@ -251,7 +251,10 @@ If you can handle the query directly, do so. Otherwise, call the appropriate fun
       'code', 'program', 'develop', 'build', 'create', 'implement',
       'research', 'find', 'search', 'analyze', 'data', 'statistics',
       'write', 'essay', 'article', 'content', 'blog', 'report',
-      'complex', 'difficult', 'challenging', 'step by step', 'workflow'
+      'complex', 'difficult', 'challenging', 'step by step', 'workflow',
+      'advice', 'recommend', 'suggestion', 'buy', 'purchase', 'invest',
+      'decision', 'compare', 'difference', 'better', 'best', 'worst',
+      'should i', 'how do i', 'what should', 'help me'
     ];
     
     // If any complex keywords are found, it's likely not a simple query

@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createAgentTask, getAgentTasks } from '@/lib/supabase';
 import { verifyAuth } from '@/lib/auth';
 
+// GET /api/tasks - Get all tasks for the current user
+// Can filter by query_id using ?query_id=xxx
 export async function GET(request: Request) {
   // Verify authentication
   const { authenticated, userId, error: authError } = await verifyAuth();
   
-  if (!authenticated) {
+  if (!authenticated || !userId) {
     return NextResponse.json(
       { error: 'Authentication required', details: authError },
       { status: 401 }
@@ -14,62 +16,38 @@ export async function GET(request: Request) {
   }
   
   try {
-    // Get query parameters
+    // Get tasks for this user
+    const result = await getAgentTasks(userId);
+    
+    if (!result.success) {
+      throw new Error(result.error as any);
+    }
+    
+    // Filter by query_id if provided
     const url = new URL(request.url);
-    const status = url.searchParams.get('status');
-    const workflowId = url.searchParams.get('workflowId');
-    const limit = parseInt(url.searchParams.get('limit') || '50');
-    const offset = parseInt(url.searchParams.get('offset') || '0');
+    const queryId = url.searchParams.get('query_id');
     
-    // Build the query
-    let query = supabase
-      .from('tasks')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(limit)
-      .range(offset, offset + limit - 1);
-    
-    // Add filters if provided
-    if (status) {
-      query = query.eq('status', status);
+    let tasks = result.data || [];
+    if (queryId) {
+      tasks = tasks.filter(task => task.query_id === queryId);
     }
     
-    if (workflowId) {
-      query = query.eq('workflow_id', workflowId);
-    }
-    
-    // Execute the query
-    const { data: tasks, error: tasksError, count } = await query;
-    
-    if (tasksError) {
-      return NextResponse.json(
-        { error: 'Failed to fetch tasks', details: tasksError },
-        { status: 500 }
-      );
-    }
-    
-    return NextResponse.json({
-      tasks,
-      count,
-      limit,
-      offset
-    });
-    
+    return NextResponse.json({ tasks });
   } catch (error) {
-    console.error('Error fetching tasks:', error);
+    console.error('Error getting tasks:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch tasks', details: error },
+      { error: 'Failed to retrieve tasks' },
       { status: 500 }
     );
   }
 }
 
+// POST /api/tasks - Create a new task
 export async function POST(request: Request) {
   // Verify authentication
   const { authenticated, userId, error: authError } = await verifyAuth();
   
-  if (!authenticated) {
+  if (!authenticated || !userId) {
     return NextResponse.json(
       { error: 'Authentication required', details: authError },
       { status: 401 }
@@ -78,46 +56,34 @@ export async function POST(request: Request) {
   
   try {
     const body = await request.json();
-    const { title, description, workflowId, agent } = body;
+    const { query_id, description, agent, status = 'queued', parent_task_id } = body;
     
-    if (!title) {
+    if (!description || !agent) {
       return NextResponse.json(
-        { error: 'Title is required' },
+        { error: 'Description and agent are required fields' },
         { status: 400 }
       );
     }
     
-    // Create a new task
-    const { data: task, error: createError } = await supabase
-      .from('tasks')
-      .insert({
-        title,
-        description,
-        workflow_id: workflowId,
-        agent,
-        status: 'queued',
-        user_id: userId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-    
-    if (createError) {
-      return NextResponse.json(
-        { error: 'Failed to create task', details: createError },
-        { status: 500 }
-      );
-    }
-    
-    return NextResponse.json({
-      task
+    // Create the task
+    const result = await createAgentTask({
+      user_id: userId,
+      query_id: query_id || undefined,
+      description,
+      agent,
+      status,
+      parent_task_id,
     });
     
+    if (!result.success) {
+      throw new Error(result.error as any);
+    }
+    
+    return NextResponse.json({ success: true, taskId: result.id });
   } catch (error) {
     console.error('Error creating task:', error);
     return NextResponse.json(
-      { error: 'Failed to create task', details: error },
+      { error: 'Failed to create task' },
       { status: 500 }
     );
   }

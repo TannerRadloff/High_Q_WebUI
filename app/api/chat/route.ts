@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { MimirAgent, runAgent } from '@/lib/agents';
 import { verifyAuth } from '@/lib/auth';
+import { v4 as uuidv4 } from 'uuid';
 
 // Initialize the Mimir agent (singleton instance)
 const mimirAgent = new MimirAgent();
@@ -9,18 +10,29 @@ const mimirAgent = new MimirAgent();
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function POST(request: Request) {
+  // Verify authentication
+  const { authenticated, userId, error: authError } = await verifyAuth();
+  
+  if (!authenticated) {
+    return NextResponse.json(
+      { error: 'Authentication required', details: authError },
+      { status: 401 }
+    );
+  }
+  
   try {
     const body = await request.json();
-    const { message, taskId, instruction, newAgent, workflowId } = body;
+    const { message, taskId, instruction, newAgent, workflowId, options } = body;
     
-    // Verify authentication (optional, comment out if not using auth)
-    // const { authenticated, userId, error: authError } = await verifyAuth();
-    // if (!authenticated) {
-    //   return NextResponse.json(
-    //     { error: 'Authentication required', details: authError },
-    //     { status: 401 }
-    //   );
-    // }
+    // Generate a unique query ID for tracking related tasks
+    const queryId = uuidv4();
+    
+    // Context for agent execution
+    const context = {
+      userId,
+      queryId,
+      options
+    };
     
     // Handle task instruction
     if (taskId && instruction) {
@@ -54,32 +66,16 @@ export async function POST(request: Request) {
     }
 
     // For regular messages, use our orchestration system
-    const result = await runAgent(mimirAgent, message);
+    const response = await runAgent(mimirAgent, message, context);
     
-    // Format the response based on the agent result
-    if (result.delegationReasoning) {
-      // If the query was delegated to a specialist agent
-      return NextResponse.json({
-        sender: 'agent',
-        agentName: result.agent,
-        content: result.content,
-        delegationReasoning: result.delegationReasoning,
-        model: result.model || 'gpt-4',
-        timestamp: new Date().toISOString()
-      });
-    } else {
-      // If Mimir handled it directly
-      return NextResponse.json({
-        sender: 'mimir',
-        content: result.content,
-        model: result.model || 'gpt-3.5-turbo',
-        timestamp: new Date().toISOString()
-      });
-    }
+    return NextResponse.json({
+      response,
+      queryId
+    });
   } catch (error) {
-    console.error('Error processing chat:', error);
+    console.error('Error in chat API:', error);
     return NextResponse.json(
-      { error: 'Failed to process message', details: error },
+      { error: 'An error occurred while processing your request' },
       { status: 500 }
     );
   }
