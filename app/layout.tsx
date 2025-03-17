@@ -1,9 +1,12 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import { UserProvider } from '@/contexts/user-context';
+import { WorkflowProvider } from '@/contexts/workflow-context';
+import { AgentProvider } from '@/contexts/agent-context';
+import { Toaster } from '@/components/ui/toaster';
 
-export const metadata: Metadata = {
-  title: 'Next.js App',
-  description: 'A minimal Next.js application',
+export const metadata = {
+  title: 'AI Agent Workflow Builder',
+  description: 'Build and manage AI agent workflows',
 };
 
 export default function RootLayout({
@@ -13,7 +16,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <UserProvider>
+          <WorkflowProvider>
+            <AgentProvider>
+              {children}
+              <Toaster />
+            </AgentProvider>
+          </WorkflowProvider>
+        </UserProvider>
+      </body>
     </html>
   );
 } 
