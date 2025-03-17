@@ -4,6 +4,7 @@ import { WorkflowProvider } from '@/contexts/workflow-context';
 import { AgentProvider } from '@/contexts/agent-context';
 import { Toaster } from '@/components/ui/toaster';
 import { TaskProvider } from '@/contexts/task-context';
+import { ThemeProvider } from '@/components/ui/theme-provider';
 
 export const metadata = {
   title: 'Mimir - AI Orchestration',
@@ -16,18 +17,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body>
-        <UserProvider>
-          <WorkflowProvider>
-            <TaskProvider>
-              <AgentProvider>
-                {children}
-                <Toaster />
-              </AgentProvider>
-            </TaskProvider>
-          </WorkflowProvider>
-        </UserProvider>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          <UserProvider>
+            <WorkflowProvider>
+              <TaskProvider>
+                <AgentProvider>
+                  {children}
+                  <Toaster />
+                </AgentProvider>
+              </TaskProvider>
+            </WorkflowProvider>
+          </UserProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
