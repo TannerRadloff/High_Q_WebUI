@@ -1,12 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { verifyAuth } from '@/lib/auth';
 import { updateAgentTask } from '@/lib/supabase';
 
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+type Params = {
+  params: {
+    id: string;
+  };
+};
+
+export const GET = async (request: NextRequest, { params }: Params) => {
   // Verify authentication
   const { authenticated, userId, error: authError } = await verifyAuth();
   
@@ -60,13 +63,10 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+};
 
 // PATCH /api/tasks/:id - Update a task
-export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+export const PATCH = async (request: NextRequest, { params }: Params) => {
   const taskId = params.id;
   
   // Verify authentication
@@ -98,8 +98,8 @@ export async function PATCH(
       updated_at: new Date().toISOString()
     });
     
-    if (!updateResult.success) {
-      throw new Error(updateResult.error as any);
+    if (updateResult.error) {
+      throw new Error(String(updateResult.error));
     }
     
     return NextResponse.json({ success: true });
@@ -110,4 +110,4 @@ export async function PATCH(
       { status: 500 }
     );
   }
-} 
+}; 
