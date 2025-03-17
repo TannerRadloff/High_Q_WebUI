@@ -2,11 +2,12 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useUser } from './user-context';
 
 export type Task = {
   id: string;
   user_id: string;
-  query_id?: string;
+  workflow_id?: string;
   description: string;
   agent: string;
   status: 'queued' | 'in_progress' | 'completed' | 'error';
@@ -20,38 +21,48 @@ interface TaskContextType {
   tasks: Task[];
   loading: boolean;
   error: string | null;
-  fetchTasks: (queryId?: string) => Promise<void>;
+  fetchTasks: (workflowId?: string) => Promise<void>;
   clearTasks: () => void;
 }
 
 const TaskContext = createContext<TaskContextType | undefined>(undefined);
 
 export function TaskProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useUser();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentQueryId, setCurrentQueryId] = useState<string | undefined>(undefined);
+  const [currentWorkflowId, setCurrentWorkflowId] = useState<string | undefined>(undefined);
 
   // Fetch tasks
-  const fetchTasks = async (queryId?: string) => {
+  const fetchTasks = async (workflowId?: string) => {
+    if (!user) return;
+    
     setLoading(true);
     setError(null);
     try {
-      const url = queryId ? `/api/tasks?query_id=${queryId}` : '/api/tasks';
-      const response = await fetch(url);
+      // Fetch tasks directly from Supabase with RLS
+      let query = supabase
+        .from('tasks')
+        .select('*')
+        .order('created_at', { ascending: false });
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch tasks');
+      // Filter by workflow_id if provided
+      if (workflowId) {
+        query = query.eq('workflow_id', workflowId);
       }
       
-      const data = await response.json();
-      setTasks(data.tasks || []);
+      const { data, error: fetchError } = await query;
       
-      // Save the query ID for real-time updates
-      setCurrentQueryId(queryId);
-    } catch (err) {
+      if (fetchError) throw fetchError;
+      
+      setTasks(data || []);
+      
+      // Save the workflow ID for real-time updates
+      setCurrentWorkflowId(workflowId);
+    } catch (err: any) {
       console.error('Error fetching tasks:', err);
-      setError('Failed to load tasks');
+      setError(err.message || 'Failed to load tasks');
     } finally {
       setLoading(false);
     }
@@ -60,28 +71,26 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
   // Clear tasks
   const clearTasks = () => {
     setTasks([]);
-    setCurrentQueryId(undefined);
+    setCurrentWorkflowId(undefined);
   };
 
   // Set up real-time subscription
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (!user) return;
 
-    // Subscribe to changes on the agent_tasks table
-    const subscription = supabase
-      .channel('agent_tasks_changes')
+    // Subscribe to changes on the tasks table
+    const channel = supabase
+      .channel('tasks_changes')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'agent_tasks',
+        table: 'tasks',
+        filter: currentWorkflowId ? `workflow_id=eq.${currentWorkflowId}` : undefined
       }, (payload) => {
         // Handle different types of changes
         if (payload.eventType === 'INSERT') {
           const newTask = payload.new as Task;
-          // Only add if it matches our current query filter or we're showing all
-          if (!currentQueryId || newTask.query_id === currentQueryId) {
-            setTasks((prev) => [newTask, ...prev]);
-          }
+          setTasks((prev) => [newTask, ...prev]);
         } else if (payload.eventType === 'UPDATE') {
           const updatedTask = payload.new as Task;
           setTasks((prev) =>
@@ -96,9 +105,9 @@ export function TaskProvider({ children }: { children: React.ReactNode }) {
 
     // Clean up the subscription
     return () => {
-      supabase.channel('agent_tasks_changes').unsubscribe();
+      channel.unsubscribe();
     };
-  }, [currentQueryId]);
+  }, [user, currentWorkflowId]);
 
   return (
     <TaskContext.Provider

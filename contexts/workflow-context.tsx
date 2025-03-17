@@ -5,6 +5,7 @@ import { useUser } from './user-context';
 import { saveWorkflow, getUserWorkflows, getWorkflow, deleteWorkflow, WorkflowData } from '@/lib/supabase';
 import { patentAnalysisWorkflow, exampleWorkflows } from '@/components/workflow/example-workflows';
 import { Edge, Node } from 'reactflow';
+import { supabase } from '@/lib/supabase';
 
 // Define the context type
 type WorkflowContextType = {
@@ -48,8 +49,6 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
 
       setLoading(true);
       try {
-        // For demo purposes, we'll create a sample workflow if none exist
-        // In a real app, you would fetch from Supabase
         const result = await getUserWorkflows(user.id);
         
         if (result.success && result.data) {
@@ -58,16 +57,31 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
             const demoWorkflow: WorkflowData = {
               user_id: user.id,
               name: patentAnalysisWorkflow.name,
+              description: "Sample workflow for patent analysis",
               graph: {
                 nodes: patentAnalysisWorkflow.nodes,
-                edges: patentAnalysisWorkflow.edges,
+                edges: patentAnalysisWorkflow.edges
               },
             };
             
             const saveResult = await saveWorkflow(demoWorkflow);
-            if (saveResult.success && saveResult.id) {
-              demoWorkflow.id = saveResult.id;
-              setWorkflows([demoWorkflow]);
+            if (saveResult.success) {
+              // Fetch again to get the created workflow with ID
+              const updatedResult = await getUserWorkflows(user.id);
+              if (updatedResult.success) {
+                setWorkflows(updatedResult.data || []);
+              }
+            } else {
+              // Just use examples without persisting
+              setWorkflows(exampleWorkflows.map(workflow => ({
+                user_id: user.id,
+                name: workflow.name,
+                description: "Example workflow",
+                graph: {
+                  nodes: workflow.nodes,
+                  edges: workflow.edges
+                }
+              })));
             }
           } else {
             setWorkflows(result.data);
@@ -75,38 +89,65 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         console.error('Error loading workflows:', error);
-        
-        // For demo, create mock workflows
-        const mockWorkflows: WorkflowData[] = exampleWorkflows.map((workflow, index) => ({
-          id: `demo-workflow-${index}`,
+        // Fallback to examples
+        setWorkflows(exampleWorkflows.map(workflow => ({
           user_id: user.id,
           name: workflow.name,
+          description: "Example workflow",
           graph: {
             nodes: workflow.nodes,
-            edges: workflow.edges,
-          },
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }));
-        
-        setWorkflows(mockWorkflows);
+            edges: workflow.edges
+          }
+        })));
       } finally {
         setLoading(false);
       }
     };
 
     loadWorkflows();
+    
+    // Set up real-time subscription for workflows
+    if (user) {
+      const channel = supabase
+        .channel('workflows_changes')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'workflows'
+        }, (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newWorkflow = payload.new as WorkflowData;
+            setWorkflows((prev) => [newWorkflow, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedWorkflow = payload.new as WorkflowData;
+            setWorkflows((prev) =>
+              prev.map((workflow) => 
+                (workflow.id === updatedWorkflow.id ? updatedWorkflow : workflow)
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            const deletedWorkflow = payload.old as WorkflowData;
+            setWorkflows((prev) => 
+              prev.filter((workflow) => workflow.id !== deletedWorkflow.id)
+            );
+          }
+        })
+        .subscribe();
+        
+      return () => {
+        channel.unsubscribe();
+      };
+    }
   }, [user]);
 
-  // Function to refresh workflows
   const refreshWorkflows = async () => {
     if (!user) return;
     
     setLoading(true);
     try {
       const result = await getUserWorkflows(user.id);
-      if (result.success && result.data) {
-        setWorkflows(result.data);
+      if (result.success) {
+        setWorkflows(result.data || []);
       }
     } catch (error) {
       console.error('Error refreshing workflows:', error);
@@ -115,91 +156,105 @@ export function WorkflowProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Function to save current workflow
   const saveCurrentWorkflow = async (name: string, nodes: Node[], edges: Edge[]) => {
-    if (!user) return { success: false };
+    if (!user || !activeWorkflowId) {
+      return { success: false };
+    }
     
     try {
-      const workflowToUpdate = workflows.find(w => w.id === activeWorkflowId);
-      
-      if (!workflowToUpdate) {
-        return createWorkflow(name, nodes, edges);
+      // Find the active workflow
+      const activeWorkflow = workflows.find(w => w.id === activeWorkflowId);
+      if (!activeWorkflow) {
+        return { success: false };
       }
       
+      // Update the workflow
       const updatedWorkflow: WorkflowData = {
-        ...workflowToUpdate,
+        ...activeWorkflow,
         name,
-        graph: { nodes, edges },
+        graph: { nodes, edges }
       };
       
       const result = await saveWorkflow(updatedWorkflow);
+      
       if (result.success) {
-        await refreshWorkflows();
+        // Update local state
+        setWorkflows(workflows.map(w => 
+          w.id === activeWorkflowId ? updatedWorkflow : w
+        ));
       }
       
       return result;
     } catch (error) {
       console.error('Error saving workflow:', error);
-      return { success: false, error };
+      return { success: false };
     }
   };
 
-  // Function to create a new workflow
   const createWorkflow = async (name: string, nodes: Node[], edges: Edge[]) => {
-    if (!user) return { success: false };
+    if (!user) {
+      return { success: false };
+    }
     
     try {
       const newWorkflow: WorkflowData = {
         user_id: user.id,
         name,
-        graph: { nodes, edges },
+        description: `Created on ${new Date().toLocaleDateString()}`,
+        graph: { nodes, edges }
       };
       
       const result = await saveWorkflow(newWorkflow);
-      if (result.success) {
-        await refreshWorkflows();
-        if (result.id) {
-          setActiveWorkflowId(result.id);
-        }
+      
+      if (result.success && result.id) {
+        // We'll let the real-time subscription handle updating the list
+        // but we can also set the active workflow immediately
+        setActiveWorkflowId(result.id);
       }
       
       return result;
     } catch (error) {
       console.error('Error creating workflow:', error);
-      return { success: false, error };
+      return { success: false };
     }
   };
 
-  // Function to delete a workflow
   const deleteUserWorkflow = async (id: string) => {
+    if (!user) {
+      return { success: false };
+    }
+    
     try {
       const result = await deleteWorkflow(id);
+      
       if (result.success) {
+        // Update local state (but real-time will also handle this)
+        setWorkflows(workflows.filter(w => w.id !== id));
+        
+        // Clear active workflow if it was deleted
         if (activeWorkflowId === id) {
           setActiveWorkflowId(null);
         }
-        await refreshWorkflows();
       }
       
       return result;
     } catch (error) {
       console.error('Error deleting workflow:', error);
-      return { success: false, error };
+      return { success: false };
     }
   };
 
-  // Provide the workflow context to children components
   return (
-    <WorkflowContext.Provider 
-      value={{ 
-        workflows, 
-        loading, 
-        activeWorkflowId, 
-        setActiveWorkflowId, 
-        saveCurrentWorkflow, 
-        createWorkflow, 
-        deleteUserWorkflow, 
-        refreshWorkflows 
+    <WorkflowContext.Provider
+      value={{
+        workflows,
+        loading,
+        activeWorkflowId,
+        setActiveWorkflowId,
+        saveCurrentWorkflow,
+        createWorkflow,
+        deleteUserWorkflow,
+        refreshWorkflows,
       }}
     >
       {children}
