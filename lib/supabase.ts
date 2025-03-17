@@ -62,7 +62,9 @@ export type CustomAgentData = {
   id?: string;
   user_id: string;
   name: string;
+  type: string;
   description?: string;
+  instructions: string;
   system_prompt: string;
   model: string;
   created_at?: string;

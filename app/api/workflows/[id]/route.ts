@@ -1,10 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { verifyAuth } from '@/lib/auth';
 
+type Params = {
+  id: string;
+};
+
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
 ) {
   // Verify authentication
   const { authenticated, userId, error: authError } = await verifyAuth();
@@ -16,7 +20,8 @@ export async function GET(
     );
   }
   
-  const workflowId = params.id;
+  const resolvedParams = await params;
+  const workflowId = resolvedParams.id;
   
   if (!workflowId) {
     return NextResponse.json(
@@ -62,8 +67,8 @@ export async function GET(
 }
 
 export async function PUT(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
 ) {
   // Verify authentication
   const { authenticated, userId, error: authError } = await verifyAuth();
@@ -75,7 +80,8 @@ export async function PUT(
     );
   }
   
-  const workflowId = params.id;
+  const resolvedParams = await params;
+  const workflowId = resolvedParams.id;
   
   if (!workflowId) {
     return NextResponse.json(
@@ -153,8 +159,8 @@ export async function PUT(
 }
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
 ) {
   // Verify authentication
   const { authenticated, userId, error: authError } = await verifyAuth();
@@ -166,7 +172,8 @@ export async function DELETE(
     );
   }
   
-  const workflowId = params.id;
+  const resolvedParams = await params;
+  const workflowId = resolvedParams.id;
   
   if (!workflowId) {
     return NextResponse.json(

@@ -4,12 +4,13 @@ import { verifyAuth } from '@/lib/auth';
 import { updateAgentTask } from '@/lib/supabase';
 
 type Params = {
-  params: {
-    id: string;
-  };
+  id: string;
 };
 
-export const GET = async (request: NextRequest, { params }: Params) => {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
   // Verify authentication
   const { authenticated, userId, error: authError } = await verifyAuth();
   
@@ -20,7 +21,8 @@ export const GET = async (request: NextRequest, { params }: Params) => {
     );
   }
   
-  const taskId = params.id;
+  const resolvedParams = await params;
+  const taskId = resolvedParams.id;
   
   if (!taskId) {
     return NextResponse.json(
@@ -63,12 +65,13 @@ export const GET = async (request: NextRequest, { params }: Params) => {
       { status: 500 }
     );
   }
-};
+}
 
 // PATCH /api/tasks/:id - Update a task
-export const PATCH = async (request: NextRequest, { params }: Params) => {
-  const taskId = params.id;
-  
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
+) {
   // Verify authentication
   const { authenticated, userId, error: authError } = await verifyAuth();
   
@@ -78,6 +81,9 @@ export const PATCH = async (request: NextRequest, { params }: Params) => {
       { status: 401 }
     );
   }
+  
+  const resolvedParams = await params;
+  const taskId = resolvedParams.id;
   
   try {
     const body = await request.json();
@@ -110,4 +116,4 @@ export const PATCH = async (request: NextRequest, { params }: Params) => {
       { status: 500 }
     );
   }
-}; 
+} 

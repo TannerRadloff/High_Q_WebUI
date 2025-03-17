@@ -17,7 +17,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Loader2, Plus, Trash2, Edit, AlertCircle } from 'lucide-react';
 
 export function AgentDashboard() {
-  const { workflows, isLoading: isWorkflowsLoading } = useWorkflow();
+  const { workflows, loading: isWorkflowsLoading } = useWorkflow();
   const { customAgents, isLoading: isAgentsLoading, saveAgent, deleteAgent } = useAgent();
   const [selectedTab, setSelectedTab] = useState('workflows');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -53,12 +53,27 @@ export function AgentDashboard() {
   const handleAgentSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+    const name = formData.get('name') as string;
+    const type = formData.get('type') as string;
+    const instructions = formData.get('instructions') as string;
+    
+    if (!name || !type || !instructions) {
+      toast({
+        title: 'Error',
+        description: 'Please fill in all required fields.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const agentData: CustomAgentData = {
       id: editingAgent?.id,
       user_id: '', // Will be set by the backend
-      name: formData.get('name') as string,
-      type: formData.get('type') as string,
-      instructions: formData.get('instructions') as string,
+      name,
+      type,
+      instructions,
+      system_prompt: instructions, // Use instructions as the system prompt
+      model: 'gpt-4', // Default model
     };
 
     const result = await saveAgent(agentData);
@@ -130,7 +145,7 @@ export function AgentDashboard() {
                       variant="destructive"
                       size="sm"
                       onClick={() => {
-                        setDeleteItemId(workflow.id);
+                        setDeleteItemId(workflow.id || null);
                         setIsDeleteDialogOpen(true);
                       }}
                     >
@@ -172,7 +187,7 @@ export function AgentDashboard() {
                         variant="destructive"
                         size="sm"
                         onClick={() => {
-                          setDeleteItemId(agent.id);
+                          setDeleteItemId(agent.id || null);
                           setIsDeleteDialogOpen(true);
                         }}
                       >

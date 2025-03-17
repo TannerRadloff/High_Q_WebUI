@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { verifyAuth } from '@/lib/auth';
 import { 
@@ -26,15 +26,12 @@ const agentMap = {
   'MimirAgent': mimirAgent
 };
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   // Verify authentication
   const { authenticated, userId, error: authError } = await verifyAuth();
   
-  if (!authenticated) {
-    return NextResponse.json(
-      { error: 'Authentication required', details: authError },
-      { status: 401 }
-    );
+  if (!authenticated || !userId) {
+    return NextResponse.json({ error: authError || 'Unauthorized' }, { status: 401 });
   }
   
   try {
@@ -97,7 +94,7 @@ export async function POST(request: Request) {
 
     // Execute the workflow
     // Make sure input is always a string to satisfy TypeScript
-    const inputString: string = typeof input === 'string' ? input : '';
+    const inputString = typeof input === 'string' ? input : '';
     const result = await executeWorkflow(nodes, edges, inputString, userId, task.id);
     
     // Update the task with the result
@@ -140,10 +137,16 @@ export async function POST(request: Request) {
  * @param taskId Task ID for tracking
  * @returns The final result of the workflow
  */
-async function executeWorkflow(nodes: any[], edges: any[], input: string | null | undefined, userId: string, taskId: string) {
+async function executeWorkflow(
+  nodes: any[],
+  edges: any[],
+  input: string,
+  userId: string,
+  taskId: string
+) {
   try {
-    // Ensure input is a string
-    let inputStr = typeof input === 'string' ? input : '';
+    // Input is already guaranteed to be a string by the caller
+    let inputStr = input;
     
     // Determine node execution order using topological sort
     const executionOrder = topologicalSort(nodes, edges);
@@ -274,11 +277,7 @@ async function executeWorkflow(nodes: any[], edges: any[], input: string | null 
     return finalResult || { content: "Workflow completed but no output node was found" };
   } catch (error) {
     console.error('Error in workflow execution:', error);
-    return {
-      content: 'There was an error executing the workflow',
-      error: true,
-      details: error
-    };
+    throw error;
   }
 }
 

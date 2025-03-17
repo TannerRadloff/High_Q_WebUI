@@ -1,11 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { verifyAuth } from '@/lib/auth';
 
+type Params = {
+  id: string;
+};
+
 // GET handler to retrieve task status and steps
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
 ) {
   // Verify authentication
   const { authenticated, userId, error: authError } = await verifyAuth();
@@ -18,7 +22,8 @@ export async function GET(
   }
   
   try {
-    const taskId = params.id;
+    const resolvedParams = await params;
+    const taskId = resolvedParams.id;
     
     // Fetch task details
     const { data: task, error: taskError } = await supabase
@@ -65,8 +70,8 @@ export async function GET(
 
 // PATCH handler to update task status or add instructions
 export async function PATCH(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: Promise<Params> }
 ) {
   // Verify authentication
   const { authenticated, userId, error: authError } = await verifyAuth();
@@ -79,7 +84,8 @@ export async function PATCH(
   }
   
   try {
-    const taskId = params.id;
+    const resolvedParams = await params;
+    const taskId = resolvedParams.id;
     const body = await request.json();
     const { action, data } = body;
     

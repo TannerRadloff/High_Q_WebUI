@@ -28,8 +28,8 @@ export async function runAgent(
         parent_task_id: context.parentTaskId,
       });
       
-      if (taskResult.success) {
-        taskId = taskResult.id;
+      if (taskResult.data && !taskResult.error) {
+        taskId = taskResult.data.id;
         // Update context with this task's ID for potential subtasks
         context.parentTaskId = taskId;
       }
