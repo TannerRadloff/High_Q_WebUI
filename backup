@@ -1,0 +1,28 @@
+# Generate a random secret: https://generate-secret.vercel.app/32 or `openssl rand -base64 32`
+AUTH_SECRET=supersecretkey123456789supersecretkey
+
+# For development purposes only - not needed for admin/admin login
+POSTGRES_URL=postgres://postgres:postgres@localhost:5432/postgres
+
+NEXT_DISABLE_ESLINT=1 
+
+
+NEXT_PUBLIC_SUPABASE_URL=https://mqwfrlkcrouhwhiumbzg.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xd2ZybGtjcm91aHdoaXVtYnpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE4MzQ5OTksImV4cCI6MjA1NzQxMDk5OX0.7jCl1DTuVTy9g9ragmH1_slHqGPPKFuwfJHPumR2B5M
+     
+hq_POSTGRES_URL="postgres://postgres.mqwfrlkcrouhwhiumbzg:7hHX0yNiNcmvwLyS@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&supa=base-pooler.x"
+hq_POSTGRES_PRISMA_URL="postgres://postgres.mqwfrlkcrouhwhiumbzg:7hHX0yNiNcmvwLyS@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require&supa=base-pooler.x"
+hq_SUPABASE_URL="https://mqwfrlkcrouhwhiumbzg.supabase.co"
+hq_NEXT_PUBLIC_SUPABASE_URL="https://mqwfrlkcrouhwhiumbzg.supabase.co"
+hq_POSTGRES_URL_NON_POOLING="postgres://postgres.mqwfrlkcrouhwhiumbzg:7hHX0yNiNcmvwLyS@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require"
+hq_SUPABASE_JWT_SECRET="NpLxaLnn2qwkq32FW2oPRujvVj0vZVWyVw2D9d0eyOwsPNHwvTwIvXn26Jd0YrS/3DxFX0TJ0Q/uqDqtfCb1VQ=="
+hq_POSTGRES_USER="postgres"
+hq_NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xd2ZybGtjcm91aHdoaXVtYnpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE4MzQ5OTksImV4cCI6MjA1NzQxMDk5OX0.7jCl1DTuVTy9g9ragmH1_slHqGPPKFuwfJHPumR2B5M"
+hq_POSTGRES_PASSWORD="7hHX0yNiNcmvwLyS"
+hq_POSTGRES_DATABASE="postgres"
+hq_SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xd2ZybGtjcm91aHdoaXVtYnpnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MTgzNDk5OSwiZXhwIjoyMDU3NDEwOTk5fQ.bNUmzQYfghXOEotD82PsZ6M4XDzS_R3N_NGC-8oTl0A"
+hq_POSTGRES_HOST="db.mqwfrlkcrouhwhiumbzg.supabase.co"
+hq_NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xd2ZybGtjcm91aHdoaXVtYnpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDE4MzQ5OTksImV4cCI6MjA1NzQxMDk5OX0.7jCl1DTuVTy9g9ragmH1_slHqGPPKFuwfJHPumR2B5M"   
+
+# Add DATABASE_URL if not already present
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres"   

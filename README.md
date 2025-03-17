@@ -1,28 +1,21 @@
-# Minimal Next.js Application
+# Barebones Next.js Application
 
-This is a stripped-down Next.js application with only the essential components. It provides a clean starting point for building Next.js applications without unnecessary complexity.
+This is an ultra-minimal Next.js application with only the absolute essentials needed to get started.
 
 ## Project Structure
 
 ```
 ├── app/                  # Next.js App Router
-│   ├── api/              # API routes
-│   ├── globals.css       # Global styles
-│   ├── layout.tsx        # Root layout
-│   └── page.tsx          # Home page
-├── components/           # React components
-│   └── ui/               # UI components
-│       └── button.tsx    # Button component
-├── lib/                  # Utility functions and shared code
-│   └── utils/            # Utility functions
-│       └── cn.ts         # Class name utility
-├── public/               # Static assets
-│   └── favicon.ico       # Favicon
-├── next.config.js        # Next.js configuration
-├── package.json          # Project dependencies
-├── postcss.config.mjs    # PostCSS configuration
-├── tailwind.config.ts    # Tailwind CSS configuration
-└── tsconfig.json         # TypeScript configuration
+│   ├── globals.css      # Global styles (Tailwind imports)
+│   ├── layout.tsx       # Root layout
+│   └── page.tsx         # Home page
+├── public/              # Static assets
+│   └── favicon.ico      # Favicon
+├── next.config.js       # Next.js configuration
+├── package.json         # Project dependencies
+├── postcss.config.mjs   # PostCSS configuration
+├── tailwind.config.ts   # Tailwind CSS configuration
+└── tsconfig.json        # TypeScript configuration
 ```
 
 ## Getting Started
@@ -54,5 +47,5 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 - Next.js App Router
 - TypeScript
 - Tailwind CSS
-- Minimal UI components
-- Clean project structure 
+- Absolute minimum configuration
+- Zero unnecessary components or utilities 
