@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { useUser } from '@/contexts/user-context';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { ModeToggle } from './mode-toggle';
+import { Sparkles } from 'lucide-react';
 
 interface HeaderProps {
   onClearChat?: () => void;
@@ -41,7 +43,7 @@ export function Header({
   };
 
   return (
-    <header className="sticky top-0 z-50 flex h-16 w-full shrink-0 items-center justify-between border-b bg-white px-4">
+    <header className="sticky top-0 z-50 flex h-16 w-full shrink-0 items-center justify-between border-b bg-white px-4 dark:bg-gray-900 dark:border-gray-800">
       <div className="flex items-center">
         <h1 className="text-xl font-semibold">Mimir Assistant</h1>
       </div>
@@ -54,8 +56,15 @@ export function Header({
           />
         )}
         <Link
+          href="/theme-showcase"
+          className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 dark:bg-gray-800 dark:text-amber-400 dark:hover:bg-gray-700 dark:border dark:border-amber-400/30"
+        >
+          <Sparkles className="h-4 w-4 mr-2" />
+          Theme Showcase
+        </Link>
+        <Link
           href="/agent-dashboard"
-          className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-4 py-2 bg-violet-50 hover:bg-violet-100 text-violet-700"
+          className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 h-9 px-4 py-2 bg-violet-50 hover:bg-violet-100 text-violet-700 dark:bg-gray-800 dark:text-violet-400 dark:hover:bg-gray-700 dark:border dark:border-violet-400/30"
         >
           <svg 
             xmlns="http://www.w3.org/2000/svg" 
@@ -140,6 +149,10 @@ export function Header({
         >
           {isLoggingOut ? 'Signing out...' : 'Sign out'}
         </button>
+        
+        <div className="ml-2">
+          <ModeToggle />
+        </div>
       </div>
     </header>
   );

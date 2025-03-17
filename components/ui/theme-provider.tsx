@@ -10,5 +10,15 @@ export function ThemeProvider({
   children: React.ReactNode
   [key: string]: any 
 }) {
-  return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+  return (
+    <NextThemesProvider
+      {...props}
+      themes={["light", "dark", "luxury"]}
+      attribute="class"
+      defaultTheme="dark"
+      enableSystem={false}
+    >
+      {children}
+    </NextThemesProvider>
+  )
 } 
