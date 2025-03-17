@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS public.workflows (
     name TEXT NOT NULL,
     description TEXT,
     user_id UUID NOT NULL REFERENCES auth.users(id),
+    graph JSONB NOT NULL DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

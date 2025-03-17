@@ -16,7 +16,11 @@ export type User = {
 type UserContextType = {
   user: User | null;
   loading: boolean;
-  signInWithEmail: (email: string, password: string) => Promise<{ success: boolean; error?: any }>;
+  signInWithEmail: (email: string, password: string) => Promise<{ 
+    success: boolean; 
+    error?: { message: string; status?: number }; 
+    data?: { user: SupabaseUser; session: Session } 
+  }>;
   signUpWithEmail: (email: string, password: string) => Promise<{ success: boolean; error?: any }>;
   signInWithGoogle: () => Promise<{ success: boolean; error?: any }>;
   signOut: () => Promise<void>;
@@ -91,11 +95,35 @@ export function UserProvider({ children }: { children: ReactNode }) {
         password,
       });
 
-      if (error) throw error;
-      return { success: true };
+      if (error) {
+        console.error('Supabase auth error:', error);
+        return {
+          success: false,
+          error: { message: error.message, status: error.status }
+        };
+      }
+
+      if (!data?.user || !data?.session) {
+        console.error('No user or session data returned from Supabase');
+        return {
+          success: false,
+          error: { message: 'Authentication failed - no user data returned' }
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          user: data.user,
+          session: data.session
+        }
+      };
     } catch (error) {
-      console.error('Error signing in:', error);
-      return { success: false, error };
+      console.error('Unexpected error during sign in:', error);
+      return {
+        success: false,
+        error: { message: 'An unexpected error occurred during sign in' }
+      };
     }
   };
 

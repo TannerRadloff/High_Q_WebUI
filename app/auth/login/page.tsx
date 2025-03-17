@@ -26,16 +26,23 @@ export default function LoginPage() {
     setError(null);
     setIsLoading(true);
 
+    if (!email || !password) {
+      setError('Please enter both email and password');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const { success, error } = await signInWithEmail(email, password);
-      if (success) {
-        router.push('/'); // Redirect to home page after successful login
+      const { success, error, data } = await signInWithEmail(email, password);
+      if (success && data?.session) {
+        // Successful login
+        router.push('/');
       } else {
-        setError(error?.message || 'Failed to sign in');
+        setError(error?.message || 'Failed to sign in. Please check your credentials.');
       }
     } catch (err) {
-      setError('An unexpected error occurred');
-      console.error(err);
+      console.error('Login error:', err);
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -43,13 +50,19 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     setError(null);
+    setIsLoading(true);
     
     try {
-      await signInWithGoogle();
+      const { success, error } = await signInWithGoogle();
+      if (!success) {
+        setError(error?.message || 'Failed to sign in with Google');
+      }
       // No need to redirect, OAuth flow will handle it
     } catch (err) {
-      setError('Failed to sign in with Google');
-      console.error(err);
+      console.error('Google login error:', err);
+      setError('Failed to sign in with Google. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 

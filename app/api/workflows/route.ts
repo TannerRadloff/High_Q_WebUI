@@ -22,21 +22,28 @@ export async function GET(request: Request) {
     // Fetch workflows from the database
     const { data: workflows, error: workflowsError, count } = await supabase
       .from('workflows')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit)
       .range(offset, offset + limit - 1);
     
     if (workflowsError) {
+      console.error('Database error:', workflowsError);
       return NextResponse.json(
         { error: 'Failed to fetch workflows', details: workflowsError },
         { status: 500 }
       );
     }
     
+    // Transform workflows to ensure graph is always an object with nodes and edges
+    const transformedWorkflows = workflows?.map(workflow => ({
+      ...workflow,
+      graph: workflow.graph || { nodes: [], edges: [] }
+    }));
+    
     return NextResponse.json({
-      workflows,
+      workflows: transformedWorkflows,
       count,
       limit,
       offset
@@ -64,7 +71,7 @@ export async function POST(request: Request) {
   
   try {
     const body = await request.json();
-    const { name, description, nodes, edges } = body;
+    const { name, description, nodes = [], edges = [] } = body;
     
     if (!name) {
       return NextResponse.json(
@@ -73,14 +80,7 @@ export async function POST(request: Request) {
       );
     }
     
-    if (!nodes || !Array.isArray(nodes) || nodes.length === 0) {
-      return NextResponse.json(
-        { error: 'Workflow must contain at least one node' },
-        { status: 400 }
-      );
-    }
-    
-    // Create a new workflow
+    // Create a new workflow with graph data
     const { data: workflow, error: createError } = await supabase
       .from('workflows')
       .insert({
@@ -95,6 +95,7 @@ export async function POST(request: Request) {
       .single();
     
     if (createError) {
+      console.error('Database error:', createError);
       return NextResponse.json(
         { error: 'Failed to create workflow', details: createError },
         { status: 500 }
@@ -102,7 +103,10 @@ export async function POST(request: Request) {
     }
     
     return NextResponse.json({
-      workflow
+      workflow: {
+        ...workflow,
+        graph: workflow.graph || { nodes: [], edges: [] }
+      }
     });
     
   } catch (error) {

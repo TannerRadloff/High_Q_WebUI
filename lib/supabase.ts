@@ -88,9 +88,12 @@ export type AgentTaskData = {
 // Function to save a workflow
 export async function saveWorkflow(workflow: WorkflowData) {
   try {
+    // Create a new workflow object without the graph property if it doesn't exist in the database
+    const { graph, ...workflowWithoutGraph } = workflow;
+    
     const { data, error } = await supabase
       .from('workflows')
-      .upsert(workflow, { onConflict: 'id' })
+      .upsert(workflowWithoutGraph, { onConflict: 'id' })
       .select('id');
     
     if (error) throw error;
