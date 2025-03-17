@@ -140,9 +140,17 @@
   }
   
   .marble-bg {
-    @apply relative bg-gray-900 before:absolute before:inset-0 before:opacity-10 
-    before:bg-[radial-gradient(circle_at_30%_35%,#ffffff33,transparent),radial-gradient(circle_at_70%_60%,#ffffff22,transparent),radial-gradient(circle_at_40%_80%,#ffffff11,transparent),url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")]
-    transition-all duration-700;
+    @apply relative bg-gray-900 transition-all duration-700;
+  }
+
+  .marble-bg::before {
+    content: '';
+    @apply absolute inset-0 opacity-10;
+    background-image: 
+      radial-gradient(circle at 30% 35%, rgba(255, 255, 255, 0.2), transparent),
+      radial-gradient(circle at 70% 60%, rgba(255, 255, 255, 0.13), transparent),
+      radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.07), transparent),
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
   }
 
   /* Scroll Reveal Animation */
@@ -167,9 +175,16 @@
   .glass-card {
     @apply bg-gray-900/40 backdrop-blur-md border border-gray-700/50
     shadow-[0_8px_32px_0_rgba(0,0,0,0.36)] rounded-lg
-    before:absolute before:inset-0 before:rounded-lg
-    before:p-[1px] before:bg-gradient-to-b before:from-gray-700/50 before:to-transparent
-    before:mask-border relative overflow-hidden;
+    relative overflow-hidden;
+  }
+
+  .glass-card::before {
+    content: '';
+    @apply absolute inset-0 rounded-lg p-[1px];
+    background: linear-gradient(to bottom, rgba(100, 100, 100, 0.5), transparent);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
   }
 
   /* Gold Shimmer Effect */
@@ -179,8 +194,8 @@
 
   .gold-shimmer::before {
     @apply content-[''] absolute top-0 left-[-100%] w-1/2 h-full
-    bg-gradient-to-r from-transparent via-amber-400/20 to-transparent
     transform skew-x-[-25deg];
+    background: linear-gradient(to right, transparent, rgba(251, 191, 36, 0.2), transparent);
     animation: shimmer 2s infinite;
   }
 
